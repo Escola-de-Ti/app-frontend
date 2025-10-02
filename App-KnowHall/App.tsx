@@ -15,7 +15,7 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Tela de Login</Text>
+      <Text style={styles.title}>Login</Text>
 
       <TextInput
         style={styles.input}
