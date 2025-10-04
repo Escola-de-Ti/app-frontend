@@ -1,6 +1,22 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    "baseUrl": "src",
+    "paths": {
+      "@api/*": ["scr/api/*"],
+      "@components/*": ["scr/components/*"],
+      "@hooks/*": ["scr/hooks/*"],
+      "@navigation/*": ["scr/navigation/*"],
+      "@screens/*": ["scr/screens/*"],
+      "@services/*": ["scr/services/*"],
+      "@store/*": ["scr/store/*"],
+      "@styles/*": ["scr/styles/*"],
+      "@types/*": ["scr/types/*"],
+      "@utils/*": ["scr/utils/*"]
+    },
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   }
 }
