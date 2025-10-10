@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View, TouchableOpacity, Alert } from 'react-native';
 // import RegisterScreen from './src/screens/LoginScreen';
-import RegisterScreen from '@screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
 
 export default function App() {
   const [email, setEmail] = useState('');

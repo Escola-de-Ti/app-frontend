@@ -3,20 +3,19 @@
   "compilerOptions": {
     "strict": true,
     "baseUrl": "src",
-    "paths": {
-      "@api/*": ["api/*"],
-      "@components/*": ["components/*"],
-      "@hooks/*": ["hooks/*"],
-      "@navigation/*": ["navigation/*"],
-      "@screens/*": ["screens/*"],
-      "@services/*": ["services/*"],
-      "@store/*": ["store/*"],
-      "@styles/*": ["styles/*"],
-      "@types/*": ["types/*"],
-      "@utils/*": ["utils/*"]
-    },
+    
+    "jsx": "react-jsx",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
-  }
+  },
+  "include": [
+    "src",
+    "declarations.d.ts" 
+  ],
+  "exclude": [
+    "node_modules",
+    "babel.config.js",
+    "metro.config.js"
+  ]
 }
