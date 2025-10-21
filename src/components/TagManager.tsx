@@ -1,5 +1,8 @@
+// src/components/TagManager.tsx
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import AppInput from './AppInput';
+import Tag from './Tag';
 
 interface TagManagerProps {
   tags: string[];
@@ -40,13 +43,7 @@ export default function TagManager({ tags, onChange }: TagManagerProps) {
 
       {/* Input + Botão */}
       <View style={styles.tagInputRow}>
-        <TextInput
-          style={[styles.input, { flex: 1, marginBottom: 0 }]}
-          placeholder="Digite e adicione sua tag..."
-          placeholderTextColor="#777"
-          value={tag}
-          onChangeText={setTag}
-        />
+        <AppInput placeholder="Digite sua tag..." value={tag} onChangeText={setTag} />
         <TouchableOpacity onPress={addTag} style={styles.addTagButton}>
           <Text style={styles.addTagText}>Adicionar</Text>
         </TouchableOpacity>
@@ -55,19 +52,15 @@ export default function TagManager({ tags, onChange }: TagManagerProps) {
       {/* Tags criadas */}
       <View style={styles.tagList}>
         {tags.map((t, i) => (
-          <TouchableOpacity key={i} onPress={() => removeTag(t)} style={styles.tag}>
-            <Text style={styles.tagText}>{t} ✕</Text>
-          </TouchableOpacity>
+          <Tag key={i} name={`${t} ✕`} type="added" onPress={() => removeTag(t)} />
         ))}
       </View>
 
       {/* Tags sugeridas */}
-      <Text style={[styles.label, { marginTop: 12 }]}>Tags sugeridas:</Text>
+      <Text style={styles.label}>Tags sugeridas:</Text>
       <View style={styles.tagList}>
         {suggestedTags.map((t, i) => (
-          <TouchableOpacity key={i} onPress={() => handleSuggested(t)} style={styles.suggestedTag}>
-            <Text style={styles.tagText}>{t}</Text>
-          </TouchableOpacity>
+          <Tag key={i} name={t} type="suggested" onPress={() => handleSuggested(t)} />
         ))}
       </View>
     </View>
@@ -119,28 +112,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  tag: {
-    backgroundColor: '#0f0f0f',
-    borderWidth: 1,
-    borderColor: '#0ff',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  suggestedTag: {
-    backgroundColor: '#0f0f0f',
-    borderWidth: 1,
-    borderColor: '#00ffaa',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  tagText: {
-    color: '#fff',
-    fontSize: 14,
-  },
   label: {
     color: '#aaa',
     fontSize: 14,
+    marginTop: 12,
+    marginBottom: 10,
   },
 });
