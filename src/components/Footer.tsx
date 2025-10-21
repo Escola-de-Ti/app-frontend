@@ -7,13 +7,14 @@ export default function Footer() {
   return (
     <View
       style={{
-        height: 60,
+        height: 70,
         backgroundColor: '#111',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-around',
         borderTopWidth: 1,
         borderTopColor: '#222',
+        paddingBottom: 10,
       }}
     >
       <TouchableOpacity>
