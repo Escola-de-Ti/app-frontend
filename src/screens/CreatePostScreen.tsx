@@ -1,16 +1,17 @@
-// src/screens/CreatePostScreen.tsx
 import React, { useState } from 'react';
-import { ScrollView, View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import ImageUploader from '../components/ImageUploader';
 import TagManager from '../components/TagManager';
 import { Feather } from '@expo/vector-icons';
-import Logo from 'components/Logo';
 import AppLayout from 'components/AppLayout';
+import AppInput from '../components/AppInput'; // 👈 importa o novo input
 
 export default function CreatePostScreen() {
   const [images, setImages] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
 
   return (
     <AppLayout>
@@ -25,23 +26,25 @@ export default function CreatePostScreen() {
           <Text style={styles.sectionTitle}>Conteúdo do Post</Text>
 
           <Text style={styles.label}>Título</Text>
-          <TextInput
+          <AppInput
             placeholder="Digite um título chamativo..."
-            style={styles.input}
-            placeholderTextColor="#777"
+            value={title}
+            onChangeText={setTitle}
           />
 
           <Text style={styles.label}>Conteúdo</Text>
-          <TextInput
+          <AppInput
             placeholder="Compartilhe seu conhecimento..."
-            style={[styles.input, { height: 150 }]}
-            placeholderTextColor="#777"
+            value={content}
+            onChangeText={setContent}
             multiline
+            style={{ height: 150, textAlignVertical: 'top' }}
           />
 
           <ImageUploader onChange={setImages} />
           <TagManager tags={tags} onChange={setTags} />
         </View>
+
         {/* Rewards */}
         <View>
           <LinearGradient
@@ -113,14 +116,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { color: '#fff', fontWeight: 'bold', fontSize: 18, marginBottom: 16 },
   label: { color: '#ccc', marginTop: 12, marginBottom: 4 },
-  input: {
-    backgroundColor: '#121212',
-    color: '#fff',
-    borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 8,
-    padding: 10,
-  },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
