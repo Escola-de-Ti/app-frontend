@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View, TouchableOpacity, Alert } from 'react-native';
 // import RegisterScreen from './src/screens/LoginScreen';
-// import RegisterScreen from '@screens/LoginScreen';
+import CreatePostScreen from './src/screens/CreatePostScreen';
 
 export default function App() {
   const [email, setEmail] = useState('');
@@ -15,5 +15,5 @@ export default function App() {
     }
   }
 
-  // return <RegisterScreen />;
+  return <CreatePostScreen />;
 }

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import ImageUploader from '../components/ImageUploader';
 import TagManager from '../components/TagManager';
-import { Feather } from '@expo/vector-icons';
 import AppLayout from 'components/AppLayout';
-import AppInput from '../components/AppInput'; // 👈 importa o novo input
+import AppInput from '../components/AppInput';
 
 export default function CreatePostScreen() {
   const [images, setImages] = useState<string[]>([]);
@@ -13,10 +12,68 @@ export default function CreatePostScreen() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
 
+  const handlePublish = async () => {
+    if (!title.trim() || !content.trim()) {
+      Alert.alert('Campos obrigatórios', 'Preencha título e conteúdo antes de publicar.');
+      return;
+    }
+
+    try {
+      // 🧩 Monta os dados para envio (post + imagens)
+      const formData = new FormData();
+
+      // adiciona as imagens selecionadas
+      images.forEach((uri, i) => {
+        const filename = uri.split('/').pop() || `image-${i}.jpg`;
+        const ext = filename.split('.').pop();
+        const type = `image/${ext}`;
+
+        formData.append('files', {
+          uri,
+          name: filename,
+          type,
+        } as any);
+      });
+
+      // adiciona os outros campos do post
+      formData.append('title', title);
+      formData.append('content', content);
+      formData.append('tags', JSON.stringify(tags));
+
+      // ⚙️ Exemplo de envio (comentado enquanto não tem backend)
+      /*
+      const response = await fetch('http://192.168.0.105:3000/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'multipart/form-data' },
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Erro ao criar post');
+      const data = await response.json();
+      */
+
+      console.log('📦 Dados prontos para envio:');
+      console.log({
+        title,
+        content,
+        tags,
+        images,
+      });
+
+      Alert.alert('Simulação', 'Post pronto para ser enviado ao servidor!');
+      setTitle('');
+      setContent('');
+      setTags([]);
+      setImages([]);
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Erro', 'Falha ao preparar o post.');
+    }
+  };
+
   return (
     <AppLayout>
       <ScrollView style={styles.container}>
-        {/* Header */}
         <View style={styles.headerView}>
           <Text style={styles.title}>Criar Post</Text>
           <Text style={styles.subtitle}>Compartilhe seu conhecimento com a comunidade</Text>
@@ -45,7 +102,6 @@ export default function CreatePostScreen() {
           <TagManager tags={tags} onChange={setTags} />
         </View>
 
-        {/* Rewards */}
         <View>
           <LinearGradient
             colors={['#00FFA3', '#7C73FF']}
@@ -84,15 +140,6 @@ export default function CreatePostScreen() {
             </View>
           </LinearGradient>
         </View>
-
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.cancel}>
-            <Text style={{ color: '#fff' }}>Cancelar</Text>
-          </TouchableOpacity>
-          <LinearGradient colors={['#0ff', '#8f00ff']} style={styles.publish}>
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>Publicar</Text>
-          </LinearGradient>
-        </View>
       </ScrollView>
     </AppLayout>
   );
@@ -100,7 +147,6 @@ export default function CreatePostScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f0f0f', padding: 20, paddingTop: 60 },
-
   title: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
   subtitle: { color: '#ccc', fontSize: 14, marginBottom: 20 },
   card: {
@@ -111,9 +157,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333',
   },
-  headerView: {
-    marginTop: 50,
-  },
+  headerView: { marginTop: 50 },
   sectionTitle: { color: '#fff', fontWeight: 'bold', fontSize: 18, marginBottom: 16 },
   label: { color: '#ccc', marginTop: 12, marginBottom: 4 },
   footer: {

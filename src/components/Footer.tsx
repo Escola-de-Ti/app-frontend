@@ -14,7 +14,7 @@ export default function Footer() {
         justifyContent: 'space-around',
         borderTopWidth: 1,
         borderTopColor: '#222',
-        paddingBottom: 10,
+        paddingBottom: 5,
       }}
     >
       <TouchableOpacity>
