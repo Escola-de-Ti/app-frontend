@@ -20,7 +20,8 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <CreatePostScreen />
+      {/* <CreatePostScreen /> */}
+      <AuthScreen />
     </SafeAreaProvider>
   );
   // return <RegisterScreen />;
