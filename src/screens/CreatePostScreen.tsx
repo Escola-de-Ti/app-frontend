@@ -146,7 +146,7 @@ export default function CreatePostScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f0f', padding: 20, paddingTop: 60 },
+  container: { flex: 1, backgroundColor: '#0f0f0f', padding: 20, paddingTop: 20 },
   title: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
   subtitle: { color: '#ccc', fontSize: 14, marginBottom: 20 },
   card: {
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333',
   },
-  headerView: { marginTop: 50 },
+  headerView: { marginTop: 0 },
   sectionTitle: { color: '#fff', fontWeight: 'bold', fontSize: 18, marginBottom: 16 },
   label: { color: '#ccc', marginTop: 12, marginBottom: 4 },
   footer: {

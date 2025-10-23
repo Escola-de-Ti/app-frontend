@@ -11,7 +11,6 @@ export default function ImageUploader({ onChange }: ImageUploaderProps) {
   const [images, setImages] = useState<string[]>([]);
 
   const pickImage = async () => {
-    // Solicita permissão de acesso à galeria
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permissão necessária', 'Permita o acesso à galeria para escolher imagens.');
@@ -23,20 +22,17 @@ export default function ImageUploader({ onChange }: ImageUploaderProps) {
       return;
     }
 
-    // Novo formato (sem warning)
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], // ✅ novo formato compatível
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+
       allowsMultipleSelection: true,
-      selectionLimit: 4 - images.length, // impede passar do limite
+      selectionLimit: 4 - images.length,
       quality: 0.7,
     });
 
     if (!result.canceled) {
       const selectedUris = result.assets.map((asset) => asset.uri);
-
-      // Junta com as anteriores, sem ultrapassar 4
       const newImages = [...images, ...selectedUris].slice(0, 4);
-
       setImages(newImages);
       onChange(newImages);
     }
@@ -52,20 +48,28 @@ export default function ImageUploader({ onChange }: ImageUploaderProps) {
     <View style={styles.container}>
       <Text style={styles.label}>Imagens (máx. 4)</Text>
 
-      <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
+      <TouchableOpacity style={styles.uploadBox} onPress={pickImage} activeOpacity={0.8}>
         <Feather name="upload" size={32} color="#999" />
         <Text style={styles.text}>Clique para adicionar imagens</Text>
       </TouchableOpacity>
 
       <View style={styles.previewContainer}>
-        {images.map((uri, index) => (
-          <View key={index} style={styles.previewWrapper}>
-            <Image source={{ uri }} style={styles.preview} />
-            <TouchableOpacity style={styles.removeButton} onPress={() => removeImage(uri)}>
-              <Feather name="x" size={16} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        ))}
+        {images.map((uri) =>
+          React.createElement(
+            View,
+            { key: uri, style: styles.previewWrapper },
+            <>
+              <Image source={{ uri }} style={styles.preview} />
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => removeImage(uri)}
+                activeOpacity={0.8}
+              >
+                <Feather name="x" size={14} color="#fff" />
+              </TouchableOpacity>
+            </>
+          )
+        )}
       </View>
     </View>
   );

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View, TouchableOpacity, Alert } from 'react-native';
-// import RegisterScreen from './src/screens/LoginScreen';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import CreatePostScreen from './src/screens/CreatePostScreen';
 
 export default function App() {
@@ -11,9 +11,13 @@ export default function App() {
     if (email === 'teste@teste.com' && password === '1234') {
       Alert.alert('Sucesso', 'Login realizado!');
     } else {
-      Alert.alert('Erro', 'Credenciais inválidas');
+      Alert.alert('Error', 'Credenciais inválidas');
     }
   }
 
-  return <CreatePostScreen />;
+  return (
+    <SafeAreaProvider>
+      <CreatePostScreen />
+    </SafeAreaProvider>
+  );
 }

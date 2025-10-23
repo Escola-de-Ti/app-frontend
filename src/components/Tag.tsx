@@ -3,6 +3,7 @@ import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface TagProps {
+  key?: string | number;
   name: string;
   type?: 'added' | 'suggested';
   onPress?: () => void;

@@ -1,11 +1,19 @@
 import React from 'react';
-import { View, TouchableOpacity, Text } from 'react-native';
+import { Animated, View, TouchableOpacity, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-export default function Footer() {
+interface FooterProps {
+  translateY?: any;
+  activePage: 'Feed' | 'Workshops' | 'Ranking' | 'Perfil';
+  onChangePage: (page: 'Feed' | 'Workshops' | 'Ranking' | 'Perfil') => void;
+}
+
+export default function Footer({ translateY, activePage, onChangePage }: FooterProps) {
+  const getColor = (page: string) => (activePage === page ? '#00FFA3' : '#fff');
+
   return (
-    <View
+    <Animated.View
       style={{
         height: 70,
         backgroundColor: '#111',
@@ -14,20 +22,20 @@ export default function Footer() {
         justifyContent: 'space-around',
         borderTopWidth: 1,
         borderTopColor: '#222',
-        paddingBottom: 5,
+        transform: [{ translateY: translateY || 0 }],
       }}
     >
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => onChangePage('Feed')}>
         <View style={{ alignItems: 'center' }}>
-          <Feather name="home" size={22} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 10 }}>Feed</Text>
+          <Feather name="home" size={22} color={getColor('Feed')} />
+          <Text style={{ color: getColor('Feed'), fontSize: 10 }}>Feed</Text>
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => onChangePage('Workshops')}>
         <View style={{ alignItems: 'center' }}>
-          <Feather name="book-open" size={22} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 10 }}>Workshops</Text>
+          <Feather name="book-open" size={22} color={getColor('Workshops')} />
+          <Text style={{ color: getColor('Workshops'), fontSize: 10 }}>Workshops</Text>
         </View>
       </TouchableOpacity>
 
@@ -44,19 +52,19 @@ export default function Footer() {
         <Feather name="plus" size={28} color="#fff" />
       </LinearGradient>
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => onChangePage('Ranking')}>
         <View style={{ alignItems: 'center' }}>
-          <Feather name="award" size={22} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 10 }}>Ranking</Text>
+          <Feather name="award" size={22} color={getColor('Ranking')} />
+          <Text style={{ color: getColor('Ranking'), fontSize: 10 }}>Ranking</Text>
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => onChangePage('Perfil')}>
         <View style={{ alignItems: 'center' }}>
-          <Feather name="user" size={22} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 10 }}>Perfil</Text>
+          <Feather name="user" size={22} color={getColor('Perfil')} />
+          <Text style={{ color: getColor('Perfil'), fontSize: 10 }}>Perfil</Text>
         </View>
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   );
 }

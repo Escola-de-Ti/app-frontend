@@ -1,6 +1,6 @@
 // src/components/TagManager.tsx
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AppInput from './AppInput';
 import Tag from './Tag';
 
@@ -51,16 +51,21 @@ export default function TagManager({ tags, onChange }: TagManagerProps) {
 
       {/* Tags criadas */}
       <View style={styles.tagList}>
-        {tags.map((t, i) => (
-          <Tag key={i} name={`${t} ✕`} type="added" onPress={() => removeTag(t)} />
+        {tags.map((t: string, i: number) => (
+          <Tag key={`tag-${i}`} name={`${t} ✕`} type="added" onPress={() => removeTag(t)} />
         ))}
       </View>
 
       {/* Tags sugeridas */}
       <Text style={styles.label}>Tags sugeridas:</Text>
       <View style={styles.tagList}>
-        {suggestedTags.map((t, i) => (
-          <Tag key={i} name={t} type="suggested" onPress={() => handleSuggested(t)} />
+        {suggestedTags.map((t: string, i: number) => (
+          <Tag
+            key={`suggested-${i}`}
+            name={t}
+            type="suggested"
+            onPress={() => handleSuggested(t)}
+          />
         ))}
       </View>
     </View>
