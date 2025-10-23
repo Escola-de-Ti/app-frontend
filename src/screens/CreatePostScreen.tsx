@@ -146,7 +146,7 @@ export default function CreatePostScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f0f', padding: 20, paddingTop: 20 },
+  container: { flex: 1, backgroundColor: 'rgb(17, 17, 17);', padding: 20, paddingTop: 20 },
   title: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
   subtitle: { color: '#ccc', fontSize: 14, marginBottom: 20 },
   card: {

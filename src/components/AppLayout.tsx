@@ -23,7 +23,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   // animação do header (some quando rola pra baixo)
   const headerTranslateY = scrollY.interpolate({
     inputRange: [0, 70],
-    outputRange: [0, -80],
+    outputRange: [0, -120],
     extrapolate: 'clamp',
   });
 
@@ -39,9 +39,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
   });
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, { paddingBottom: insets.bottom, paddingTop: insets.top }]}>
       {/* HEADER */}
-      <Animated.View style={[styles.header, { transform: [{ translateY: headerTranslateY }] }]}>
+      <Animated.View
+        style={[
+          styles.header,
+          { transform: [{ translateY: headerTranslateY }], paddingTop: insets.top },
+        ]}
+      >
         <Header />
       </Animated.View>
 
@@ -50,7 +55,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         style={styles.content}
         scrollEventThrottle={16}
         onScroll={handleScroll}
-        contentContainerStyle={{ paddingTop: 90, paddingBottom: 100 }}
+        contentContainerStyle={{ paddingTop: 50, paddingBottom: 100 }}
       >
         {children}
       </Animated.ScrollView>
@@ -78,7 +83,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'rgb(17, 17, 17);',
+    backgroundColor: 'rgba(17, 17, 17);',
   },
   header: {
     position: 'absolute',
