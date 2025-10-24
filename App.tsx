@@ -6,8 +6,8 @@ import { OpenFilterButton } from './src/components/OpenFilterButton';
 export default function App() {
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      {/*<FilterButton/>*/}
-      <OpenFilterButton />
+      <FilterButton />
+      {/*<OpenFilterButton />*/}
     </View>
   );
 }
