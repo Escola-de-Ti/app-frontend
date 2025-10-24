@@ -21,11 +21,10 @@ export default function App() {
   return (
     <SafeAreaProvider>
       {/* <CreatePostScreen /> */}
+      {/* <RegisterScreen /> */}
+      {/* <LoginScreen /> */}
+      {/* <CreatePostScreen /> */}
       <AuthScreen />
     </SafeAreaProvider>
   );
-  // return <RegisterScreen />;
-  // return <LoginScreen />;
-  // return <CreatePostScreen />;
-  // return <AuthScreen />;
 }

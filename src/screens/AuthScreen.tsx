@@ -1,23 +1,35 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Animated,
-  KeyboardAvoidingView,
   Platform,
-  ScrollView,
+  StatusBar,
   Easing,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import Logo from '../components/LogoWhitName';
-import AppInput from '../components/AppInput'; // 👈 import do input customizado
+import AppInput from '../components/AppInput';
 
 export default function AuthScreen() {
   const [isRegister, setIsRegister] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
+
+  // animação de altura do card
+  const cardHeight = useRef(new Animated.Value(460)).current;
+
+  useEffect(() => {
+    Animated.timing(cardHeight, {
+      toValue: isRegister ? 720 : 460, // aumenta na tela de criar conta
+      duration: 400,
+      easing: Easing.out(Easing.exp),
+      useNativeDriver: false, // altura não suporta driver nativo
+    }).start();
+  }, [isRegister]);
 
   const toggleForm = () => {
     Animated.timing(anim, {
@@ -49,198 +61,218 @@ export default function AuthScreen() {
   });
 
   return (
-    <KeyboardAvoidingView
+    <KeyboardAwareScrollView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      contentContainerStyle={styles.scroll}
+      enableOnAndroid
+      extraScrollHeight={60}
+      keyboardOpeningTime={100}
+      showsVerticalScrollIndicator={false}
     >
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.header}>
-          <Logo />
+      <StatusBar barStyle="light-content" />
+      <View style={styles.header}>
+        <Logo />
+      </View>
+
+      <Animated.View style={[styles.card, { height: cardHeight }]}>
+        {/* Tabs animadas */}
+        <View style={styles.tabs}>
+          {/* Entrar */}
+          <Animated.View
+            style={{
+              flex: 1,
+              opacity: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 0.4],
+              }),
+              transform: [
+                {
+                  scale: anim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 0.95],
+                  }),
+                },
+              ],
+            }}
+          >
+            {!isRegister ? (
+              <LinearGradient
+                colors={['#00FFA3', '#7C73FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.tabActive}
+              >
+                <Text style={styles.tabTextActive}>Entrar</Text>
+              </LinearGradient>
+            ) : (
+              <TouchableOpacity style={styles.tabInactive} onPress={toggleForm}>
+                <Text style={styles.tabTextInactive}>Entrar</Text>
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+
+          {/* Criar Conta */}
+          <Animated.View
+            style={{
+              flex: 1,
+              opacity: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.4, 1],
+              }),
+              transform: [
+                {
+                  scale: anim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.95, 1],
+                  }),
+                },
+              ],
+            }}
+          >
+            {isRegister ? (
+              <LinearGradient
+                colors={['#00FFA3', '#7C73FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.tabActive}
+              >
+                <Text style={styles.tabTextActive}>Criar Conta</Text>
+              </LinearGradient>
+            ) : (
+              <TouchableOpacity style={styles.tabInactive} onPress={toggleForm}>
+                <Text style={styles.tabTextInactive}>Criar Contaaaa</Text>
+              </TouchableOpacity>
+            )}
+          </Animated.View>
         </View>
 
-        <View style={styles.card}>
-          {/* Tabs animadas */}
-          <View style={styles.tabs}>
-            {/* Entrar */}
-            <Animated.View
-              style={{
-                flex: 1,
-                opacity: anim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 0.4],
-                }),
-                transform: [
-                  {
-                    scale: anim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 0.95],
-                    }),
-                  },
-                ],
-              }}
-            >
-              {!isRegister ? (
-                <LinearGradient
-                  colors={['#00FFA3', '#7C73FF']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.tabActive}
-                >
-                  <Text style={styles.tabTextActive}>Entrar</Text>
-                </LinearGradient>
-              ) : (
-                <TouchableOpacity style={styles.tabInactive} onPress={toggleForm}>
-                  <Text style={styles.tabTextInactive}>Entrar</Text>
-                </TouchableOpacity>
-              )}
-            </Animated.View>
+        {/* Forms com slide + fade */}
+        <View style={styles.formWrapper}>
+          {/* Login */}
+          <Animated.View
+            style={[
+              styles.form,
+              {
+                transform: [{ translateX: translateXLogin }],
+                opacity: opacityLogin,
+              },
+            ]}
+          >
+            <Text style={styles.label}>
+              E-mail <Text style={styles.required}>*</Text>
+            </Text>
+            <AppInput
+              placeholder="Digite seu e-mail"
+              keyboardType="email-address"
+              style={styles.inputStyle}
+            />
 
-            {/* Criar Conta */}
-            <Animated.View
-              style={{
-                flex: 1,
-                opacity: anim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.4, 1],
-                }),
-                transform: [
-                  {
-                    scale: anim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.95, 1],
-                    }),
-                  },
-                ],
-              }}
-            >
-              {isRegister ? (
-                <LinearGradient
-                  colors={['#00FFA3', '#7C73FF']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.tabActive}
-                >
-                  <Text style={styles.tabTextActive}>Criar Conta</Text>
-                </LinearGradient>
-              ) : (
-                <TouchableOpacity style={styles.tabInactive} onPress={toggleForm}>
-                  <Text style={styles.tabTextInactive}>Criar Conta</Text>
-                </TouchableOpacity>
-              )}
-            </Animated.View>
-          </View>
+            <Text style={styles.label}>
+              Senha <Text style={styles.required}>*</Text>
+            </Text>
+            <AppInput placeholder="Digite sua senha" secureTextEntry style={styles.inputStyle} />
 
-          {/* Forms com slide + fade */}
-          <View style={styles.formWrapper}>
-            {/* Login */}
-            <Animated.View
-              style={[
-                styles.form,
-                {
-                  transform: [{ translateX: translateXLogin }],
-                  opacity: opacityLogin,
-                },
-              ]}
-            >
+            <TouchableOpacity>
+              <Text style={styles.forgotPassword}>Esqueceu a senha?</Text>
+            </TouchableOpacity>
+
+            <View style={styles.socialContainer}>
+              <TouchableOpacity style={styles.socialButton}>
+                <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.socialBorder}>
+                  <View style={styles.socialInner}>
+                    <Feather name="github" size={28} color="#00FFA3" />
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.socialButton}>
+                <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.socialBorder}>
+                  <View style={styles.socialInner}>
+                    <Text style={styles.socialText}>G</Text>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity>
+              <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.submitButton}>
+                <Text style={styles.submitText}>Entrar</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Registro */}
+          <Animated.View
+            style={[
+              styles.form,
+              {
+                transform: [{ translateX: translateXRegister }],
+                opacity: opacityRegister,
+              },
+            ]}
+          >
+            <View style={{ paddingBottom: 60 }}>
+              <Text style={styles.label}>
+                Nome de Usuário <Text style={styles.required}>*</Text>
+              </Text>
+              <AppInput placeholder="Digite seu nome de usuário" style={styles.inputStyle} />
+
+              <Text style={styles.label}>
+                CPF <Text style={styles.required}>*</Text>
+              </Text>
+              <AppInput
+                placeholder="Digite seu CPF"
+                keyboardType="numeric"
+                style={styles.inputStyle}
+              />
+
               <Text style={styles.label}>
                 E-mail <Text style={styles.required}>*</Text>
               </Text>
-              <AppInput placeholder="Digite seu e-mail" keyboardType="email-address" />
+              <AppInput
+                placeholder="Digite seu e-mail"
+                keyboardType="email-address"
+                style={styles.inputStyle}
+              />
+
+              <Text style={styles.label}>Telefone (opcional)</Text>
+              <AppInput
+                placeholder="Digite seu telefone"
+                keyboardType="phone-pad"
+                style={styles.inputStyle}
+              />
 
               <Text style={styles.label}>
                 Senha <Text style={styles.required}>*</Text>
               </Text>
-              <AppInput placeholder="Digite sua senha" secureTextEntry />
+              <AppInput placeholder="Crie uma senha" secureTextEntry style={styles.inputStyle} />
 
-              <TouchableOpacity>
-                <Text style={styles.forgotPassword}>Esqueceu a senha?</Text>
-              </TouchableOpacity>
+              <Text style={styles.label}>
+                Confirmar Senha <Text style={styles.required}>*</Text>
+              </Text>
+              <AppInput
+                placeholder="Confirme sua senha"
+                secureTextEntry
+                style={styles.inputStyle}
+              />
 
-              <View style={styles.socialContainer}>
-                <TouchableOpacity style={styles.socialButton}>
-                  <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.socialBorder}>
-                    <View style={styles.socialInner}>
-                      <Feather name="github" size={28} color="#00FFA3" />
-                    </View>
-                  </LinearGradient>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.socialButton}>
-                  <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.socialBorder}>
-                    <View style={styles.socialInner}>
-                      <Text style={styles.socialText}>G</Text>
-                    </View>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity>
+              <TouchableOpacity style={{ marginTop: 10 }}>
                 <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.submitButton}>
-                  <Text style={styles.submitText}>Entrar</Text>
+                  <Text style={styles.submitText}>Cadastrar</Text>
                 </LinearGradient>
               </TouchableOpacity>
-            </Animated.View>
 
-            {/* Registro */}
-            <Animated.View
-              style={[
-                styles.form,
-                {
-                  transform: [{ translateX: translateXRegister }],
-                  opacity: opacityRegister,
-                },
-              ]}
-            >
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 40 }}
-              >
-                <Text style={styles.label}>
-                  Nome de Usuário <Text style={styles.required}>*</Text>
-                </Text>
-                <AppInput placeholder="Digite seu nome de usuário" />
-
-                <Text style={styles.label}>
-                  CPF <Text style={styles.required}>*</Text>
-                </Text>
-                <AppInput placeholder="Digite seu CPF" keyboardType="numeric" />
-
-                <Text style={styles.label}>
-                  E-mail <Text style={styles.required}>*</Text>
-                </Text>
-                <AppInput placeholder="Digite seu e-mail" keyboardType="email-address" />
-
-                <Text style={styles.label}>Telefone (opcional)</Text>
-                <AppInput placeholder="Digite seu telefone" keyboardType="phone-pad" />
-
-                <Text style={styles.label}>
-                  Senha <Text style={styles.required}>*</Text>
-                </Text>
-                <AppInput placeholder="Crie uma senha" secureTextEntry />
-
-                <Text style={styles.label}>
-                  Confirmar Senha <Text style={styles.required}>*</Text>
-                </Text>
-                <AppInput placeholder="Confirme sua senha" secureTextEntry />
-
-                <TouchableOpacity style={{ marginTop: 10 }}>
-                  <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.submitButton}>
-                    <Text style={styles.submitText}>Cadastrar</Text>
-                  </LinearGradient>
+              <View style={styles.backToLogin}>
+                <Text style={styles.backText}>Já tem uma conta?</Text>
+                <TouchableOpacity onPress={toggleForm}>
+                  <Text style={styles.backLink}> Entrar</Text>
                 </TouchableOpacity>
-
-                <View style={styles.backToLogin}>
-                  <Text style={styles.backText}>Já tem uma conta?</Text>
-                  <TouchableOpacity onPress={toggleForm}>
-                    <Text style={styles.backLink}> Entrar</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-            </Animated.View>
-          </View>
+              </View>
+            </View>
+          </Animated.View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </Animated.View>
+    </KeyboardAwareScrollView>
   );
 }
 
@@ -251,6 +283,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   header: { alignItems: 'center', marginBottom: 30 },
   card: {
@@ -283,15 +316,17 @@ const styles = StyleSheet.create({
   },
   tabTextInactive: { color: '#ccc', fontWeight: '500' },
   tabTextActive: { color: '#fff', fontWeight: '600' },
-  formWrapper: { width: '100%', overflow: 'hidden', minHeight: 440 },
+  formWrapper: { width: '100%', minHeight: 460 },
   form: { position: 'absolute', width: '100%', top: 0 },
-  label: { color: '#fff', fontSize: 14, marginBottom: 4 },
+  label: { color: '#fff', fontSize: 14, marginBottom: 0, marginTop: 10 },
+  inputStyle: { height: 50, marginTop: 10 },
   required: { color: '#FF6B6B' },
   forgotPassword: {
     color: '#00FFA3',
     fontSize: 13,
     marginBottom: 20,
     textAlign: 'right',
+    marginTop: 10,
   },
   socialContainer: {
     flexDirection: 'row',
@@ -314,6 +349,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
+    marginTop: 10,
   },
   submitText: {
     color: '#000',

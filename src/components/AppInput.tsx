@@ -6,7 +6,7 @@ export default function AppInput(props: TextInputProps) {
     <TextInput
       {...props}
       placeholderTextColor={props.placeholderTextColor || '#777'}
-      style={[styles.input, props.style]} // permite sobrescrever estilos
+      style={[styles.input, props.style]}
     />
   );
 }
