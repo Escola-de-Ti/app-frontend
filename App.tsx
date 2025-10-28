@@ -5,6 +5,7 @@ import RegisterScreen from './src/screens/RegisterScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import CreatePostScreen from './src/screens/CreatePostScreen';
 import AuthScreen from './src/screens/AuthScreen';
+import WorkshopsScreen from './src/screens/WorkshopsScreen';
 
 export default function App() {
   const [email, setEmail] = useState('');
@@ -24,7 +25,8 @@ export default function App() {
       {/* <RegisterScreen /> */}
       {/* <LoginScreen /> */}
       {/* <CreatePostScreen /> */}
-      <AuthScreen />
+      {/* <AuthScreen /> */}
+      <WorkshopsScreen />
     </SafeAreaProvider>
   );
 }
