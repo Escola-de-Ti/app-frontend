@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   TouchableOpacity,
   StyleSheet,
@@ -10,42 +10,28 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 
-export function FilterButton({ size = 25 }: { size?: number }) {
+type FilterButtonProps = {
+  size?: number;
+  onSelectFilter: (filter: string) => void;
+};
+
+export function FilterButton({ size = 25, onSelectFilter }: FilterButtonProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
   const [buttonHeight, setButtonHeight] = useState(0);
-  const [filterHeight, setFilterHeight] = useState(0);
 
-  const handleSelectFilter = (filter: string) => {
-    setSelectedFilter(filter);
-    setIsMenuOpen(false);
-  };
-
-  const handleRemoveFilter = () => {
-    setSelectedFilter(null);
-  };
+  const filters = ['Mais votados', 'Mais recentes', 'Mais comentados'];
 
   const onButtonLayout = (event: LayoutChangeEvent) => {
     setButtonHeight(event.nativeEvent.layout.height);
   };
 
-  const onFilterLayout = (event: LayoutChangeEvent) => {
-    setFilterHeight(event.nativeEvent.layout.height);
+  const handleSelectFilter = (filter: string) => {
+    onSelectFilter(filter);
+    setIsMenuOpen(false);
   };
 
   return (
     <View style={styles.container}>
-      {selectedFilter && (
-        <View style={styles.activeFilterContainer} onLayout={onFilterLayout}>
-          <View style={styles.activeFilter}>
-            <Text style={styles.activeFilterText}>{selectedFilter}</Text>
-            <TouchableOpacity onPress={handleRemoveFilter}>
-              <Feather name="x" size={14} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => setIsMenuOpen(!isMenuOpen)}
@@ -64,18 +50,14 @@ export function FilterButton({ size = 25 }: { size?: number }) {
       </TouchableOpacity>
 
       {isMenuOpen && (
-        <View style={[styles.dropdown, { top: buttonHeight + filterHeight + 10 }]}>
-          {['Mais votados', 'Mais recentes', 'Mais comentados'].map((filter) => (
+        <View style={[styles.dropdown, { top: buttonHeight + 10 }]}>
+          {filters.map((filter) => (
             <TouchableOpacity
               key={filter}
-              style={[styles.option, selectedFilter === filter && styles.optionSelected]}
+              style={styles.option}
               onPress={() => handleSelectFilter(filter)}
             >
-              <Text
-                style={[styles.optionText, selectedFilter === filter && styles.optionTextSelected]}
-              >
-                {filter}
-              </Text>
+              <Text style={styles.optionText}>{filter}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -89,7 +71,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'flex-end',
   },
-
   gradientBorder: {
     width: 70,
     height: 70,
@@ -104,7 +85,6 @@ const styles = StyleSheet.create({
       android: { elevation: 12 },
     }),
   },
-
   innerCircle: {
     width: 66,
     height: 66,
@@ -113,7 +93,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   dropdown: {
     position: 'absolute',
     right: 0,
@@ -129,47 +108,12 @@ const styles = StyleSheet.create({
       android: { elevation: 10 },
     }),
   },
-
   option: {
     paddingVertical: 10,
     paddingHorizontal: 16,
   },
-
-  optionSelected: {
-    backgroundColor: '#3b1b99',
-    borderRadius: 8,
-  },
-
   optionText: {
     color: '#fff',
     fontSize: 16,
-  },
-
-  optionTextSelected: {
-    color: '#ff8ce6',
-    fontWeight: 'bold',
-  },
-
-  activeFilterContainer: {
-    alignSelf: 'flex-start',
-    marginBottom: 10,
-  },
-
-  activeFilter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#5b2eff',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    shadowColor: '#5b2eff',
-    shadowOpacity: 0.7,
-    shadowRadius: 10,
-  },
-
-  activeFilterText: {
-    color: '#fff',
-    fontWeight: '600',
-    marginRight: 6,
   },
 });
