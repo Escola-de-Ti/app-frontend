@@ -391,7 +391,7 @@ export default function WorkshopsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0E0E0E' },
+  container: { flex: 1, backgroundColor: 'rgba(17, 17, 17);' },
 
   header: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 10 },
   h1: { color: '#F9F9FF', fontSize: 24, fontWeight: '800' },
