@@ -12,24 +12,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import AppLayout from 'components/AppLayout';
 
-/** ─────────────────────────────
- *  mock data
- *  ────────────────────────────*/
 type Workshop = {
   id: string;
   title: string;
   subtitle?: string;
-  date: string; // ex: "18 Set 2025"
-  weekday?: string; // ex: "Sáb"
-  time?: string; // ex: "19:00 - 21:00"
-  level?: string; // ex: "Nvl. 18"
+  date: string;
+  weekday?: string;
+  time?: string;
+  level?: string;
   tokens?: number;
   speaker?: string;
   speakerLvl?: string;
   prereqs?: string[];
   topics?: string[];
   status?: 'Inscrito' | 'Concluído';
-  rating?: number; // ex: 4.7
+  rating?: number;
 };
 
 const AVAILABLE: Workshop[] = [
@@ -141,9 +138,6 @@ const ENROLLED: Workshop[] = [
   },
 ];
 
-/** ─────────────────────────────
- *  ui helpers
- *  ────────────────────────────*/
 const Chip = ({ text }: { text: string }) => (
   <View style={styles.chip}>
     <Text style={styles.chipText}>{text}</Text>
@@ -181,9 +175,6 @@ const StatusBadge = ({ status }: { status?: 'Inscrito' | 'Concluído' }) =>
     </View>
   ) : null;
 
-/** ─────────────────────────────
- *  card principal (varia por modo)
- *  ────────────────────────────*/
 type Mode = 'Disponíveis' | 'Meus Workshops' | 'Inscritos';
 
 function WorkshopCard({
@@ -199,7 +190,6 @@ function WorkshopCard({
 }) {
   return (
     <View style={styles.card}>
-      {/* header */}
       <View style={styles.cardHeader}>
         <Text style={styles.title}>{item.title}</Text>
         {mode !== 'Inscritos' ? (
@@ -211,7 +201,6 @@ function WorkshopCard({
 
       {item.subtitle ? <Text style={styles.subtitle}>{item.subtitle}</Text> : null}
 
-      {/* speaker/level */}
       {mode !== 'Inscritos' && item.speaker ? (
         <View style={styles.speakerRow}>
           <View style={styles.avatar} />
@@ -222,7 +211,6 @@ function WorkshopCard({
         </View>
       ) : null}
 
-      {/* infos (data / semana / hora) */}
       <View style={styles.metaRow}>
         <Feather name="calendar" size={14} color="#A9A9B2" />
         <Text style={styles.metaText}>{item.date}</Text>
@@ -308,9 +296,6 @@ function WorkshopCard({
   );
 }
 
-/** ─────────────────────────────
- *  dropdown simples
- *  ────────────────────────────*/
 function ModeDropdown({ value, onChange }: { value: Mode; onChange: (v: Mode) => void }) {
   const [open, setOpen] = useState(false);
   const opts: Mode[] = ['Disponíveis', 'Meus Workshops', 'Inscritos'];
@@ -349,9 +334,6 @@ function ModeDropdown({ value, onChange }: { value: Mode; onChange: (v: Mode) =>
   );
 }
 
-/** ─────────────────────────────
- *  SCREEN
- *  ────────────────────────────*/
 export default function WorkshopsScreen() {
   const [mode, setMode] = useState<Mode>('Disponíveis');
 
@@ -362,17 +344,14 @@ export default function WorkshopsScreen() {
   }, [mode]);
 
   const onInscrever = (w: Workshop) => {
-    // TODO: plugar sua ação real
     console.log('Inscrever-se em:', w.title);
   };
 
   const onEntrar = (w: Workshop) => {
-    // TODO: plugar navegação/sala
     console.log('Entrar em:', w.title);
   };
 
   const onEditar = (w: Workshop) => {
-    // TODO: abrir modal/rotear para settings do workshop
     console.log('Editar Configuração de:', w.title);
   };
 
@@ -394,8 +373,6 @@ export default function WorkshopsScreen() {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* lista (sem FlatList para conviver com o ScrollView do AppLayout) */}
         <View style={{ paddingHorizontal: 14, paddingBottom: 24 }}>
           {data.map((item, idx) => (
             <View key={item.id} style={{ marginTop: idx === 0 ? 0 : 14 }}>
@@ -413,9 +390,6 @@ export default function WorkshopsScreen() {
   );
 }
 
-/** ─────────────────────────────
- *  STYLES
- *  ────────────────────────────*/
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0E0E0E' },
 
