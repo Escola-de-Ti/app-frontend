@@ -7,7 +7,7 @@ import CreatePostScreen from './src/screens/CreatePostScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import { FilterButton } from './src/components/FilterButton';
 import { OpenFilterButton } from './src/components/OpenFilterButton';
-import { FilterSection } from '@components/FilterSection';
+import { FilterSection } from './src/components/FilterSection';
 
 export default function App() {
   const [email, setEmail] = useState('');
@@ -27,13 +27,9 @@ export default function App() {
       {/* <RegisterScreen /> */}
       {/* <LoginScreen /> */}
       {/* <CreatePostScreen /> */}
+      {/* <FilterSection /> */}
+      {/*<OpenFilterButton />*/}
       <AuthScreen />
     </SafeAreaProvider>
-  );
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <FilterSection />
-      {/*<OpenFilterButton />*/}
-    </View>
   );
 }
