@@ -6,6 +6,9 @@ import RegisterScreen from './src/screens/RegisterScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import CreatePostScreen from './src/screens/CreatePostScreen';
 import AuthScreen from './src/screens/AuthScreen';
+import { FilterButton } from './src/components/FilterButton';
+import { OpenFilterButton } from './src/components/OpenFilterButton';
+import { FilterSection } from './src/components/FilterSection';
 
 // import { PostCard } from './src/components/PostCard';
 import { PostDetails } from './src/components/PostDetails';
@@ -67,6 +70,13 @@ export default function App() {
           {/* <AuthScreen /> */}
         </ScrollView>
       </View>
+      {/* <CreatePostScreen /> */}
+      {/* <RegisterScreen /> */}
+      {/* <LoginScreen /> */}
+      {/* <CreatePostScreen /> */}
+      {/* <FilterSection /> */}
+      {/*<OpenFilterButton />*/}
+      <AuthScreen />
     </SafeAreaProvider>
   );
 }
