@@ -7,17 +7,18 @@ import {
   Animated,
   StatusBar,
   Easing,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useNavigation } from '@react-navigation/native';
+import Toast from 'react-native-toast-message';
 
 import Logo from '../components/LogoWhitName';
 import AppInput from '../components/AppInput';
 import { useAuth } from '../hooks/useAuth';
+import { getErrorMessage } from '../lib/errors';
 
 export default function AuthScreen() {
   const { login, register, isLoading } = useAuth();
@@ -63,18 +64,27 @@ export default function AuthScreen() {
   const opacityLogin = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const opacityRegister = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
+  // ====== AÇÕES ======
+
   const handleLogin = async () => {
     if (!emailLogin.trim() || !senhaLogin.trim()) {
-      Alert.alert('Campos obrigatórios', 'Preencha e-mail e senha para entrar.');
+      Toast.show({
+        type: 'error',
+        text1: 'Campos obrigatórios',
+        text2: 'Preencha e-mail e senha para entrar.',
+      });
       return;
     }
     try {
       await login(emailLogin.trim(), senhaLogin);
-      // ✅ navega pra CreatePost após login
+      // ✅ logou: navega para CreatePost
       navigation.reset({ index: 0, routes: [{ name: 'CreatePost' }] });
-      // ou, se preferir manter histórico: navigation.navigate('CreatePost');
     } catch (e: any) {
-      Alert.alert('Falha no login', e?.message ?? 'Não foi possível entrar.');
+      Toast.show({
+        type: 'error',
+        text1: 'Falha no login',
+        text2: getErrorMessage(e, 'Não foi possível entrar.'),
+      });
     }
   };
 
@@ -86,11 +96,19 @@ export default function AuthScreen() {
       !senhaReg.trim() ||
       !confirmSenha.trim()
     ) {
-      Alert.alert('Campos obrigatórios', 'Preencha todos os campos obrigatórios (*)');
+      Toast.show({
+        type: 'error',
+        text1: 'Campos obrigatórios',
+        text2: 'Preencha todos os campos marcados com *.',
+      });
       return;
     }
     if (senhaReg !== confirmSenha) {
-      Alert.alert('Senhas diferentes', 'A confirmação precisa ser igual à senha.');
+      Toast.show({
+        type: 'error',
+        text1: 'Senhas diferentes',
+        text2: 'A confirmação precisa ser igual à senha.',
+      });
       return;
     }
     try {
@@ -101,11 +119,31 @@ export default function AuthScreen() {
         cpf: cpf.replace(/\D/g, ''),
         telefone: telefone.trim() || undefined,
       });
-      Alert.alert('Sucesso', 'Conta criada! Faça seu login.');
-      if (isRegister) toggleForm();
+
+      // ✅ cadastro OK: mostra toast e só então volta pro "Entrar"
+      Toast.show({
+        type: 'success',
+        text1: 'Conta criada com sucesso!',
+        text2: 'Agora faça seu login.',
+        // ao fechar o toast (auto-hide), troca pra aba Entrar
+        onHide: () => {
+          if (isRegister) toggleForm();
+        },
+      });
+
+      // limpa o form de cadastro
+      setNome('');
+      setCpf('');
+      setEmailReg('');
+      setTelefone('');
+      setSenhaReg('');
+      setConfirmSenha('');
     } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || 'Não foi possível cadastrar.';
-      Alert.alert('Erro no cadastro', msg);
+      Toast.show({
+        type: 'error',
+        text1: 'Erro no cadastro',
+        text2: getErrorMessage(e, 'Não foi possível cadastrar.'),
+      });
     }
   };
 

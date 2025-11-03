@@ -1,44 +1,39 @@
+// src/services/posts.ts
 import { api } from '../api/client';
-import type { CreatePostDTO, ID, OrdenacaoTipo, Direcao, Paged, PostItem } from '../types';
 
-export async function createPost(dto: CreatePostDTO): Promise<PostItem> {
-  const { data } = await api.post('/api/posts', dto);
-  return data;
-}
+const POSTS_ENDPOINT = '/api/posts'; // troque aqui se seu endpoint for outro (ex: '/api/publicacoes')
 
-export async function getFeed(params?: {
-  page?: number;
-  size?: number;
-  ordenacao?: OrdenacaoTipo;
-  direcao?: Direcao;
-}): Promise<Paged<PostItem>> {
-  const { page = 0, size = 10, ordenacao = 'MAIS_RECENTES', direcao = 'DESC' } = params || {};
-  const { data } = await api.get('/api/posts/feed', { params: { page, size, ordenacao, direcao } });
-  return data;
-}
+export type CreatePostPayload = {
+  titulo: string;
+  conteudo: string;
+  tags?: string[];
+  usuarioId: string; // obrigatório pro seu back
+};
 
-export async function searchPosts(params?: {
-  q?: string;
-  tagIds?: ID[];
-  page?: number;
-  size?: number;
-  ordenacao?: OrdenacaoTipo;
-  direcao?: Direcao;
-}): Promise<Paged<PostItem>> {
-  const { data } = await api.get('/api/posts/buscar', { params });
-  return data;
-}
+export async function createPost(payload: CreatePostPayload) {
+  try {
+    const body: Record<string, unknown> = {
+      titulo: payload.titulo?.trim(),
+      conteudo: payload.conteudo?.trim(),
+      usuarioId: payload.usuarioId, // <- chave exata pedida pelo back
+    };
+    if (Array.isArray(payload.tags)) body.tags = payload.tags.filter(Boolean);
 
-export async function getPost(id: ID): Promise<PostItem> {
-  const { data } = await api.get(`/api/posts/${id}`);
-  return data;
-}
+    const { data } = await api.post(POSTS_ENDPOINT, body, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return data;
+  } catch (err: any) {
+    const status = err?.response?.status;
+    const data = err?.response?.data;
+    console.log('[POST][DEBUG] status =', status);
+    console.log('[POST][DEBUG] data =', data);
 
-export async function updatePost(id: ID, partial: Partial<PostItem>): Promise<PostItem> {
-  const { data } = await api.patch(`/api/posts/${id}`, partial);
-  return data;
-}
-
-export async function deletePost(id: ID): Promise<void> {
-  await api.delete(`/api/posts/${id}`);
+    const msg =
+      (typeof data === 'string' && data) ||
+      data?.message ||
+      (Array.isArray(data?.errors) && data.errors.join('\n')) ||
+      'Falha ao criar post.';
+    throw new Error(msg);
+  }
 }

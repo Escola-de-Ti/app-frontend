@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import Toast from 'react-native-toast-message';
 
 import RegisterScreen from './src/screens/RegisterScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -28,6 +29,7 @@ function Router() {
           // Telas privadas
           <>
             <Stack.Screen name="CreatePost" component={CreatePostScreen} />
+            <Stack.Screen name="CreateWorkshopScreen" component={CreateWorkshopScreen} />
           </>
         ) : (
           // Telas públicas
@@ -44,6 +46,7 @@ export default function App() {
   return (
     <AuthProvider>
       <Router />
+      <Toast />
     </AuthProvider>
   );
 }

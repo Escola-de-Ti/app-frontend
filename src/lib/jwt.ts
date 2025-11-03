@@ -75,31 +75,30 @@ function utf8BytesToString(bytes: Uint8Array): string {
   return out;
 }
 
+import { jwtDecode } from 'jwt-decode';
+
 export type JwtPayload = Record<string, unknown>;
 
-/** Decodifica o payload do JWT (sem verificar assinatura). */
 export function decodeJwt(token?: string | null): JwtPayload | null {
-  if (!token) return null;
-  const parts = token.split('.');
-  if (parts.length < 2) return null;
+  if (!token || typeof token !== 'string') return null;
   try {
-    const bytes = b64urlToBytes(parts[1]);
-    const json = utf8BytesToString(bytes);
-    return JSON.parse(json) as JwtPayload;
+    return jwtDecode<JwtPayload>(token);
   } catch {
     return null;
   }
 }
 
-/** Extrai o userId comum (claims 'id' ou 'sub'). */
 export function getUserIdFromJwt(token?: string | null): string | null {
-  const payload = decodeJwt(token);
-  if (!payload) return null;
-  const id =
-    typeof (payload as { id?: unknown }).id === 'string' ? (payload as { id?: string }).id! : null;
-  const sub =
-    typeof (payload as { sub?: unknown }).sub === 'string'
-      ? (payload as { sub?: string }).sub!
-      : null;
-  return id ?? sub;
+  const p = decodeJwt(token);
+  if (!p) return null;
+
+  const pick = (v: unknown) => (v === undefined || v === null ? null : String(v));
+  // cobre várias opções de claim comuns
+  return (
+    pick((p as any).id) ??
+    pick((p as any).sub) ??
+    pick((p as any).userId) ??
+    pick((p as any).usuarioId) ??
+    null
+  );
 }
