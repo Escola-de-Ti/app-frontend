@@ -1,23 +1,24 @@
-// src/services/posts.ts
 import { api } from '../api/client';
 
-const POSTS_ENDPOINT = '/api/posts'; // troque aqui se seu endpoint for outro (ex: '/api/publicacoes')
+const POSTS_ENDPOINT = '/api/posts';
 
 export type CreatePostPayload = {
   titulo: string;
-  conteudo: string;
-  tags?: string[];
-  usuarioId: string; // obrigatório pro seu back
+  descricao: string; // no back é "descricao"
+  usuarioId: number; // BigInteger no back → number aqui
+  tagIds?: number[]; // se/quando tiver ids
 };
 
 export async function createPost(payload: CreatePostPayload) {
   try {
     const body: Record<string, unknown> = {
       titulo: payload.titulo?.trim(),
-      conteudo: payload.conteudo?.trim(),
-      usuarioId: payload.usuarioId, // <- chave exata pedida pelo back
+      descricao: payload.descricao?.trim(),
+      usuarioId: payload.usuarioId,
     };
-    if (Array.isArray(payload.tags)) body.tags = payload.tags.filter(Boolean);
+    if (Array.isArray(payload.tagIds)) {
+      body.tagIds = payload.tagIds.filter((n) => Number.isFinite(n));
+    }
 
     const { data } = await api.post(POSTS_ENDPOINT, body, {
       headers: { 'Content-Type': 'application/json' },
@@ -28,7 +29,6 @@ export async function createPost(payload: CreatePostPayload) {
     const data = err?.response?.data;
     console.log('[POST][DEBUG] status =', status);
     console.log('[POST][DEBUG] data =', data);
-
     const msg =
       (typeof data === 'string' && data) ||
       data?.message ||

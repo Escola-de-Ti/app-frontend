@@ -7,10 +7,12 @@ import {
   StatusBar,
   Modal,
   Pressable,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import AppLayout from 'components/AppLayout';
+import AppLayout from '../components/AppLayout';
+import { useNavigation } from '@react-navigation/native';
 
 type Workshop = {
   id: string;
@@ -311,10 +313,8 @@ function ModeDropdown({ value, onChange }: { value: Mode; onChange: (v: Mode) =>
         <Feather name={open ? 'chevron-up' : 'chevron-down'} size={16} color="#EDEDF5" />
       </TouchableOpacity>
 
-      <Modal transparent visible={open} animationType="fade">
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <View />
-        </Pressable>
+      <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
         <View style={styles.dropdownMenu}>
           {opts.map((o) => (
             <TouchableOpacity
@@ -336,6 +336,7 @@ function ModeDropdown({ value, onChange }: { value: Mode; onChange: (v: Mode) =>
 
 export default function WorkshopsScreen() {
   const [mode, setMode] = useState<Mode>('Disponíveis');
+  const navigation = useNavigation<any>();
 
   const data = useMemo(() => {
     if (mode === 'Disponíveis') return AVAILABLE;
@@ -343,25 +344,44 @@ export default function WorkshopsScreen() {
     return ENROLLED;
   }, [mode]);
 
+  /** Handlers */
   const onInscrever = (w: Workshop) => {
-    console.log('Inscrever-se em:', w.title);
+    Alert.alert('Inscrição', `Você se inscreveu em: ${w.title}`);
   };
 
   const onEntrar = (w: Workshop) => {
-    console.log('Entrar em:', w.title);
+    Alert.alert('Entrar', `Entrando em: ${w.title}`);
   };
 
   const onEditar = (w: Workshop) => {
-    console.log('Editar Configuração de:', w.title);
+    navigation.navigate('CreateWorkshopScreen', { id: w.id });
+  };
+
+  const goCreateWorkshop = () => {
+    navigation.navigate('CreateWorkshopScreen');
   };
 
   return (
-    <AppLayout>
+    <AppLayout initialActivePage="Workshops">
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
+
         {/* header */}
         <View style={styles.header}>
-          <Text style={styles.h1}>Workshops</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.h1}>Workshops</Text>
+
+            {/* Botão "Criar workshop" só em "Meus Workshops" */}
+            {mode === 'Meus Workshops' && (
+              <TouchableOpacity activeOpacity={0.9} onPress={goCreateWorkshop}>
+                <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.createBtn}>
+                  <Feather name="plus-circle" size={16} color="#0B0B0E" />
+                  <Text style={styles.createBtnText}>Criar workshop</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </View>
+
           <Text style={styles.subtitleHeader}>Aprenda com especialistas da comunidade</Text>
 
           <View style={styles.headerRow}>
@@ -373,6 +393,7 @@ export default function WorkshopsScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
         <View style={{ paddingHorizontal: 14, paddingBottom: 24 }}>
           {data.map((item, idx) => (
             <View key={item.id} style={{ marginTop: idx === 0 ? 0 : 14 }}>
@@ -391,10 +412,15 @@ export default function WorkshopsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'rgba(17, 17, 17);' },
+  container: { flex: 1, backgroundColor: 'rgb(17, 17, 17)' },
 
   header: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 10 },
-  h1: { color: '#F9F9FF', fontSize: 24, fontWeight: '800' },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  h1: { color: '#F9F9FF', fontSize: 24, fontWeight: '800', flex: 1 },
   subtitleHeader: { color: '#BDBDCC', marginTop: 4 },
 
   headerRow: {
@@ -404,9 +430,24 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
+  /* Botão criar */
+  createBtn: {
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  createBtnText: {
+    color: '#0B0B0E',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+
   filterBtn: {
     marginLeft: 'auto',
-    borderRadius: 12,
+    borderRadius: 5,
     overflow: 'hidden',
   },
   filterBtnInner: {

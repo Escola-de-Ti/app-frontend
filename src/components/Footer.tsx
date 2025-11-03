@@ -14,7 +14,7 @@ type Props = {
 
 const ROUTES = {
   CREATE_POST: 'CreatePost',
-  CREATE_WORKSHOP: 'CreateWorkshopScreen',
+  CREATE_WORKSHOP: 'WorkshopScreen',
   FEED: 'Feed',
   RANKING: 'Ranking',
   PROFILE: 'Perfil',

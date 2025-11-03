@@ -91,14 +91,14 @@ export function decodeJwt(token?: string | null): JwtPayload | null {
 export function getUserIdFromJwt(token?: string | null): string | null {
   const p = decodeJwt(token);
   if (!p) return null;
+  const pick = (v: unknown) => (v == null ? null : String(v));
+  return pick((p as any).id) ?? pick((p as any).userId) ?? pick((p as any).usuarioId) ?? null;
+}
 
-  const pick = (v: unknown) => (v === undefined || v === null ? null : String(v));
-  // cobre várias opções de claim comuns
-  return (
-    pick((p as any).id) ??
-    pick((p as any).sub) ??
-    pick((p as any).userId) ??
-    pick((p as any).usuarioId) ??
-    null
-  );
+export function getEmailFromJwt(token?: string | null): string | null {
+  const p = decodeJwt(token);
+  if (!p) return null;
+  // sub = email no teu back
+  const sub = (p as any).sub;
+  return typeof sub === 'string' ? sub : null;
 }
