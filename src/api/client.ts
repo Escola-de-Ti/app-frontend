@@ -2,6 +2,7 @@ import axios, { AxiosError, AxiosInstance } from 'axios';
 import { getAccessToken, getRefreshToken, setTokens, clearTokens } from '../lib/secure';
 
 const baseURL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+console.log('[API] baseURL =', process.env.EXPO_PUBLIC_API_BASE_URL);
 
 export const api: AxiosInstance = axios.create({ baseURL, timeout: 20000 });
 

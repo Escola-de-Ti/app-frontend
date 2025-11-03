@@ -5,29 +5,46 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
-  Platform,
   StatusBar,
   Easing,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+
 import Logo from '../components/LogoWhitName';
 import AppInput from '../components/AppInput';
+import { useAuth } from '../hooks/useAuth';
 
 export default function AuthScreen() {
+  const { login, register, isLoading } = useAuth();
+
+  // --- estado dos forms ---
+  // login
+  const [emailLogin, setEmailLogin] = useState('');
+  const [senhaLogin, setSenhaLogin] = useState('');
+
+  // registro
+  const [nome, setNome] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [emailReg, setEmailReg] = useState('');
+  const [telefone, setTelefone] = useState('');
+  const [senhaReg, setSenhaReg] = useState('');
+  const [confirmSenha, setConfirmSenha] = useState('');
+
+  // alternância/anim
   const [isRegister, setIsRegister] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
-
-  // animação de altura do card
   const cardHeight = useRef(new Animated.Value(460)).current;
 
   useEffect(() => {
     Animated.timing(cardHeight, {
-      toValue: isRegister ? 720 : 460, // aumenta na tela de criar conta
+      toValue: isRegister ? 720 : 460,
       duration: 400,
       easing: Easing.out(Easing.exp),
-      useNativeDriver: false, // altura não suporta driver nativo
+      useNativeDriver: false,
     }).start();
   }, [isRegister]);
 
@@ -40,25 +57,56 @@ export default function AuthScreen() {
     }).start(() => setIsRegister(!isRegister));
   };
 
-  const translateXLogin = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -350],
-  });
+  const translateXLogin = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -350] });
+  const translateXRegister = anim.interpolate({ inputRange: [0, 1], outputRange: [350, 0] });
+  const opacityLogin = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const opacityRegister = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
-  const translateXRegister = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [350, 0],
-  });
+  // --- ações ---
+  const handleLogin = async () => {
+    if (!emailLogin.trim() || !senhaLogin.trim()) {
+      Alert.alert('Campos obrigatórios', 'Preencha e-mail e senha para entrar.');
+      return;
+    }
+    try {
+      await login(emailLogin.trim(), senhaLogin);
+      // se usar navegação, redirecione aqui (ex.: navigation.replace('Home'))
+    } catch (e: any) {
+      Alert.alert('Falha no login', e?.message ?? 'Não foi possível entrar.');
+    }
+  };
 
-  const opacityLogin = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-  });
-
-  const opacityRegister = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
+  const handleRegister = async () => {
+    if (
+      !nome.trim() ||
+      !cpf.trim() ||
+      !emailReg.trim() ||
+      !senhaReg.trim() ||
+      !confirmSenha.trim()
+    ) {
+      Alert.alert('Campos obrigatórios', 'Preencha todos os campos obrigatórios (*)');
+      return;
+    }
+    if (senhaReg !== confirmSenha) {
+      Alert.alert('Senhas diferentes', 'A confirmação precisa ser igual à senha.');
+      return;
+    }
+    try {
+      await register({
+        nome: nome.trim(),
+        email: emailReg.trim(),
+        senha: senhaReg,
+        cpf: cpf.replace(/\D/g, ''),
+        telefone: telefone.trim() || undefined,
+      });
+      Alert.alert('Sucesso', 'Conta criada! Faça seu login.');
+      // volta para a aba de login
+      if (isRegister) toggleForm();
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || 'Não foi possível cadastrar.';
+      Alert.alert('Erro no cadastro', msg);
+    }
+  };
 
   return (
     <KeyboardAwareScrollView
@@ -75,23 +123,15 @@ export default function AuthScreen() {
       </View>
 
       <Animated.View style={[styles.card, { height: cardHeight }]}>
-        {/* Tabs animadas */}
+        {/* Tabs */}
         <View style={styles.tabs}>
           {/* Entrar */}
           <Animated.View
             style={{
               flex: 1,
-              opacity: anim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 0.4],
-              }),
+              opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.4] }),
               transform: [
-                {
-                  scale: anim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [1, 0.95],
-                  }),
-                },
+                { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.95] }) },
               ],
             }}
           >
@@ -115,17 +155,9 @@ export default function AuthScreen() {
           <Animated.View
             style={{
               flex: 1,
-              opacity: anim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.4, 1],
-              }),
+              opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }),
               transform: [
-                {
-                  scale: anim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.95, 1],
-                  }),
-                },
+                { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) },
               ],
             }}
           >
@@ -140,13 +172,13 @@ export default function AuthScreen() {
               </LinearGradient>
             ) : (
               <TouchableOpacity style={styles.tabInactive} onPress={toggleForm}>
-                <Text style={styles.tabTextInactive}>Criar Contaaaa</Text>
+                <Text style={styles.tabTextInactive}>Criar Conta</Text>
               </TouchableOpacity>
             )}
           </Animated.View>
         </View>
 
-        {/* Forms com slide + fade */}
+        {/* Forms */}
         <View style={styles.formWrapper}>
           {/* Login */}
           <Animated.View
@@ -165,19 +197,28 @@ export default function AuthScreen() {
               placeholder="Digite seu e-mail"
               keyboardType="email-address"
               style={styles.inputStyle}
+              value={emailLogin}
+              onChangeText={setEmailLogin}
+              autoCapitalize="none"
             />
 
             <Text style={styles.label}>
               Senha <Text style={styles.required}>*</Text>
             </Text>
-            <AppInput placeholder="Digite sua senha" secureTextEntry style={styles.inputStyle} />
+            <AppInput
+              placeholder="Digite sua senha"
+              secureTextEntry
+              style={styles.inputStyle}
+              value={senhaLogin}
+              onChangeText={setSenhaLogin}
+            />
 
             <TouchableOpacity>
               <Text style={styles.forgotPassword}>Esqueceu a senha?</Text>
             </TouchableOpacity>
 
             <View style={styles.socialContainer}>
-              <TouchableOpacity style={styles.socialButton}>
+              <TouchableOpacity style={styles.socialButton} disabled>
                 <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.socialBorder}>
                   <View style={styles.socialInner}>
                     <Feather name="github" size={28} color="#00FFA3" />
@@ -185,7 +226,7 @@ export default function AuthScreen() {
                 </LinearGradient>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.socialButton}>
+              <TouchableOpacity style={styles.socialButton} disabled>
                 <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.socialBorder}>
                   <View style={styles.socialInner}>
                     <Text style={styles.socialText}>G</Text>
@@ -194,9 +235,13 @@ export default function AuthScreen() {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity>
+            <TouchableOpacity onPress={handleLogin} disabled={isLoading}>
               <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.submitButton}>
-                <Text style={styles.submitText}>Entrar</Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#000" />
+                ) : (
+                  <Text style={styles.submitText}>Entrar</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
@@ -215,7 +260,12 @@ export default function AuthScreen() {
               <Text style={styles.label}>
                 Nome de Usuário <Text style={styles.required}>*</Text>
               </Text>
-              <AppInput placeholder="Digite seu nome de usuário" style={styles.inputStyle} />
+              <AppInput
+                placeholder="Digite seu nome de usuário"
+                style={styles.inputStyle}
+                value={nome}
+                onChangeText={setNome}
+              />
 
               <Text style={styles.label}>
                 CPF <Text style={styles.required}>*</Text>
@@ -224,6 +274,8 @@ export default function AuthScreen() {
                 placeholder="Digite seu CPF"
                 keyboardType="numeric"
                 style={styles.inputStyle}
+                value={cpf}
+                onChangeText={setCpf}
               />
 
               <Text style={styles.label}>
@@ -233,6 +285,9 @@ export default function AuthScreen() {
                 placeholder="Digite seu e-mail"
                 keyboardType="email-address"
                 style={styles.inputStyle}
+                value={emailReg}
+                onChangeText={setEmailReg}
+                autoCapitalize="none"
               />
 
               <Text style={styles.label}>Telefone (opcional)</Text>
@@ -240,12 +295,20 @@ export default function AuthScreen() {
                 placeholder="Digite seu telefone"
                 keyboardType="phone-pad"
                 style={styles.inputStyle}
+                value={telefone}
+                onChangeText={setTelefone}
               />
 
               <Text style={styles.label}>
                 Senha <Text style={styles.required}>*</Text>
               </Text>
-              <AppInput placeholder="Crie uma senha" secureTextEntry style={styles.inputStyle} />
+              <AppInput
+                placeholder="Crie uma senha"
+                secureTextEntry
+                style={styles.inputStyle}
+                value={senhaReg}
+                onChangeText={setSenhaReg}
+              />
 
               <Text style={styles.label}>
                 Confirmar Senha <Text style={styles.required}>*</Text>
@@ -254,11 +317,21 @@ export default function AuthScreen() {
                 placeholder="Confirme sua senha"
                 secureTextEntry
                 style={styles.inputStyle}
+                value={confirmSenha}
+                onChangeText={setConfirmSenha}
               />
 
-              <TouchableOpacity style={{ marginTop: 10 }}>
+              <TouchableOpacity
+                style={{ marginTop: 10 }}
+                onPress={handleRegister}
+                disabled={isLoading}
+              >
                 <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.submitButton}>
-                  <Text style={styles.submitText}>Cadastrar</Text>
+                  {isLoading ? (
+                    <ActivityIndicator color="#000" />
+                  ) : (
+                    <Text style={styles.submitText}>Cadastrar</Text>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
 

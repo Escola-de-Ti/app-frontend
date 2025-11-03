@@ -9,25 +9,16 @@ import CreateWorkshopScreen from './src/screens/CreateWorkshopScreen';
 import { AuthProvider } from './src/hooks/useAuth';
 
 export default function App() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  function handleLogin() {
-    if (email === 'teste@teste.com' && password === '1234') {
-      Alert.alert('Sucesso', 'Login realizado!');
-    } else {
-      Alert.alert('Error', 'Credenciais inválidas');
-    }
-  }
-
   return (
-    <AuthProvider>
-      {/* <CreatePostScreen /> */}
-      {/* <RegisterScreen /> */}
-      {/* <LoginScreen /> */}
-      {/* <CreatePostScreen /> */}
-      {/* <AuthScreen /> */}
-      <CreateWorkshopScreen />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        {/* <CreatePostScreen /> */}
+        {/* <RegisterScreen /> */}
+        {/* <LoginScreen /> */}
+        {/* <CreatePostScreen /> */}
+        <AuthScreen />
+        {/* <CreateWorkshopScreen /> */}
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
