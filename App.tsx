@@ -12,6 +12,7 @@ import CreatePostScreen from './src/screens/CreatePostScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import CreateWorkshopScreen from './src/screens/CreateWorkshopScreen';
 import WorkshopScreen from './src/screens/WorkshopsScreen';
+import FeedScreen from './src/screens/FeedScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -29,6 +30,7 @@ function Router() {
         {isAuthenticated ? (
           // Telas privadas
           <>
+            <Stack.Screen name="FeedScreen" component={FeedScreen} />
             <Stack.Screen name="CreatePost" component={CreatePostScreen} />
             <Stack.Screen name="CreateWorkshopScreen" component={CreateWorkshopScreen} />
             <Stack.Screen name="WorkshopScreen" component={WorkshopScreen} />
