@@ -1,6 +1,17 @@
 import { api } from '../api/client';
 import { setTokens, clearTokens } from '../lib/secure';
-import type { AuthTokens, LoginRequest, RegisterRequest, Usuario } from '../types';
+
+export type AuthTokens = { accessToken: string; refreshToken: string };
+export type LoginRequest = { email: string; senha: string };
+export type RegisterRequest = {
+  nome: string;
+  email: string;
+  senha: string;
+  cpf?: string;
+  telefone?: string;
+  sobrenome?: string;
+  tipoUsuario?: 'ALUNO' | string;
+};
 
 export async function login(payload: LoginRequest): Promise<AuthTokens> {
   const { data } = await api.post('/api/usuarios/login', payload);
@@ -12,22 +23,13 @@ export async function login(payload: LoginRequest): Promise<AuthTokens> {
 }
 
 export async function register(payload: RegisterRequest): Promise<void> {
-  // await api.post('/api/usuarios', payload);
-  const body = { ...payload, tipoUsuario: 'ALUNO' };
-  console.log('body', body);
+  const body = { ...payload, tipoUsuario: 'ALUNO' as const };
   await api.post('/api/usuarios', body);
 }
 
-export async function getUsuario(id: string): Promise<Usuario> {
-  const { data } = await api.get(`/api/usuarios/${id}`);
-  return data;
-}
-
-export async function updateUsuario(id: string, partial: Partial<Usuario>): Promise<Usuario> {
-  const { data } = await api.put(`/api/usuarios/${id}`, partial);
-  return data;
-}
-
 export async function logout(): Promise<void> {
+  try {
+    await api.post('/api/usuarios/logout'); // se existir
+  } catch {}
   await clearTokens();
 }

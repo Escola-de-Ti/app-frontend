@@ -13,6 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { useNavigation } from '@react-navigation/native';
 
 import Logo from '../components/LogoWhitName';
 import AppInput from '../components/AppInput';
@@ -20,8 +21,8 @@ import { useAuth } from '../hooks/useAuth';
 
 export default function AuthScreen() {
   const { login, register, isLoading } = useAuth();
+  const navigation = useNavigation<any>();
 
-  // --- estado dos forms ---
   // login
   const [emailLogin, setEmailLogin] = useState('');
   const [senhaLogin, setSenhaLogin] = useState('');
@@ -34,7 +35,7 @@ export default function AuthScreen() {
   const [senhaReg, setSenhaReg] = useState('');
   const [confirmSenha, setConfirmSenha] = useState('');
 
-  // alternância/anim
+  // anim
   const [isRegister, setIsRegister] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
   const cardHeight = useRef(new Animated.Value(460)).current;
@@ -62,7 +63,6 @@ export default function AuthScreen() {
   const opacityLogin = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
   const opacityRegister = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
-  // --- ações ---
   const handleLogin = async () => {
     if (!emailLogin.trim() || !senhaLogin.trim()) {
       Alert.alert('Campos obrigatórios', 'Preencha e-mail e senha para entrar.');
@@ -70,7 +70,9 @@ export default function AuthScreen() {
     }
     try {
       await login(emailLogin.trim(), senhaLogin);
-      // se usar navegação, redirecione aqui (ex.: navigation.replace('Home'))
+      // ✅ navega pra CreatePost após login
+      navigation.reset({ index: 0, routes: [{ name: 'CreatePost' }] });
+      // ou, se preferir manter histórico: navigation.navigate('CreatePost');
     } catch (e: any) {
       Alert.alert('Falha no login', e?.message ?? 'Não foi possível entrar.');
     }
@@ -100,7 +102,6 @@ export default function AuthScreen() {
         telefone: telefone.trim() || undefined,
       });
       Alert.alert('Sucesso', 'Conta criada! Faça seu login.');
-      // volta para a aba de login
       if (isRegister) toggleForm();
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || 'Não foi possível cadastrar.';
@@ -184,10 +185,7 @@ export default function AuthScreen() {
           <Animated.View
             style={[
               styles.form,
-              {
-                transform: [{ translateX: translateXLogin }],
-                opacity: opacityLogin,
-              },
+              { transform: [{ translateX: translateXLogin }], opacity: opacityLogin },
             ]}
           >
             <Text style={styles.label}>
@@ -201,7 +199,6 @@ export default function AuthScreen() {
               onChangeText={setEmailLogin}
               autoCapitalize="none"
             />
-
             <Text style={styles.label}>
               Senha <Text style={styles.required}>*</Text>
             </Text>
@@ -212,11 +209,9 @@ export default function AuthScreen() {
               value={senhaLogin}
               onChangeText={setSenhaLogin}
             />
-
             <TouchableOpacity>
               <Text style={styles.forgotPassword}>Esqueceu a senha?</Text>
             </TouchableOpacity>
-
             <View style={styles.socialContainer}>
               <TouchableOpacity style={styles.socialButton} disabled>
                 <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.socialBorder}>
@@ -225,7 +220,6 @@ export default function AuthScreen() {
                   </View>
                 </LinearGradient>
               </TouchableOpacity>
-
               <TouchableOpacity style={styles.socialButton} disabled>
                 <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.socialBorder}>
                   <View style={styles.socialInner}>
@@ -234,7 +228,6 @@ export default function AuthScreen() {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-
             <TouchableOpacity onPress={handleLogin} disabled={isLoading}>
               <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.submitButton}>
                 {isLoading ? (
@@ -250,10 +243,7 @@ export default function AuthScreen() {
           <Animated.View
             style={[
               styles.form,
-              {
-                transform: [{ translateX: translateXRegister }],
-                opacity: opacityRegister,
-              },
+              { transform: [{ translateX: translateXRegister }], opacity: opacityRegister },
             ]}
           >
             <View style={{ paddingBottom: 60 }}>
@@ -266,7 +256,6 @@ export default function AuthScreen() {
                 value={nome}
                 onChangeText={setNome}
               />
-
               <Text style={styles.label}>
                 CPF <Text style={styles.required}>*</Text>
               </Text>
@@ -277,7 +266,6 @@ export default function AuthScreen() {
                 value={cpf}
                 onChangeText={setCpf}
               />
-
               <Text style={styles.label}>
                 E-mail <Text style={styles.required}>*</Text>
               </Text>
@@ -289,7 +277,6 @@ export default function AuthScreen() {
                 onChangeText={setEmailReg}
                 autoCapitalize="none"
               />
-
               <Text style={styles.label}>Telefone (opcional)</Text>
               <AppInput
                 placeholder="Digite seu telefone"
@@ -298,7 +285,6 @@ export default function AuthScreen() {
                 value={telefone}
                 onChangeText={setTelefone}
               />
-
               <Text style={styles.label}>
                 Senha <Text style={styles.required}>*</Text>
               </Text>
@@ -309,7 +295,6 @@ export default function AuthScreen() {
                 value={senhaReg}
                 onChangeText={setSenhaReg}
               />
-
               <Text style={styles.label}>
                 Confirmar Senha <Text style={styles.required}>*</Text>
               </Text>
@@ -320,7 +305,6 @@ export default function AuthScreen() {
                 value={confirmSenha}
                 onChangeText={setConfirmSenha}
               />
-
               <TouchableOpacity
                 style={{ marginTop: 10 }}
                 onPress={handleRegister}
@@ -334,7 +318,6 @@ export default function AuthScreen() {
                   )}
                 </LinearGradient>
               </TouchableOpacity>
-
               <View style={styles.backToLogin}>
                 <Text style={styles.backText}>Já tem uma conta?</Text>
                 <TouchableOpacity onPress={toggleForm}>
@@ -401,12 +384,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 10,
   },
-  socialContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 20,
-    gap: 20,
-  },
+  socialContainer: { flexDirection: 'row', justifyContent: 'center', marginBottom: 20, gap: 20 },
   socialButton: { borderRadius: 12, overflow: 'hidden' },
   socialBorder: { borderRadius: 12, padding: 2 },
   socialInner: {
@@ -418,17 +396,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   socialText: { color: '#00FFA3', fontSize: 28, fontWeight: 'bold' },
-  submitButton: {
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  submitText: {
-    color: '#000',
-    fontWeight: '700',
-    fontSize: 16,
-  },
+  submitButton: { borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 10 },
+  submitText: { color: '#000', fontWeight: '700', fontSize: 16 },
   backToLogin: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
   backText: { color: '#ccc', fontSize: 14 },
   backLink: { color: '#00FFA3', fontSize: 14, fontWeight: '600' },
