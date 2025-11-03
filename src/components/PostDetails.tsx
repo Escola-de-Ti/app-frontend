@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 type Comment = {
@@ -10,54 +10,70 @@ type Comment = {
   replies?: Comment[];
 };
 
-type PostDetailsProps = {
-  userName: string;
-  userLevel: string;
-  postDate: string;
-  title: string;
-  content: string;
-  imageUri?: string;
-  comments: Comment[];
-};
+export function PostDetails() {
+  const post = {
+    userName: 'Willyan Tomaz',
+    userLevel: '13',
+    postDate: '2d atrás',
+    title: 'Como implementar Clean Architecture em projetos Node.js',
+    content:
+      'Neste post vou compartilhar como estruturei meu último projeto utilizando os princípios da Clean Architecture. A separação clara de responsabilidades trouxe muitos benefícios. Aqui está o conteúdo completo com mais detalhes sobre a implementação da Clean Architecture. Esta abordagem revolucionou a forma como estruturo meus projetos backend.',
+    imageUri: 'https://placehold.co/600x300',
+  };
 
-export function PostDetails({
-  userName,
-  userLevel,
-  postDate,
-  title,
-  content,
-  imageUri,
-  comments,
-}: PostDetailsProps) {
+  const comments: Comment[] = [
+    {
+      id: '1',
+      user: 'Andre Jacob',
+      content:
+        'Excelente post! Eu também passei por uma experiência similar ao implementar Clean Architecture em um projeto grande. Uma dica que funcionou bem foi começar pela camada de domínio e ir expandindo gradualmente.',
+      upvotes: 21,
+      replies: [
+        {
+          id: '1-1',
+          user: 'Willyan Tomaz',
+          content:
+            'Perfeito, André! É exatamente assim que comecei também. Essa abordagem ajuda a manter o foco.',
+          upvotes: 8,
+        },
+      ],
+    },
+    {
+      id: '2',
+      user: 'Maria Souza',
+      content: 'Conteúdo sensacional! Poderia compartilhar o repositório?',
+      upvotes: 14,
+    },
+  ];
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.userInfo}>
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>{userName.charAt(0).toUpperCase()}</Text>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{post.userName.charAt(0).toUpperCase()}</Text>
           </View>
           <View>
             <View style={styles.nameRow}>
-              <Text style={styles.userName}>{userName}</Text>
+              <Text style={styles.userName}>{post.userName}</Text>
               <View style={styles.levelContainer}>
-                <Text style={styles.levelText}>Nvl. {userLevel}</Text>
+                <Text style={styles.levelText}>Nvl. {post.userLevel}</Text>
               </View>
             </View>
-            <Text style={styles.postDate}>{postDate}</Text>
+            <Text style={styles.postDate}>{post.postDate}</Text>
           </View>
         </View>
+
         <TouchableOpacity>
           <Feather name="more-horizontal" size={20} color="#aaa" />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.postContent}>
-        <Text style={styles.title}>{title}</Text>
+      <Text style={styles.title}>{post.title}</Text>
 
-        {imageUri && <Image source={{ uri: imageUri }} style={styles.postImage} />}
+      {post.imageUri && <Image source={{ uri: post.imageUri }} style={styles.image} />}
 
-        <Text style={styles.content}>{content}</Text>
-      </View>
+      <Text style={styles.content}>{post.content}</Text>
 
       <View style={styles.commentsSection}>
         <Text style={styles.commentTitle}>Comentários ({comments.length})</Text>
@@ -69,17 +85,12 @@ export function PostDetails({
   );
 }
 
-type CommentItemProps = {
-  comment: Comment;
-  depth: number;
-};
-
-function CommentItem({ comment, depth }: CommentItemProps) {
+function CommentItem({ comment, depth }: { comment: Comment; depth: number }) {
   return (
     <View style={[styles.commentContainer, { marginLeft: depth * 20 }]}>
       <View style={styles.commentHeader}>
         <View style={styles.commentAvatar}>
-          <Text style={styles.commentInitial}>{comment.user.charAt(0).toUpperCase()}</Text>
+          <Text style={styles.commentAvatarText}>{comment.user.charAt(0).toUpperCase()}</Text>
         </View>
         <Text style={styles.commentUser}>{comment.user}</Text>
       </View>
@@ -108,8 +119,8 @@ function CommentItem({ comment, depth }: CommentItemProps) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: '#0b0b0f',
+    flex: 1,
     padding: 16,
   },
   header: {
@@ -122,7 +133,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  avatarPlaceholder: {
+  avatar: {
     width: 38,
     height: 38,
     borderRadius: 50,
@@ -130,7 +141,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarInitial: {
+  avatarText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
@@ -160,16 +171,14 @@ const styles = StyleSheet.create({
     color: '#aaa',
     fontSize: 12,
   },
-  postContent: {
-    marginTop: 16,
-  },
   title: {
     color: '#fff',
-    fontSize: 17,
     fontWeight: '700',
+    fontSize: 17,
+    marginTop: 14,
     marginBottom: 10,
   },
-  postImage: {
+  image: {
     width: '100%',
     height: 180,
     borderRadius: 12,
@@ -206,7 +215,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  commentInitial: {
+  commentAvatarText: {
     color: '#fff',
     fontWeight: '600',
     fontSize: 13,

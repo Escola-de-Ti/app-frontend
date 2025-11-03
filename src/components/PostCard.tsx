@@ -1,49 +1,35 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
-type PostCardProps = {
-  userName: string;
-  userLevel: string;
-  postDate: string;
-  title: string;
-  description: string;
-  tag: string;
-  upvotes: number;
-  comments: number;
-  profileImage?: string;
-};
+export function PostCard() {
+  const post = {
+    userName: 'Gabriel Marassi',
+    userLevel: '14',
+    postDate: '2d atrás',
+    title: 'Como vocês organizam os estudos de programação?',
+    description:
+      'Estou tentando conciliar faculdade, projetos pessoais e cursos online. Alguém tem uma rotina que funcione bem?',
+    tag: 'Dúvida',
+    upvotes: 102,
+    comments: 37,
+  };
 
-export function PostCard({
-  userName,
-  userLevel,
-  postDate,
-  title,
-  description,
-  tag,
-  upvotes,
-  comments,
-  profileImage,
-}: PostCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <View style={styles.userInfo}>
-          {profileImage ? (
-            <Image source={{ uri: profileImage }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarInitial}>{userName.charAt(0).toUpperCase()}</Text>
-            </View>
-          )}
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{post.userName.charAt(0).toUpperCase()}</Text>
+          </View>
           <View>
             <View style={styles.nameRow}>
-              <Text style={styles.userName}>{userName}</Text>
+              <Text style={styles.userName}>{post.userName}</Text>
               <View style={styles.levelContainer}>
-                <Text style={styles.levelText}>Nvl. {userLevel}</Text>
+                <Text style={styles.levelText}>Nvl. {post.userLevel}</Text>
               </View>
             </View>
-            <Text style={styles.postDate}>{postDate}</Text>
+            <Text style={styles.postDate}>{post.postDate}</Text>
           </View>
         </View>
 
@@ -52,24 +38,24 @@ export function PostCard({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.content}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.description}>{description}</Text>
+      <View style={styles.body}>
+        <Text style={styles.title}>{post.title}</Text>
+        <Text style={styles.description}>{post.description}</Text>
       </View>
 
       <View style={styles.footer}>
         <View style={styles.tagContainer}>
-          <Text style={styles.tagText}>{tag}</Text>
+          <Text style={styles.tagText}>{post.tag}</Text>
         </View>
 
         <View style={styles.stats}>
           <View style={styles.statItem}>
-            <Feather name="arrow-up" size={16} color="#ccc" />
-            <Text style={styles.statText}>{upvotes}</Text>
+            <Feather name="arrow-up" size={16} color="#fff" />
+            <Text style={styles.statText}>{post.upvotes}</Text>
           </View>
           <View style={styles.statItem}>
-            <Feather name="message-circle" size={16} color="#ccc" />
-            <Text style={styles.statText}>{comments}</Text>
+            <Feather name="message-circle" size={16} color="#fff" />
+            <Text style={styles.statText}>{post.comments}</Text>
           </View>
         </View>
       </View>
@@ -83,12 +69,14 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     marginBottom: 20,
+    width: '100%',
     shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
     elevation: 4,
   },
+
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -103,16 +91,11 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 50,
-  },
-  avatarPlaceholder: {
-    width: 38,
-    height: 38,
-    borderRadius: 50,
     backgroundColor: '#3a3a40',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarInitial: {
+  avatarText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
@@ -142,7 +125,8 @@ const styles = StyleSheet.create({
     color: '#aaa',
     fontSize: 12,
   },
-  content: {
+
+  body: {
     marginTop: 14,
   },
   title: {
@@ -156,6 +140,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+
   footer: {
     marginTop: 16,
     flexDirection: 'row',
