@@ -13,7 +13,7 @@ import {
   Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import AppLayout from 'components/AppLayout';
+import AppLayout from '../components/AppLayout';
 import AppInput from '../components/AppInput';
 import ImageUploader from '../components/ImageUploader';
 import TagManager from '../components/TagManager';

@@ -6,6 +6,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import CreatePostScreen from './src/screens/CreatePostScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import CreateWorkshopScreen from './src/screens/CreateWorkshopScreen';
+import { AuthProvider } from './src/hooks/useAuth';
 
 export default function App() {
   const [email, setEmail] = useState('');
@@ -20,13 +21,13 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
+    <AuthProvider>
       {/* <CreatePostScreen /> */}
       {/* <RegisterScreen /> */}
       {/* <LoginScreen /> */}
       {/* <CreatePostScreen /> */}
       {/* <AuthScreen /> */}
       <CreateWorkshopScreen />
-    </SafeAreaProvider>
+    </AuthProvider>
   );
 }

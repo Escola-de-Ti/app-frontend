@@ -8,6 +8,7 @@ export async function uploadImages(
   files.forEach((f, idx) => {
     const name = f.name || `image_${idx}.jpg`;
     const type = f.type || 'image/jpeg';
+    // @ts-expect-error RN FormData
     form.append('files', { uri: f.uri, name, type });
   });
 

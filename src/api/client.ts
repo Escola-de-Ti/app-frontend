@@ -1,25 +1,7 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import * as SecureStore from 'expo-secure-store';
-
-const ACCESS_TOKEN_KEY = 'kh.accessToken';
-const REFRESH_TOKEN_KEY = 'kh.refreshToken';
+import { getAccessToken, getRefreshToken, setTokens, clearTokens } from '../lib/secure';
 
 const baseURL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8080';
-
-export async function getAccessToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
-}
-export async function getRefreshToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-}
-export async function setTokens(accessToken: string, refreshToken: string) {
-  await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
-  await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
-}
-export async function clearTokens() {
-  await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
-  await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
-}
 
 export const api: AxiosInstance = axios.create({ baseURL, timeout: 20000 });
 
@@ -36,10 +18,7 @@ let isRefreshing = false;
 let pendingQueue: { resolve: (v?: unknown) => void; reject: (e: any) => void; request: any }[] = [];
 
 function processQueue(error: any = null) {
-  pendingQueue.forEach((p) => {
-    if (error) p.reject(error);
-    else p.resolve(true);
-  });
+  pendingQueue.forEach((p) => (error ? p.reject(error) : p.resolve(true)));
   pendingQueue = [];
 }
 
@@ -78,10 +57,9 @@ api.interceptors.response.use(
           await clearTokens();
           return Promise.reject(error);
         }
-
         const resp = await axios.post(`${baseURL}/api/usuarios/refresh`, { refreshToken });
-        const newAccess = (resp.data?.accessToken ?? resp.data?.token) as string;
-        const newRefresh = (resp.data?.refreshToken ?? refreshToken) as string;
+        const newAccess = (resp.data as any)?.accessToken ?? (resp.data as any)?.token;
+        const newRefresh = (resp.data as any)?.refreshToken ?? refreshToken;
         if (!newAccess) throw new Error('Refresh sem accessToken');
 
         await setTokens(newAccess, newRefresh);
