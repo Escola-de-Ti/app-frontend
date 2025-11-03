@@ -1,4 +1,5 @@
-import { api, setTokens, clearTokens } from '../api/client';
+import { api } from '../api/client';
+import { setTokens, clearTokens } from '../lib/secure';
 import type { AuthTokens, LoginRequest, RegisterRequest, Usuario } from '../types';
 
 export async function login(payload: LoginRequest): Promise<AuthTokens> {
@@ -11,7 +12,10 @@ export async function login(payload: LoginRequest): Promise<AuthTokens> {
 }
 
 export async function register(payload: RegisterRequest): Promise<void> {
-  await api.post('/api/usuarios', payload);
+  // await api.post('/api/usuarios', payload);
+  const body = { ...payload, tipoUsuario: 'ALUNO' };
+  console.log('body', body);
+  await api.post('/api/usuarios', body);
 }
 
 export async function getUsuario(id: string): Promise<Usuario> {

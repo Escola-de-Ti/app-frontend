@@ -26,6 +26,7 @@ export interface RegisterRequest {
   cpf?: string;
   telefone?: string;
   senha: string;
+  tipoUsuario?: string;
 }
 
 export interface Imagem {
