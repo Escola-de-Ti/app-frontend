@@ -1,8 +1,10 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 export function PostCard() {
+  const [menuVisible, setMenuVisible] = useState(false);
+
   const post = {
     userName: 'Gabriel Marassi',
     userLevel: '14',
@@ -15,51 +17,72 @@ export function PostCard() {
     comments: 37,
   };
 
+  const handleOutsidePress = () => {
+    if (menuVisible) setMenuVisible(false);
+  };
+
   return (
-    <View style={styles.card}>
-      <View style={styles.header}>
-        <View style={styles.userInfo}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{post.userName.charAt(0).toUpperCase()}</Text>
-          </View>
-          <View>
-            <View style={styles.nameRow}>
-              <Text style={styles.userName}>{post.userName}</Text>
-              <View style={styles.levelContainer}>
-                <Text style={styles.levelText}>Nvl. {post.userLevel}</Text>
-              </View>
+    <TouchableWithoutFeedback onPress={handleOutsidePress}>
+      <View style={styles.card}>
+        <View style={styles.header}>
+          <View style={styles.userInfo}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{post.userName.charAt(0).toUpperCase()}</Text>
             </View>
-            <Text style={styles.postDate}>{post.postDate}</Text>
+            <View>
+              <View style={styles.nameRow}>
+                <Text style={styles.userName}>{post.userName}</Text>
+                <View style={styles.levelContainer}>
+                  <Text style={styles.levelText}>Nvl. {post.userLevel}</Text>
+                </View>
+              </View>
+              <Text style={styles.postDate}>{post.postDate}</Text>
+            </View>
+          </View>
+
+          <View>
+            <TouchableOpacity onPress={() => setMenuVisible(!menuVisible)} activeOpacity={0.7}>
+              <Feather name="more-horizontal" size={20} color="#aaa" />
+            </TouchableOpacity>
+
+            {menuVisible && (
+              <View style={styles.menu}>
+                <TouchableOpacity style={styles.menuItem}>
+                  <Feather name="edit-3" size={14} color="#fff" />
+                  <Text style={styles.menuText}>Editar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem}>
+                  <Feather name="trash-2" size={14} color="#ff6666" />
+                  <Text style={[styles.menuText, { color: '#ff6666' }]}>Apagar</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
 
-        <TouchableOpacity>
-          <Feather name="more-horizontal" size={20} color="#aaa" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.body}>
-        <Text style={styles.title}>{post.title}</Text>
-        <Text style={styles.description}>{post.description}</Text>
-      </View>
-
-      <View style={styles.footer}>
-        <View style={styles.tagContainer}>
-          <Text style={styles.tagText}>{post.tag}</Text>
+        <View style={styles.body}>
+          <Text style={styles.title}>{post.title}</Text>
+          <Text style={styles.description}>{post.description}</Text>
         </View>
 
-        <View style={styles.stats}>
-          <View style={styles.statItem}>
-            <Feather name="arrow-up" size={16} color="#fff" />
-            <Text style={styles.statText}>{post.upvotes}</Text>
+        <View style={styles.footer}>
+          <View style={styles.tagContainer}>
+            <Text style={styles.tagText}>{post.tag}</Text>
           </View>
-          <View style={styles.statItem}>
-            <Feather name="message-circle" size={16} color="#fff" />
-            <Text style={styles.statText}>{post.comments}</Text>
+
+          <View style={styles.stats}>
+            <View style={styles.statItem}>
+              <Feather name="arrow-up" size={16} color="#fff" />
+              <Text style={styles.statText}>{post.upvotes}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Feather name="message-circle" size={16} color="#fff" />
+              <Text style={styles.statText}>{post.comments}</Text>
+            </View>
           </View>
         </View>
       </View>
-    </View>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -148,13 +171,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tagContainer: {
-    backgroundColor: '#5b2eff',
-    borderRadius: 8,
-    paddingHorizontal: 10,
+    borderColor: '#8a73ff',
+    borderWidth: 1.8,
+    borderRadius: 20,
+    paddingHorizontal: 12,
     paddingVertical: 4,
+    backgroundColor: '#141417',
   },
   tagText: {
-    color: '#fff',
+    color: '#8a73ff',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -170,5 +195,33 @@ const styles = StyleSheet.create({
   statText: {
     color: '#ccc',
     fontSize: 13,
+  },
+
+  menu: {
+    position: 'absolute',
+    right: 0,
+    top: 25,
+    backgroundColor: '#1f1f23',
+    borderRadius: 8,
+    paddingVertical: 6,
+    width: 120,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+    zIndex: 10,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  menuText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
