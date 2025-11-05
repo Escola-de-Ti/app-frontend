@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  Modal,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 export function PostCard() {
@@ -17,72 +24,73 @@ export function PostCard() {
     comments: 37,
   };
 
-  const handleOutsidePress = () => {
-    if (menuVisible) setMenuVisible(false);
-  };
-
   return (
-    <TouchableWithoutFeedback onPress={handleOutsidePress}>
-      <View style={styles.card}>
-        <View style={styles.header}>
-          <View style={styles.userInfo}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{post.userName.charAt(0).toUpperCase()}</Text>
-            </View>
-            <View>
-              <View style={styles.nameRow}>
-                <Text style={styles.userName}>{post.userName}</Text>
-                <View style={styles.levelContainer}>
-                  <Text style={styles.levelText}>Nvl. {post.userLevel}</Text>
-                </View>
-              </View>
-              <Text style={styles.postDate}>{post.postDate}</Text>
-            </View>
+    <View style={styles.card}>
+      <View style={styles.header}>
+        <View style={styles.userInfo}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{post.userName.charAt(0).toUpperCase()}</Text>
           </View>
-
           <View>
-            <TouchableOpacity onPress={() => setMenuVisible(!menuVisible)} activeOpacity={0.7}>
-              <Feather name="more-horizontal" size={20} color="#aaa" />
-            </TouchableOpacity>
-
-            {menuVisible && (
-              <View style={styles.menu}>
-                <TouchableOpacity style={styles.menuItem}>
-                  <Feather name="edit-3" size={14} color="#fff" />
-                  <Text style={styles.menuText}>Editar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.menuItem}>
-                  <Feather name="trash-2" size={14} color="#ff6666" />
-                  <Text style={[styles.menuText, { color: '#ff6666' }]}>Apagar</Text>
-                </TouchableOpacity>
+            <View style={styles.nameRow}>
+              <Text style={styles.userName}>{post.userName}</Text>
+              <View style={styles.levelContainer}>
+                <Text style={styles.levelText}>Nvl. {post.userLevel}</Text>
               </View>
-            )}
+            </View>
+            <Text style={styles.postDate}>{post.postDate}</Text>
           </View>
         </View>
 
-        <View style={styles.body}>
-          <Text style={styles.title}>{post.title}</Text>
-          <Text style={styles.description}>{post.description}</Text>
+        <TouchableOpacity onPress={() => setMenuVisible(true)} activeOpacity={0.7}>
+          <Feather name="more-horizontal" size={22} color="#ccc" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.body}>
+        <Text style={styles.title}>{post.title}</Text>
+        <Text style={styles.description}>{post.description}</Text>
+      </View>
+
+      <View style={styles.footer}>
+        <View style={styles.tagContainer}>
+          <Text style={styles.tagText}>{post.tag}</Text>
         </View>
 
-        <View style={styles.footer}>
-          <View style={styles.tagContainer}>
-            <Text style={styles.tagText}>{post.tag}</Text>
+        <View style={styles.stats}>
+          <View style={styles.statItem}>
+            <Feather name="arrow-up" size={16} color="#fff" />
+            <Text style={styles.statText}>{post.upvotes}</Text>
           </View>
-
-          <View style={styles.stats}>
-            <View style={styles.statItem}>
-              <Feather name="arrow-up" size={16} color="#fff" />
-              <Text style={styles.statText}>{post.upvotes}</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Feather name="message-circle" size={16} color="#fff" />
-              <Text style={styles.statText}>{post.comments}</Text>
-            </View>
+          <View style={styles.statItem}>
+            <Feather name="message-circle" size={16} color="#fff" />
+            <Text style={styles.statText}>{post.comments}</Text>
           </View>
         </View>
       </View>
-    </TouchableWithoutFeedback>
+
+      <Modal
+        transparent
+        visible={menuVisible}
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.menu}>
+              <TouchableOpacity style={styles.menuItem}>
+                <Feather name="edit-3" size={14} color="#fff" />
+                <Text style={styles.menuText}>Editar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem}>
+                <Feather name="trash-2" size={14} color="#ff6666" />
+                <Text style={[styles.menuText, { color: '#ff6666' }]}>Apagar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </View>
   );
 }
 
@@ -94,10 +102,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     width: '100%',
     shadowColor: '#000',
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.5,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
     elevation: 4,
+    position: 'relative',
   },
 
   header: {
@@ -197,10 +206,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+
   menu: {
     position: 'absolute',
-    right: 0,
-    top: 25,
+    right: 20,
+    top: 90,
     backgroundColor: '#1f1f23',
     borderRadius: 8,
     paddingVertical: 6,
@@ -209,9 +223,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 5,
-    zIndex: 10,
+    elevation: 10,
   },
+
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',

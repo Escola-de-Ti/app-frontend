@@ -19,7 +19,7 @@ export default function App() {
       <View style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {/* <PostDetails /> */}
-          {/* <PostCard /> */}
+          <PostCard />
           {/* <CreatePostScreen /> */}
           {/* <RegisterScreen /> */}
           {/* <LoginScreen /> */}
