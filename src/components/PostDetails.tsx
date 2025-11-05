@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Image,
+  TouchableOpacity,
+  TextInput,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { CommentItem } from '../components/CommentItem';
 
@@ -14,18 +22,7 @@ type Comment = {
 export function PostDetails() {
   const [postUpvoted, setPostUpvoted] = useState(false);
   const [postUpvotes, setPostUpvotes] = useState(0);
-
-  const post = {
-    userName: 'Willyan Tomaz',
-    userLevel: '13',
-    postDate: '2d atrás',
-    title: 'Como implementar Clean Architecture em projetos Node.js',
-    content:
-      'Neste post vou compartilhar como estruturei meu último projeto utilizando os princípios da Clean Architecture. A separação clara de responsabilidades trouxe muitos benefícios. Aqui está o conteúdo completo com mais detalhes sobre a implementação da Clean Architecture. Esta abordagem revolucionou a forma como estruturo meus projetos backend.',
-    imageUri: 'https://placehold.co/600x300',
-  };
-
-  const comments: Comment[] = [
+  const [comments, setComments] = useState<Comment[]>([
     {
       id: '1',
       user: 'Andre Jacob',
@@ -48,11 +45,51 @@ export function PostDetails() {
       content: 'Conteúdo sensacional! Poderia compartilhar o repositório?',
       upvotes: 0,
     },
-  ];
+  ]);
+
+  const [newComment, setNewComment] = useState('');
 
   const handlePostUpvote = () => {
     setPostUpvoted(!postUpvoted);
     setPostUpvotes((prev) => prev + (postUpvoted ? -1 : 1));
+  };
+
+  const handleAddComment = () => {
+    if (newComment.trim() === '') return;
+    const newEntry: Comment = {
+      id: Date.now().toString(),
+      user: 'Você',
+      content: newComment.trim(),
+      upvotes: 0,
+      replies: [],
+    };
+    setComments((prev) => [...prev, newEntry]);
+    setNewComment('');
+  };
+
+  const handleReply = (parentId: string, replyText: string) => {
+    if (replyText.trim() === '') return;
+
+    const addReplyRecursively = (list: Comment[]): Comment[] =>
+      list.map((comment) => {
+        if (comment.id === parentId) {
+          const newReply: Comment = {
+            id: Date.now().toString(),
+            user: 'Você',
+            content: replyText.trim(),
+            upvotes: 0,
+          };
+          return {
+            ...comment,
+            replies: [...(comment.replies || []), newReply],
+          };
+        }
+        return comment.replies
+          ? { ...comment, replies: addReplyRecursively(comment.replies) }
+          : comment;
+      });
+
+    setComments((prev) => addReplyRecursively(prev));
   };
 
   return (
@@ -60,16 +97,16 @@ export function PostDetails() {
       <View style={styles.header}>
         <View style={styles.userInfo}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{post.userName.charAt(0).toUpperCase()}</Text>
+            <Text style={styles.avatarText}>W</Text>
           </View>
           <View>
             <View style={styles.nameRow}>
-              <Text style={styles.userName}>{post.userName}</Text>
+              <Text style={styles.userName}>Willyan Tomaz</Text>
               <View style={styles.levelContainer}>
-                <Text style={styles.levelText}>Nvl. {post.userLevel}</Text>
+                <Text style={styles.levelText}>Nvl. 13</Text>
               </View>
             </View>
-            <Text style={styles.postDate}>{post.postDate}</Text>
+            <Text style={styles.postDate}>2d atrás</Text>
           </View>
         </View>
 
@@ -78,9 +115,13 @@ export function PostDetails() {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.title}>{post.title}</Text>
-      {post.imageUri && <Image source={{ uri: post.imageUri }} style={styles.image} />}
-      <Text style={styles.content}>{post.content}</Text>
+      <Text style={styles.title}>Como implementar Clean Architecture em projetos Node.js</Text>
+      <Image source={{ uri: 'https://placehold.co/600x300' }} style={styles.image} />
+      <Text style={styles.content}>
+        Neste post vou compartilhar como estruturei meu último projeto utilizando os princípios da
+        Clean Architecture. A separação clara de responsabilidades trouxe muitos benefícios. Esta
+        abordagem revolucionou a forma como estruturo meus projetos backend.
+      </Text>
 
       <TouchableOpacity onPress={handlePostUpvote} activeOpacity={0.8}>
         <View style={[styles.upvoteContainer, postUpvoted && styles.upvoteActive]}>
@@ -95,8 +136,23 @@ export function PostDetails() {
 
       <View style={styles.commentsSection}>
         <Text style={styles.commentTitle}>Comentários ({comments.length})</Text>
+
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.commentInput}
+            placeholder="Escreva um comentário..."
+            placeholderTextColor="#888"
+            value={newComment}
+            onChangeText={setNewComment}
+            multiline
+          />
+          <TouchableOpacity style={styles.sendButton} onPress={handleAddComment}>
+            <Feather name="send" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
         {comments.map((comment) => (
-          <CommentItem key={comment.id} comment={comment} depth={0} />
+          <CommentItem key={comment.id} comment={comment} depth={0} onReply={handleReply} />
         ))}
       </View>
     </ScrollView>
@@ -211,5 +267,27 @@ const styles = StyleSheet.create({
     color: '#b3b3ff',
     fontWeight: '600',
     marginBottom: 10,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1b1b1f',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+    marginBottom: 20,
+    paddingHorizontal: 10,
+  },
+  commentInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    paddingVertical: 8,
+  },
+  sendButton: {
+    marginLeft: 10,
+    backgroundColor: '#5b2eff',
+    padding: 8,
+    borderRadius: 8,
   },
 });

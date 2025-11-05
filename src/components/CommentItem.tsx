@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 type CommentProps = {
@@ -11,15 +11,25 @@ type CommentProps = {
     replies?: CommentProps['comment'][];
   };
   depth: number;
+  onReply: (parentId: string, replyText: string) => void;
 };
 
-export function CommentItem({ comment, depth }: CommentProps) {
+export function CommentItem({ comment, depth, onReply }: CommentProps) {
   const [upvoted, setUpvoted] = useState(false);
   const [upvotes, setUpvotes] = useState(comment.upvotes);
+  const [showReplyInput, setShowReplyInput] = useState(false);
+  const [replyText, setReplyText] = useState('');
 
   const handleUpvote = () => {
     setUpvoted(!upvoted);
     setUpvotes((prev) => prev + (upvoted ? -1 : 1));
+  };
+
+  const handleSendReply = () => {
+    if (replyText.trim() === '') return;
+    onReply(comment.id, replyText);
+    setReplyText('');
+    setShowReplyInput(false);
   };
 
   return (
@@ -45,29 +55,38 @@ export function CommentItem({ comment, depth }: CommentProps) {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => setShowReplyInput(!showReplyInput)}>
           <Text style={styles.replyText}>Responder</Text>
         </TouchableOpacity>
       </View>
 
+      {showReplyInput && (
+        <View style={styles.replyInputContainer}>
+          <TextInput
+            style={styles.replyInput}
+            placeholder="Escreva uma resposta..."
+            placeholderTextColor="#888"
+            value={replyText}
+            onChangeText={setReplyText}
+            multiline
+          />
+          <TouchableOpacity style={styles.replySendButton} onPress={handleSendReply}>
+            <Feather name="send" size={16} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {comment.replies &&
         comment.replies.map((reply) => (
-          <CommentItem key={reply.id} comment={reply} depth={depth + 1} />
+          <CommentItem key={reply.id} comment={reply} depth={depth + 1} onReply={onReply} />
         ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  commentContainer: {
-    marginBottom: 14,
-  },
-  commentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
+  commentContainer: { marginBottom: 14 },
+  commentHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   commentAvatar: {
     width: 30,
     height: 30,
@@ -76,15 +95,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  commentAvatarText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  commentUser: {
-    color: '#fff',
-    fontWeight: '600',
-  },
+  commentAvatarText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  commentUser: { color: '#fff', fontWeight: '600' },
   commentBox: {
     backgroundColor: '#1b1b1f',
     borderLeftWidth: 3,
@@ -94,16 +106,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 6,
   },
-  commentText: {
-    color: '#ccc',
-    fontSize: 13,
-  },
-  commentFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginLeft: 34,
-  },
+  commentText: { color: '#ccc', fontSize: 13 },
+  commentFooter: { flexDirection: 'row', alignItems: 'center', gap: 14, marginLeft: 34 },
   commentUpvoteContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -113,19 +117,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  commentUpvoteActive: {
-    backgroundColor: '#6ef7c3',
+  commentUpvoteActive: { backgroundColor: '#6ef7c3' },
+  commentStatText: { color: '#ccc', fontSize: 12 },
+  commentUpvoteTextActive: { color: '#003d2b', fontWeight: '600' },
+  replyText: { color: '#82caff', fontSize: 12 },
+  replyInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1b1b1f',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+    marginTop: 8,
+    marginLeft: 34,
+    paddingHorizontal: 10,
   },
-  commentStatText: {
-    color: '#ccc',
-    fontSize: 12,
-  },
-  commentUpvoteTextActive: {
-    color: '#003d2b',
-    fontWeight: '600',
-  },
-  replyText: {
-    color: '#82caff',
-    fontSize: 12,
+  replyInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 6 },
+  replySendButton: {
+    backgroundColor: '#5b2eff',
+    padding: 6,
+    borderRadius: 8,
+    marginLeft: 6,
   },
 });
