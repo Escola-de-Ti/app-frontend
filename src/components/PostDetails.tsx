@@ -96,6 +96,8 @@ export function PostDetails() {
         </View>
       </TouchableOpacity>
 
+      <View style={styles.divider} />
+
       <View style={styles.commentsSection}>
         <Text style={styles.commentTitle}>Comentários ({comments.length})</Text>
         {comments.map((comment) => (
@@ -228,7 +230,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
-
   upvoteContainer: {
     marginTop: 16,
     flexDirection: 'row',
@@ -252,8 +253,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  divider: {
+    marginTop: 24,
+    marginBottom: 10,
+    borderBottomColor: '#3a3a40',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+
   commentsSection: {
-    marginTop: 22,
+    marginTop: 10,
   },
   commentTitle: {
     color: '#b3b3ff',
@@ -305,7 +313,6 @@ const styles = StyleSheet.create({
     gap: 14,
     marginLeft: 34,
   },
-
   commentUpvoteContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -326,7 +333,6 @@ const styles = StyleSheet.create({
     color: '#003d2b',
     fontWeight: '600',
   },
-
   replyText: {
     color: '#82caff',
     fontSize: 12,
