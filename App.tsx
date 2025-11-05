@@ -18,8 +18,8 @@ export default function App() {
     <SafeAreaProvider>
       <View style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* <PostDetails /> */}
-          <PostCard />
+          <PostDetails />
+          {/* <PostCard /> */}
           {/* <CreatePostScreen /> */}
           {/* <RegisterScreen /> */}
           {/* <LoginScreen /> */}

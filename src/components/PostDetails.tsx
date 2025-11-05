@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
@@ -11,6 +11,9 @@ type Comment = {
 };
 
 export function PostDetails() {
+  const [postUpvoted, setPostUpvoted] = useState(false);
+  const [postUpvotes, setPostUpvotes] = useState(0);
+
   const post = {
     userName: 'Willyan Tomaz',
     userLevel: '13',
@@ -27,14 +30,14 @@ export function PostDetails() {
       user: 'Andre Jacob',
       content:
         'Excelente post! Eu também passei por uma experiência similar ao implementar Clean Architecture em um projeto grande. Uma dica que funcionou bem foi começar pela camada de domínio e ir expandindo gradualmente.',
-      upvotes: 21,
+      upvotes: 0,
       replies: [
         {
           id: '1-1',
           user: 'Willyan Tomaz',
           content:
             'Perfeito, André! É exatamente assim que comecei também. Essa abordagem ajuda a manter o foco.',
-          upvotes: 8,
+          upvotes: 0,
         },
       ],
     },
@@ -42,9 +45,18 @@ export function PostDetails() {
       id: '2',
       user: 'Maria Souza',
       content: 'Conteúdo sensacional! Poderia compartilhar o repositório?',
-      upvotes: 14,
+      upvotes: 0,
     },
   ];
+
+  const handlePostUpvote = () => {
+    if (postUpvoted) {
+      setPostUpvotes(postUpvotes - 1);
+    } else {
+      setPostUpvotes(postUpvotes + 1);
+    }
+    setPostUpvoted(!postUpvoted);
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -75,6 +87,15 @@ export function PostDetails() {
 
       <Text style={styles.content}>{post.content}</Text>
 
+      <TouchableOpacity onPress={handlePostUpvote} activeOpacity={0.8}>
+        <View style={[styles.upvoteContainer, postUpvoted && styles.upvoteActive]}>
+          <Feather name="arrow-up" size={16} color={postUpvoted ? '#003d2b' : '#fff'} />
+          <Text style={[styles.upvoteText, postUpvoted && styles.upvoteTextActive]}>
+            {postUpvotes}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
       <View style={styles.commentsSection}>
         <Text style={styles.commentTitle}>Comentários ({comments.length})</Text>
         {comments.map((comment) => (
@@ -86,6 +107,18 @@ export function PostDetails() {
 }
 
 function CommentItem({ comment, depth }: { comment: Comment; depth: number }) {
+  const [upvoted, setUpvoted] = useState(false);
+  const [upvotes, setUpvotes] = useState(comment.upvotes);
+
+  const handleUpvote = () => {
+    if (upvoted) {
+      setUpvotes(upvotes - 1);
+    } else {
+      setUpvotes(upvotes + 1);
+    }
+    setUpvoted(!upvoted);
+  };
+
   return (
     <View style={[styles.commentContainer, { marginLeft: depth * 20 }]}>
       <View style={styles.commentHeader}>
@@ -100,10 +133,15 @@ function CommentItem({ comment, depth }: { comment: Comment; depth: number }) {
       </View>
 
       <View style={styles.commentFooter}>
-        <View style={styles.commentStat}>
-          <Feather name="arrow-up" size={14} color="#21d07a" />
-          <Text style={styles.commentStatText}>{comment.upvotes}</Text>
-        </View>
+        <TouchableOpacity onPress={handleUpvote} activeOpacity={0.8}>
+          <View style={[styles.commentUpvoteContainer, upvoted && styles.commentUpvoteActive]}>
+            <Feather name="arrow-up" size={13} color={upvoted ? '#003d2b' : '#fff'} />
+            <Text style={[styles.commentStatText, upvoted && styles.commentUpvoteTextActive]}>
+              {upvotes}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
         <TouchableOpacity>
           <Text style={styles.replyText}>Responder</Text>
         </TouchableOpacity>
@@ -190,6 +228,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
+
+  upvoteContainer: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: 'transparent',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  upvoteActive: {
+    backgroundColor: '#6ef7c3',
+  },
+  upvoteText: {
+    color: '#ccc',
+    fontSize: 13,
+  },
+  upvoteTextActive: {
+    color: '#003d2b',
+    fontWeight: '600',
+  },
+
   commentsSection: {
     marginTop: 22,
   },
@@ -243,15 +305,28 @@ const styles = StyleSheet.create({
     gap: 14,
     marginLeft: 34,
   },
-  commentStat: {
+
+  commentUpvoteContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: 'transparent',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  commentUpvoteActive: {
+    backgroundColor: '#6ef7c3',
   },
   commentStatText: {
     color: '#ccc',
     fontSize: 12,
   },
+  commentUpvoteTextActive: {
+    color: '#003d2b',
+    fontWeight: '600',
+  },
+
   replyText: {
     color: '#82caff',
     fontSize: 12,
