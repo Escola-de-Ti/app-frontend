@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { CommentItem } from '../components/CommentItem';
 
 type Comment = {
   id: string;
@@ -30,14 +31,14 @@ export function PostDetails() {
       user: 'Andre Jacob',
       content:
         'Excelente post! Eu também passei por uma experiência similar ao implementar Clean Architecture em um projeto grande. Uma dica que funcionou bem foi começar pela camada de domínio e ir expandindo gradualmente.',
-      upvotes: 0,
+      upvotes: 2,
       replies: [
         {
           id: '1-1',
           user: 'Willyan Tomaz',
           content:
             'Perfeito, André! É exatamente assim que comecei também. Essa abordagem ajuda a manter o foco.',
-          upvotes: 0,
+          upvotes: 1,
         },
       ],
     },
@@ -50,12 +51,8 @@ export function PostDetails() {
   ];
 
   const handlePostUpvote = () => {
-    if (postUpvoted) {
-      setPostUpvotes(postUpvotes - 1);
-    } else {
-      setPostUpvotes(postUpvotes + 1);
-    }
     setPostUpvoted(!postUpvoted);
+    setPostUpvotes((prev) => prev + (postUpvoted ? -1 : 1));
   };
 
   return (
@@ -82,9 +79,7 @@ export function PostDetails() {
       </View>
 
       <Text style={styles.title}>{post.title}</Text>
-
       {post.imageUri && <Image source={{ uri: post.imageUri }} style={styles.image} />}
-
       <Text style={styles.content}>{post.content}</Text>
 
       <TouchableOpacity onPress={handlePostUpvote} activeOpacity={0.8}>
@@ -105,55 +100,6 @@ export function PostDetails() {
         ))}
       </View>
     </ScrollView>
-  );
-}
-
-function CommentItem({ comment, depth }: { comment: Comment; depth: number }) {
-  const [upvoted, setUpvoted] = useState(false);
-  const [upvotes, setUpvotes] = useState(comment.upvotes);
-
-  const handleUpvote = () => {
-    if (upvoted) {
-      setUpvotes(upvotes - 1);
-    } else {
-      setUpvotes(upvotes + 1);
-    }
-    setUpvoted(!upvoted);
-  };
-
-  return (
-    <View style={[styles.commentContainer, { marginLeft: depth * 20 }]}>
-      <View style={styles.commentHeader}>
-        <View style={styles.commentAvatar}>
-          <Text style={styles.commentAvatarText}>{comment.user.charAt(0).toUpperCase()}</Text>
-        </View>
-        <Text style={styles.commentUser}>{comment.user}</Text>
-      </View>
-
-      <View style={styles.commentBox}>
-        <Text style={styles.commentText}>{comment.content}</Text>
-      </View>
-
-      <View style={styles.commentFooter}>
-        <TouchableOpacity onPress={handleUpvote} activeOpacity={0.8}>
-          <View style={[styles.commentUpvoteContainer, upvoted && styles.commentUpvoteActive]}>
-            <Feather name="arrow-up" size={13} color={upvoted ? '#003d2b' : '#fff'} />
-            <Text style={[styles.commentStatText, upvoted && styles.commentUpvoteTextActive]}>
-              {upvotes}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity>
-          <Text style={styles.replyText}>Responder</Text>
-        </TouchableOpacity>
-      </View>
-
-      {comment.replies &&
-        comment.replies.map((reply) => (
-          <CommentItem key={reply.id} comment={reply} depth={depth + 1} />
-        ))}
-    </View>
   );
 }
 
@@ -252,14 +198,12 @@ const styles = StyleSheet.create({
     color: '#003d2b',
     fontWeight: '600',
   },
-
   divider: {
     marginTop: 24,
     marginBottom: 10,
     borderBottomColor: '#3a3a40',
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-
   commentsSection: {
     marginTop: 10,
   },
@@ -267,74 +211,5 @@ const styles = StyleSheet.create({
     color: '#b3b3ff',
     fontWeight: '600',
     marginBottom: 10,
-  },
-  commentContainer: {
-    marginBottom: 14,
-  },
-  commentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  commentAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 50,
-    backgroundColor: '#333',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  commentAvatarText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  commentUser: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  commentBox: {
-    backgroundColor: '#1b1b1f',
-    borderLeftWidth: 3,
-    borderLeftColor: '#5b2eff',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginBottom: 6,
-  },
-  commentText: {
-    color: '#ccc',
-    fontSize: 13,
-  },
-  commentFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginLeft: 34,
-  },
-  commentUpvoteContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'transparent',
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  commentUpvoteActive: {
-    backgroundColor: '#6ef7c3',
-  },
-  commentStatText: {
-    color: '#ccc',
-    fontSize: 12,
-  },
-  commentUpvoteTextActive: {
-    color: '#003d2b',
-    fontWeight: '600',
-  },
-  replyText: {
-    color: '#82caff',
-    fontSize: 12,
   },
 });
