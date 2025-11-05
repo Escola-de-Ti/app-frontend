@@ -11,6 +11,8 @@ import { Feather } from '@expo/vector-icons';
 
 export function PostCard() {
   const [menuVisible, setMenuVisible] = useState(false);
+  const [hasUpvoted, setHasUpvoted] = useState(false);
+  const [upvotes, setUpvotes] = useState(0);
 
   const post = {
     userName: 'Gabriel Marassi',
@@ -20,8 +22,16 @@ export function PostCard() {
     description:
       'Estou tentando conciliar faculdade, projetos pessoais e cursos online. Alguém tem uma rotina que funcione bem?',
     tag: 'Dúvida',
-    upvotes: 102,
-    comments: 37,
+    comments: 0,
+  };
+
+  const handleUpvote = () => {
+    if (hasUpvoted) {
+      setUpvotes(upvotes - 1);
+    } else {
+      setUpvotes(upvotes + 1);
+    }
+    setHasUpvoted(!hasUpvoted);
   };
 
   return (
@@ -58,10 +68,15 @@ export function PostCard() {
         </View>
 
         <View style={styles.stats}>
-          <View style={styles.statItem}>
-            <Feather name="arrow-up" size={16} color="#fff" />
-            <Text style={styles.statText}>{post.upvotes}</Text>
-          </View>
+          <TouchableOpacity onPress={handleUpvote} activeOpacity={0.8}>
+            <View style={[styles.upvoteContainer, hasUpvoted && styles.upvoteActive]}>
+              <Feather name="arrow-up" size={16} color={hasUpvoted ? '#003d2b' : '#fff'} />
+              <Text style={[styles.upvoteText, hasUpvoted && styles.upvoteTextActive]}>
+                {upvotes}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
           <View style={styles.statItem}>
             <Feather name="message-circle" size={16} color="#fff" />
             <Text style={styles.statText}>{post.comments}</Text>
@@ -206,11 +221,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
+  upvoteContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'transparent',
+    borderRadius: 20,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  upvoteText: {
+    color: '#ccc',
+    fontSize: 13,
+  },
+  upvoteActive: {
+    backgroundColor: '#6ef7c3',
+  },
+  upvoteTextActive: {
+    color: '#003d2b',
+    fontWeight: '600',
+  },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'transparent',
   },
-
   menu: {
     position: 'absolute',
     right: 20,
@@ -225,7 +260,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 10,
   },
-
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
