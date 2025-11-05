@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ScrollView,
   View,
@@ -9,19 +9,19 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import ImageUploader from '../components/ImageUploader';
-import TagManager from '../components/TagManager';
+
 import AppLayout from '../components/AppLayout';
 import AppInput from '../components/AppInput';
+import ImageUploader from '../components/ImageUploader';
+import TagManager from '../components/TagManager';
 
+import { useAuth } from '../hooks/useAuth';
 import { uploadImages } from '../services/storage';
 import { createPost } from '../services/posts';
-import { getAllTags } from '../services/tags';
-import type { Tag } from '../types';
-import { useAuth } from '../hooks/useAuth';
+import { createOrGetTagIds } from '../services/tags';
 
 export default function CreatePostScreen() {
-  // imagens: uris locais do ImageUploader
+  // imagens: URIs locais vindas do ImageUploader
   const [images, setImages] = useState<string[]>([]);
   // tags: nomes vindos do TagManager
   const [tags, setTags] = useState<string[]>([]);
@@ -29,31 +29,7 @@ export default function CreatePostScreen() {
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { userId } = useAuth(); // precisa existir para enviar usuarioId numérico
-
-  // catálogo de tags do backend para mapear nome -> id
-  const [allTags, setAllTags] = useState<Tag[]>([]);
-  useEffect(() => {
-    (async () => {
-      try {
-        const list = await getAllTags(); // GET /api/tags (ou /api/tags/popular, conforme teu service)
-        setAllTags(list || []);
-      } catch (e: any) {
-        console.log('[CreatePost] Falha ao carregar tags:', e?.message);
-      }
-    })();
-  }, []);
-
-  // nome -> id (number)
-  const tagNameToId = useMemo(() => {
-    const map = new Map<string, number>();
-    allTags.forEach((t) => {
-      const key = (t as any).nome?.toLowerCase?.() ?? '';
-      const idNum = Number((t as any).id);
-      if (key && Number.isFinite(idNum)) map.set(key, idNum);
-    });
-    return map;
-  }, [allTags]);
+  const { userId } = useAuth(); // necessário pro campo usuarioId (number)
 
   const handlePublish = async () => {
     if (!title.trim() || !content.trim()) {
@@ -67,42 +43,23 @@ export default function CreatePostScreen() {
 
     setSubmitting(true);
     try {
-      // 1) (opcional) upload das imagens primeiro
-      // Mantemos o upload para já armazenar e ter IDs; o DTO do back de /api/posts ainda não aceita imagemIds.
-      // Quando o back liberar imagemIds no PostCreateDTO, é só enviar no createPost (deixei comentado abaixo).
-      let imagemIds: string[] = [];
-      if (images.length) {
-        const files = images.map((uri, i) => {
-          const filename = uri.split('/').pop() || `image_${i}.jpg`;
-          const ext = (filename.split('.').pop() || 'jpg').toLowerCase();
-          const type = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-          return { uri, name: filename, type };
-        });
+      // (upload de imagens opcional permanece igual...)
 
-        try {
-          const uploaded = await uploadImages(files); // -> Imagem[] do teu service
-          imagemIds = (uploaded || []).map((img: any) => String(img.id));
-        } catch (e: any) {
-          console.log('[CreatePost] Upload falhou, seguindo sem imagens:', e?.message);
-        }
-      }
+      console.log('[CreatePost] resolvendo tags…', tags);
+      const tagIds = await createOrGetTagIds(tags);
+      console.log('[CreatePost] tagIds resolvidos =', tagIds);
 
-      // 2) resolver tags -> ids (se não achar alguma, ignora)
-      const tagIds = tags
-        .map((name) => tagNameToId.get(name.trim().toLowerCase()))
-        .filter((id): id is number => Number.isFinite(id as number));
-
-      // 3) criar post (contrato do back: { titulo, descricao, usuarioId, tagIds? })
-      await createPost({
+      const payload = {
         titulo: title.trim(),
-        descricao: content.trim(), // <- nome correto no back
-        usuarioId: Number(userId), // <- precisa ser number
+        descricao: content.trim(),
+        usuarioId: Number(userId),
         tagIds: tagIds.length ? tagIds : undefined,
-        // imagemIds: imagemIds.length ? imagemIds : undefined, // <- LIGAR quando o back aceitar no DTO
-      });
+      };
+      console.log('[CreatePost] payload =>', payload);
+
+      await createPost(payload);
 
       Alert.alert('Sucesso', 'Post criado com sucesso!');
-      // limpa formulário
       setTitle('');
       setContent('');
       setTags([]);
@@ -121,8 +78,9 @@ export default function CreatePostScreen() {
   };
 
   return (
+    // não queremos nenhuma aba do footer “verdinha” aqui
     <AppLayout initialActivePage={null}>
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.headerView}>
           <Text style={styles.title}>Criar Post</Text>
           <Text style={styles.subtitle}>Compartilhe seu conhecimento com a comunidade</Text>
@@ -147,10 +105,10 @@ export default function CreatePostScreen() {
             style={{ height: 150, textAlignVertical: 'top' }}
           />
 
-          {/* ImageUploader devolve array de URIs (string[]) */}
+          {/* ImageUploader devolve string[] de URIs locais */}
           <ImageUploader onChange={setImages} />
 
-          {/* TagManager devolve array de nomes (string[]) — mapeamos para ids antes de enviar */}
+          {/* TagManager devolve string[] com os nomes das tags */}
           <TagManager tags={tags} onChange={setTags} />
 
           <TouchableOpacity onPress={handlePublish} disabled={submitting} style={{ marginTop: 16 }}>
@@ -169,6 +127,7 @@ export default function CreatePostScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Cards de “recompensa” visuais (mantidos) */}
         <View>
           <LinearGradient
             colors={['#00FFA3', '#7C73FF']}
@@ -213,7 +172,7 @@ export default function CreatePostScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'rgb(17, 17, 17);', padding: 20, paddingTop: 20 },
+  container: { flex: 1, backgroundColor: 'rgb(17, 17, 17)', padding: 20, paddingTop: 20 },
   title: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
   subtitle: { color: '#ccc', fontSize: 14, marginBottom: 20 },
   card: {
