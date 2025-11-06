@@ -17,7 +17,7 @@ const ROUTES = {
   CREATE_WORKSHOP: 'WorkshopScreen',
   FEED: 'FeedScreen',
   RANKING: 'Ranking',
-  PROFILE: 'Perfil',
+  PROFILE: 'ProfileScreen',
 };
 
 export default function Footer({ translateY, activePage, onChangePage }: Props) {

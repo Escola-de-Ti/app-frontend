@@ -13,6 +13,7 @@ import AuthScreen from './src/screens/AuthScreen';
 import CreateWorkshopScreen from './src/screens/CreateWorkshopScreen';
 import WorkshopScreen from './src/screens/WorkshopsScreen';
 import FeedScreen from './src/screens/FeedScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -34,6 +35,7 @@ function Router() {
             <Stack.Screen name="CreatePost" component={CreatePostScreen} />
             <Stack.Screen name="CreateWorkshopScreen" component={CreateWorkshopScreen} />
             <Stack.Screen name="WorkshopScreen" component={WorkshopScreen} />
+            <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
           </>
         ) : (
           // Telas públicas
