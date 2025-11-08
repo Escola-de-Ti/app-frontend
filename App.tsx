@@ -3,8 +3,8 @@ import { StyleSheet, View, ScrollView, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Modal from 'react-native-modal';
 
-import { PostCard } from './src/components/PostCard';
-import { PostDetails } from './src/components/PostDetails';
+import { PostCard } from './src/components/posts/PostCard';
+import { PostDetails } from './src/components/posts/PostDetails';
 
 export default function App() {
   const [isModalVisible, setModalVisible] = useState(false);

@@ -12,7 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { CommentItem } from '../components/CommentItem';
+import { CommentItem } from '../CommentItem';
 
 type Comment = {
   id: string;
@@ -243,6 +243,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 10,
   },
-  commentInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 8 },
+  commentInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 8, minHeight: 50 },
   sendButton: { marginLeft: 10, backgroundColor: '#5b2eff', padding: 8, borderRadius: 8 },
 });

@@ -36,6 +36,8 @@ export function CommentItem({ comment, depth, onReply }: CommentProps) {
     Alert.alert('Perfil', `Abrir perfil de ${comment.user}`);
   };
 
+  const borderColor = depth > 0 ? '#F08E90' : '#5b2eff';
+
   return (
     <View style={[styles.commentContainer, { marginLeft: depth * 20 }]}>
       <View style={styles.commentHeader}>
@@ -51,7 +53,7 @@ export function CommentItem({ comment, depth, onReply }: CommentProps) {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.commentBox}>
+      <View style={[styles.commentBox, { borderLeftColor: borderColor }]}>
         <Text style={styles.commentText}>{comment.content}</Text>
       </View>
 
@@ -110,7 +112,6 @@ const styles = StyleSheet.create({
   commentBox: {
     backgroundColor: '#1b1b1f',
     borderLeftWidth: 3,
-    borderLeftColor: '#5b2eff',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
