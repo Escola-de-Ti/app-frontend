@@ -38,11 +38,10 @@ export interface Imagem {
   key?: string;
 }
 
-export interface Tag {
-  id: ID;
+export type Tag = {
+  id: number | string;
   nome: string;
-  popularidade?: number;
-}
+};
 
 export interface PostItem {
   id: ID;

@@ -1,40 +1,83 @@
 // src/components/TagManager.tsx
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import AppInput from './AppInput';
 import Tag from './Tag';
+import { getPopularTags } from '../services/tags';
 
 interface TagManagerProps {
-  tags: string[];
+  tags: string[]; // nomes selecionados
   onChange: (tags: string[]) => void;
+  maxTags?: number;
+  maxLength?: number;
 }
 
-const suggestedTags = [
-  'React',
-  'JavaScript',
-  'TypeScript',
-  'Python',
-  'React Native',
-  'Clean Architecture',
-  'Node.js',
-];
+const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
 
-export default function TagManager({ tags, onChange }: TagManagerProps) {
-  const [tag, setTag] = useState('');
+export default function TagManager({
+  tags,
+  onChange,
+  maxTags = 10,
+  maxLength = 30,
+}: TagManagerProps) {
+  const [input, setInput] = useState('');
+  const [popular, setPopular] = useState<string[]>([]);
 
-  const addTag = () => {
-    if (tag.trim() && !tags.includes(tag.trim())) {
-      onChange([...tags, tag.trim()]);
-      setTag('');
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const list = await getPopularTags(12);
+      if (!mounted) return;
+      const names = (list ?? []).map((t) => String(t?.name ?? '').trim()).filter(Boolean);
+      setPopular(names);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const selectedSet = useMemo(() => new Set(tags.map(norm)), [tags]);
+
+  const addTag = (raw?: string) => {
+    const value = (raw ?? input).trim().replace(/\s+/g, ' ');
+    if (!value) return;
+
+    if (value.length > maxLength) {
+      Alert.alert('Tag muito grande', `Use no máximo ${maxLength} caracteres.`);
+      return;
     }
+    if (tags.length >= maxTags) {
+      Alert.alert('Limite atingido', `Você pode adicionar até ${maxTags} tags.`);
+      return;
+    }
+
+    const key = norm(value);
+    if (selectedSet.has(key)) {
+      setInput('');
+      return;
+    }
+
+    onChange([...tags, value]);
+    setInput('');
   };
 
   const removeTag = (t: string) => {
-    onChange(tags.filter((tag) => tag !== t));
+    // apenas tira da lista selecionada; NÃO mexe em `popular`
+    onChange(tags.filter((x) => norm(x) !== norm(t)));
   };
 
-  const handleSuggested = (t: string) => {
-    if (!tags.includes(t)) onChange([...tags, t]);
+  const togglePopular = (t: string) => {
+    const key = norm(t);
+    if (selectedSet.has(key)) {
+      // se já selecionada, remove da seleção (popular continua igual)
+      onChange(tags.filter((x) => norm(x) !== key));
+    } else {
+      if (tags.length >= maxTags) {
+        Alert.alert('Limite atingido', `Você pode adicionar até ${maxTags} tags.`);
+        return;
+      }
+      onChange([...tags, t.trim()]);
+    }
   };
 
   return (
@@ -43,28 +86,36 @@ export default function TagManager({ tags, onChange }: TagManagerProps) {
 
       {/* Input + Botão */}
       <View style={styles.tagInputRow}>
-        <AppInput placeholder="Digite sua tag..." value={tag} onChangeText={setTag} />
-        <TouchableOpacity onPress={addTag} style={styles.addTagButton}>
+        <AppInput
+          placeholder="Digite sua tag e pressione Enter..."
+          value={input}
+          onChangeText={setInput}
+          onSubmitEditing={() => addTag()}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <TouchableOpacity onPress={() => addTag()} style={styles.addTagButton}>
           <Text style={styles.addTagText}>Adicionar</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Tags criadas */}
+      {/* Selecionadas */}
       <View style={styles.tagList}>
-        {tags.map((t: string, i: number) => (
-          <Tag key={`tag-${i}`} name={`${t} ✕`} type="added" onPress={() => removeTag(t)} />
+        {tags.map((t, i) => (
+          <Tag key={`sel-${i}-${t}`} name={t} type="added" removable onPress={() => removeTag(t)} />
         ))}
       </View>
 
-      {/* Tags sugeridas */}
-      <Text style={styles.label}>Tags sugeridas:</Text>
+      {/* Populares (independentes da seleção; só mudamos o visual via `active`) */}
+      {!!popular.length && <Text style={styles.label}>Populares:</Text>}
       <View style={styles.tagList}>
-        {suggestedTags.map((t: string, i: number) => (
+        {popular.map((t, i) => (
           <Tag
-            key={`suggested-${i}`}
+            key={`pop-${i}-${t}`}
             name={t}
             type="suggested"
-            onPress={() => handleSuggested(t)}
+            active={selectedSet.has(norm(t))} // destaca se já estiver selecionada
+            onPress={() => togglePopular(t)}
           />
         ))}
       </View>
@@ -91,15 +142,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
-  },
-  input: {
-    backgroundColor: '#121212',
-    borderColor: '#333',
-    borderWidth: 1,
-    borderRadius: 8,
-    color: '#fff',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
   },
   addTagButton: {
     backgroundColor: '#8f00ff',
