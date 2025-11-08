@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,11 @@ type Comment = {
   replies?: Comment[];
 };
 
-export function PostDetails() {
+type PostDetailsProps = {
+  focusComment?: boolean;
+};
+
+export function PostDetails({ focusComment = false }: PostDetailsProps) {
   const [postUpvoted, setPostUpvoted] = useState(false);
   const [postUpvotes, setPostUpvotes] = useState(0);
   const [comments, setComments] = useState<Comment[]>([
@@ -48,6 +52,13 @@ export function PostDetails() {
   ]);
 
   const [newComment, setNewComment] = useState('');
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (focusComment && inputRef.current) {
+      setTimeout(() => inputRef.current?.focus(), 300);
+    }
+  }, [focusComment]);
 
   const handlePostUpvote = () => {
     setPostUpvoted(!postUpvoted);
@@ -139,6 +150,7 @@ export function PostDetails() {
 
         <View style={styles.inputContainer}>
           <TextInput
+            ref={inputRef}
             style={styles.commentInput}
             placeholder="Escreva um comentário..."
             placeholderTextColor="#888"
