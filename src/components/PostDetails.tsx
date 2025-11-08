@@ -7,6 +7,8 @@ import {
   Image,
   TouchableOpacity,
   TextInput,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { CommentItem } from '../components/CommentItem';
@@ -24,8 +26,14 @@ type PostDetailsProps = {
 };
 
 export function PostDetails({ focusComment = false }: PostDetailsProps) {
+  const [menuVisible, setMenuVisible] = useState(false);
   const [postUpvoted, setPostUpvoted] = useState(false);
   const [postUpvotes, setPostUpvotes] = useState(0);
+
+  const currentUser = 'Willyan Tomaz'; // mock de usuário logado
+  const postAuthor = 'Willyan Tomaz';
+  const isAuthor = currentUser === postAuthor;
+
   const [comments, setComments] = useState<Comment[]>([
     {
       id: '1',
@@ -42,12 +50,6 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
           upvotes: 1,
         },
       ],
-    },
-    {
-      id: '2',
-      user: 'Maria Souza',
-      content: 'Conteúdo sensacional! Poderia compartilhar o repositório?',
-      upvotes: 0,
     },
   ]);
 
@@ -69,38 +71,13 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
     if (newComment.trim() === '') return;
     const newEntry: Comment = {
       id: Date.now().toString(),
-      user: 'Você',
+      user: currentUser,
       content: newComment.trim(),
       upvotes: 0,
       replies: [],
     };
     setComments((prev) => [...prev, newEntry]);
     setNewComment('');
-  };
-
-  const handleReply = (parentId: string, replyText: string) => {
-    if (replyText.trim() === '') return;
-
-    const addReplyRecursively = (list: Comment[]): Comment[] =>
-      list.map((comment) => {
-        if (comment.id === parentId) {
-          const newReply: Comment = {
-            id: Date.now().toString(),
-            user: 'Você',
-            content: replyText.trim(),
-            upvotes: 0,
-          };
-          return {
-            ...comment,
-            replies: [...(comment.replies || []), newReply],
-          };
-        }
-        return comment.replies
-          ? { ...comment, replies: addReplyRecursively(comment.replies) }
-          : comment;
-      });
-
-    setComments((prev) => addReplyRecursively(prev));
   };
 
   return (
@@ -112,7 +89,7 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
           </View>
           <View>
             <View style={styles.nameRow}>
-              <Text style={styles.userName}>Willyan Tomaz</Text>
+              <Text style={styles.userName}>{postAuthor}</Text>
               <View style={styles.levelContainer}>
                 <Text style={styles.levelText}>Nvl. 13</Text>
               </View>
@@ -121,9 +98,11 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
           </View>
         </View>
 
-        <TouchableOpacity>
-          <Feather name="more-horizontal" size={20} color="#aaa" />
-        </TouchableOpacity>
+        {isAuthor && (
+          <TouchableOpacity onPress={() => setMenuVisible(true)}>
+            <Feather name="more-horizontal" size={20} color="#aaa" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <Text style={styles.title}>Como implementar Clean Architecture em projetos Node.js</Text>
@@ -164,29 +143,41 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
         </View>
 
         {comments.map((comment) => (
-          <CommentItem key={comment.id} comment={comment} depth={0} onReply={handleReply} />
+          <CommentItem key={comment.id} comment={comment} depth={0} onReply={() => {}} />
         ))}
       </View>
+
+      {isAuthor && (
+        <Modal
+          transparent
+          visible={menuVisible}
+          animationType="fade"
+          onRequestClose={() => setMenuVisible(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.menu}>
+                <TouchableOpacity style={styles.menuItem}>
+                  <Feather name="edit-3" size={14} color="#fff" />
+                  <Text style={styles.menuText}>Editar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.menuItem}>
+                  <Feather name="trash-2" size={14} color="#ff6666" />
+                  <Text style={[styles.menuText, { color: '#ff6666' }]}>Apagar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#0b0b0f',
-    flex: 1,
-    padding: 16,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
+  container: { backgroundColor: '#0b0b0f', flex: 1, padding: 16 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  userInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: {
     width: 38,
     height: 38,
@@ -195,43 +186,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  userName: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
-  },
+  avatarText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  userName: { color: '#fff', fontWeight: '600', fontSize: 15 },
   levelContainer: {
     backgroundColor: '#182848',
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  levelText: {
-    color: '#82caff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  postDate: {
-    color: '#aaa',
-    fontSize: 12,
-  },
-  title: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 17,
-    marginTop: 14,
-    marginBottom: 10,
-  },
+  levelText: { color: '#82caff', fontSize: 12, fontWeight: '600' },
+  postDate: { color: '#aaa', fontSize: 12 },
+  title: { color: '#fff', fontWeight: '700', fontSize: 17, marginTop: 14, marginBottom: 10 },
   image: {
     width: '100%',
     height: 180,
@@ -239,47 +205,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#1b1b1f',
     marginBottom: 12,
   },
-  content: {
-    color: '#ccc',
-    fontSize: 14,
-    lineHeight: 22,
-  },
+  content: { color: '#ccc', fontSize: 14, lineHeight: 22 },
   upvoteContainer: {
     marginTop: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     alignSelf: 'flex-start',
-    backgroundColor: 'transparent',
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  upvoteActive: {
-    backgroundColor: '#6ef7c3',
-  },
-  upvoteText: {
-    color: '#ccc',
-    fontSize: 13,
-  },
-  upvoteTextActive: {
-    color: '#003d2b',
-    fontWeight: '600',
-  },
+  upvoteActive: { backgroundColor: '#6ef7c3' },
+  upvoteText: { color: '#ccc', fontSize: 13 },
+  upvoteTextActive: { color: '#003d2b', fontWeight: '600' },
   divider: {
     marginTop: 24,
     marginBottom: 10,
     borderBottomColor: '#3a3a40',
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  commentsSection: {
-    marginTop: 10,
-  },
-  commentTitle: {
-    color: '#b3b3ff',
-    fontWeight: '600',
-    marginBottom: 10,
-  },
+  commentsSection: { marginTop: 10 },
+  commentTitle: { color: '#b3b3ff', fontWeight: '600', marginBottom: 10 },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -290,16 +237,24 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 10,
   },
-  commentInput: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 14,
-    paddingVertical: 8,
-  },
-  sendButton: {
-    marginLeft: 10,
-    backgroundColor: '#5b2eff',
-    padding: 8,
+  commentInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 8 },
+  sendButton: { marginLeft: 10, backgroundColor: '#5b2eff', padding: 8, borderRadius: 8 },
+  modalOverlay: { flex: 1, backgroundColor: 'transparent' },
+  menu: {
+    position: 'absolute',
+    right: 20,
+    top: 60,
+    backgroundColor: '#1f1f23',
     borderRadius: 8,
+    paddingVertical: 6,
+    width: 120,
   },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  menuText: { color: '#fff', fontSize: 13, fontWeight: '500' },
 });

@@ -21,6 +21,8 @@ export function PostCard({ onPress, onCommentPress }: PostCardProps) {
   const [upvotes, setUpvotes] = useState(0);
   const [comments, setComments] = useState(37);
 
+  const currentUser = 'Gabriel Marassi';
+
   const post = {
     userName: 'Gabriel Marassi',
     userLevel: '14',
@@ -30,6 +32,8 @@ export function PostCard({ onPress, onCommentPress }: PostCardProps) {
       'Estou tentando conciliar faculdade, projetos pessoais e cursos online. Alguém tem uma rotina que funcione bem?',
     tag: 'Dúvida',
   };
+
+  const isAuthor = currentUser === post.userName;
 
   const handleUpvote = () => {
     setHasUpvoted(!hasUpvoted);
@@ -61,9 +65,11 @@ export function PostCard({ onPress, onCommentPress }: PostCardProps) {
             </View>
           </View>
 
-          <TouchableOpacity onPress={() => setMenuVisible(true)} activeOpacity={0.7}>
-            <Feather name="more-horizontal" size={22} color="#ccc" />
-          </TouchableOpacity>
+          {isAuthor && (
+            <TouchableOpacity onPress={() => setMenuVisible(true)} activeOpacity={0.7}>
+              <Feather name="more-horizontal" size={22} color="#ccc" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.body}>
@@ -103,27 +109,29 @@ export function PostCard({ onPress, onCommentPress }: PostCardProps) {
           </View>
         </View>
 
-        <Modal
-          transparent
-          visible={menuVisible}
-          animationType="fade"
-          onRequestClose={() => setMenuVisible(false)}
-        >
-          <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
-            <View style={styles.modalOverlay}>
-              <View style={styles.menu}>
-                <TouchableOpacity style={styles.menuItem}>
-                  <Feather name="edit-3" size={14} color="#fff" />
-                  <Text style={styles.menuText}>Editar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.menuItem}>
-                  <Feather name="trash-2" size={14} color="#ff6666" />
-                  <Text style={[styles.menuText, { color: '#ff6666' }]}>Apagar</Text>
-                </TouchableOpacity>
+        {isAuthor && (
+          <Modal
+            transparent
+            visible={menuVisible}
+            animationType="fade"
+            onRequestClose={() => setMenuVisible(false)}
+          >
+            <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+              <View style={styles.modalOverlay}>
+                <View style={styles.menu}>
+                  <TouchableOpacity style={styles.menuItem}>
+                    <Feather name="edit-3" size={14} color="#fff" />
+                    <Text style={styles.menuText}>Editar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.menuItem}>
+                    <Feather name="trash-2" size={14} color="#ff6666" />
+                    <Text style={[styles.menuText, { color: '#ff6666' }]}>Apagar</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </TouchableWithoutFeedback>
-        </Modal>
+            </TouchableWithoutFeedback>
+          </Modal>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -187,7 +195,6 @@ const styles = StyleSheet.create({
   },
 
   tagText: { color: '#8a73ff', fontSize: 13, fontWeight: '600' },
-
   stats: { flexDirection: 'row', gap: 20 },
 
   upvoteContainer: {
@@ -199,7 +206,6 @@ const styles = StyleSheet.create({
   },
 
   upvoteText: { color: '#ccc', fontSize: 13 },
-
   upvoteActive: { backgroundColor: '#6ef7c3', borderRadius: 20 },
 
   upvoteTextActive: { color: '#003d2b', fontWeight: '600' },
