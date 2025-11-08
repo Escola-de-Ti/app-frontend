@@ -1,4 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
+// === src/screens/CreateWorkshopScreen.tsx ===
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ScrollView,
   View,
@@ -11,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Image,
   Switch,
+  Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppLayout from '../components/AppLayout';
@@ -18,24 +20,50 @@ import AppInput from '../components/AppInput';
 import ImageUploader from '../components/ImageUploader';
 import TagManager from '../components/TagManager';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import Toast from 'react-native-toast-message';
+import { useNavigation, useRoute } from '@react-navigation/native';
+
+import type { Workshop } from '../types';
+import { getWorkshopById, createWorkshop, updateWorkshop } from '../services/workshops';
+import { getCurrentUserId } from '../lib/secure';
+
+/* ===== Helpers de data locais (independentes de outros módulos) ===== */
+function toIsoWithMillis(d: Date): string {
+  // ISO completo com milissegundos (ex.: 2025-11-08T14:23:45.123Z)
+  return new Date(d).toISOString();
+}
+function toUtcNoMillis(d: Date): string {
+  // ISO UTC SEM milissegundos (ex.: 2025-11-08T14:23:45Z)
+  return new Date(d).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+/* ==================================================================== */
+
+type RouteParams = { id?: number };
 
 export default function CreateWorkshopScreen() {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const { id } = (route?.params || {}) as RouteParams;
+  const isEdit = useMemo(() => typeof id === 'number', [id]);
+
   // Media & meta
   const [images, setImages] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
 
-  // Fields
+  // Campos principais
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [capacity, setCapacity] = useState('');
-  const [price, setPrice] = useState(''); // R$ string (ex: 99.90)
 
-  // Modality & location
+  // Modalidade
   const [isOnline, setIsOnline] = useState(false);
   const [meetingLink, setMeetingLink] = useState('');
   const [address, setAddress] = useState('');
 
-  // Date/Time
+  // Capacidade / Tokens (UI apenas por enquanto)
+  const [capacity, setCapacity] = useState('');
+  const [tokens, setTokens] = useState('');
+
+  // Datas
   const [startAt, setStartAt] = useState<Date>(new Date());
   const [endAt, setEndAt] = useState<Date>(new Date(Date.now() + 2 * 60 * 60 * 1000));
   const [showStartPicker, setShowStartPicker] = useState(false);
@@ -46,127 +74,151 @@ export default function CreateWorkshopScreen() {
   const titleCount = title.trim().length;
   const descriptionCount = description.trim().length;
 
-  const canPublish = useMemo(() => {
-    const _title = title.trim();
-    const _desc = description.trim();
-    const _cap = Number(capacity);
-
-    const baseOk = _title.length >= 4 && _desc.length >= 20 && !Number.isNaN(_cap) && _cap > 0;
-    const locOk = isOnline ? meetingLink.trim().length >= 6 : address.trim().length >= 6;
-    const timeOk = startAt.getTime() < endAt.getTime();
-    const mediaOk = tags.length <= 10 && images.length <= 10;
-
-    return baseOk && locOk && timeOk && mediaOk && !loading;
-  }, [
-    title,
-    description,
-    capacity,
-    isOnline,
-    meetingLink,
-    address,
-    startAt,
-    endAt,
-    tags,
-    images,
-    loading,
-  ]);
-
-  const getMimeFromFilename = (filename: string) => {
-    const ext = (filename.split('.').pop() || '').toLowerCase();
-    if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
-    if (ext === 'png') return 'image/png';
-    if (ext === 'heic') return 'image/heic';
-    if (ext === 'webp') return 'image/webp';
-    return 'application/octet-stream';
-  };
-
   const formatDateTime = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
-  const handlePublish = useCallback(async () => {
+  // carregar dados no modo edição
+  useEffect(() => {
+    if (!isEdit) return;
+    (async () => {
+      try {
+        setLoading(true);
+        const w: Workshop = await getWorkshopById(id!);
+        setTitle(w.titulo ?? '');
+        // alguns backs modelam descrição como objeto { tema, descricao }
+        // outros como string simples; tratamos os dois:
+        const desc = (w as any)?.descricao?.descricao ?? (w as any)?.descricao ?? '';
+        setDescription(desc);
+        setStartAt(w.dataInicio ?? new Date());
+        setEndAt((w as any).dataTermino ?? new Date(Date.now() + 2 * 60 * 60 * 1000));
+
+        const link = (w as any).linkMeet ?? '';
+        setIsOnline(!!link);
+        setMeetingLink(link);
+        setAddress('');
+
+        // Se o back já trouxer:
+        if ((w as any)?.vagasTotais != null) setCapacity(String((w as any).vagasTotais));
+        if ((w as any)?.tokens != null) setTokens(String((w as any).tokens));
+      } catch (e: any) {
+        Toast.show({ type: 'error', text1: 'Falha ao carregar', text2: e?.message ?? '' });
+        navigation.goBack();
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [isEdit, id, navigation]);
+
+  // validação (somente UX/visual)
+  const canPublish = useMemo(() => {
     const _title = title.trim();
     const _desc = description.trim();
-    const _cap = Number(capacity);
+    const baseOk = _title.length >= 4 && _desc.length >= 20;
+    const linkOk = isOnline ? meetingLink.trim().length >= 6 : true;
+    const timeOk = startAt.getTime() < endAt.getTime();
+    const mediaOk = tags.length <= 10 && images.length <= 10;
+    return baseOk && linkOk && timeOk && mediaOk && !loading;
+  }, [title, description, isOnline, meetingLink, startAt, endAt, tags, images, loading]);
 
-    if (_title.length < 4) return Alert.alert('Título curto', 'Use pelo menos 4 caracteres.');
-    if (_desc.length < 20)
-      return Alert.alert('Descrição curta', 'Escreva pelo menos 20 caracteres.');
-    if (Number.isNaN(_cap) || _cap <= 0)
-      return Alert.alert('Capacidade inválida', 'Informe um número maior que zero.');
-    if (!(startAt.getTime() < endAt.getTime()))
-      return Alert.alert('Horário inválido', 'A data/hora de início deve ser antes do término.');
-    if (tags.length > 10) return Alert.alert('Tags demais', 'Use no máximo 10 tags.');
-    if (images.length > 10) return Alert.alert('Imagens demais', 'Envie no máximo 10 imagens.');
-    if (isOnline && meetingLink.trim().length < 6)
-      return Alert.alert('Link inválido', 'Informe um link válido para o encontro online.');
-    if (!isOnline && address.trim().length < 6)
-      return Alert.alert('Endereço curto', 'Informe um endereço válido.');
+  const handlePublish = useCallback(async () => {
+    Toast.show({ type: 'info', text1: 'Publicar', text2: 'Disparando validação...' });
+
+    const _title = title.trim();
+    const _desc = description.trim();
+
+    // validações
+    if (_title.length < 4) {
+      Toast.show({ type: 'error', text1: 'Título curto', text2: 'Use pelo menos 4 caracteres.' });
+      Alert.alert('Título curto', 'Use pelo menos 4 caracteres.');
+      return;
+    }
+    if (_desc.length < 20) {
+      Toast.show({ type: 'error', text1: 'Descrição curta', text2: 'Mínimo de 20 caracteres.' });
+      Alert.alert('Descrição curta', 'Escreva pelo menos 20 caracteres.');
+      return;
+    }
+    if (!(startAt.getTime() < endAt.getTime())) {
+      Toast.show({ type: 'error', text1: 'Horário inválido', text2: 'Início antes do término.' });
+      Alert.alert('Horário inválido', 'A data/hora de início deve ser antes do término.');
+      return;
+    }
+    if (tags.length > 10) {
+      Toast.show({ type: 'error', text1: 'Tags demais', text2: 'Máx. 10 tags.' });
+      Alert.alert('Tags demais', 'Use no máximo 10 tags.');
+      return;
+    }
+    if (images.length > 10) {
+      Toast.show({ type: 'error', text1: 'Imagens demais', text2: 'Máx. 10 imagens.' });
+      Alert.alert('Imagens demais', 'Envie no máximo 10 imagens.');
+      return;
+    }
+    if (isOnline && meetingLink.trim().length < 6) {
+      Toast.show({ type: 'error', text1: 'Link inválido', text2: 'Informe um link válido.' });
+      Alert.alert('Link inválido', 'Informe um link válido para o encontro online.');
+      return;
+    }
 
     try {
       setLoading(true);
-      const formData = new FormData();
+      const tema = _title;
+      Toast.show({ type: 'info', text1: isEdit ? 'Salvando...' : 'Publicando...' });
 
-      images.forEach((uri, i) => {
-        const filename = uri.split('/').pop() || `image-${i}.jpg`;
-        const type = getMimeFromFilename(filename);
-        formData.append('files', { uri, name: filename, type } as any);
+      if (isEdit) {
+        const payload = {
+          titulo: _title,
+          linkMeet: isOnline ? meetingLink.trim() : undefined,
+          dataInicio: toIsoWithMillis(startAt),
+          dataTermino: toIsoWithMillis(endAt),
+          descricao: { tema, descricao: _desc },
+        };
+        await updateWorkshop(id!, payload as any);
+        Toast.show({ type: 'success', text1: 'Workshop atualizado!' });
+      } else {
+        // Tenta obter instrutorId; se não vier, deixa o back deduzir pelo token
+        const maybeId = await getCurrentUserId();
+
+        const basePayload: any = {
+          titulo: _title,
+          linkMeet: isOnline ? meetingLink.trim() : undefined,
+          dataInicio: toUtcNoMillis(startAt),
+          dataTermino: toUtcNoMillis(endAt),
+          descricao: { tema, descricao: _desc },
+        };
+        if (Number.isFinite(Number(maybeId))) {
+          basePayload.instrutorId = Number(maybeId);
+        }
+
+        await createWorkshop(basePayload);
+        Toast.show({ type: 'success', text1: 'Workshop criado!' });
+      }
+
+      navigation.goBack();
+    } catch (err: any) {
+      console.log('❌ save failed', err?.response?.status, err?.response?.data || err?.message);
+      Toast.show({
+        type: 'error',
+        text1: `Erro ${err?.response?.status ?? ''}`.trim(),
+        text2: err?.response?.data?.message || err?.message || 'Erro ao salvar',
       });
-
-      formData.append('title', _title);
-      formData.append('description', _desc);
-      formData.append('capacity', String(_cap));
-      formData.append('price', price.trim());
-      formData.append('isOnline', JSON.stringify(isOnline));
-      formData.append('meetingLink', meetingLink.trim());
-      formData.append('address', address.trim());
-      formData.append('startAt', startAt.toISOString());
-      formData.append('endAt', endAt.toISOString());
-      formData.append('tags', JSON.stringify(tags));
-
-      // Exemplo de envio — não defina 'Content-Type' manualmente (o RN cuida do boundary)
-      /*
-      const response = await fetch('http://192.168.0.105:3000/workshops', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!response.ok) throw new Error('Erro ao criar workshop');
-      const data = await response.json();
-      */
-
-      console.log('📦 Workshop pronto para envio:', {
-        title: _title,
-        description: _desc,
-        capacity: _cap,
-        price,
-        isOnline,
-        meetingLink,
-        address,
-        startAt,
-        endAt,
-        tags,
-        images,
-      });
-
-      Alert.alert('Simulação', 'Workshop pronto para ser enviado ao servidor!');
-      handleClear();
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Erro', 'Falha ao preparar o workshop.');
+      Alert.alert(
+        `Erro ${err?.response?.status ?? ''}`.trim(),
+        err?.response?.data?.message || err?.message || 'Erro ao salvar'
+      );
     } finally {
       setLoading(false);
     }
   }, [
+    isEdit,
+    id,
     title,
     description,
-    capacity,
-    price,
     isOnline,
     meetingLink,
-    address,
     startAt,
     endAt,
+    navigation,
     tags,
     images,
   ]);
@@ -174,13 +226,13 @@ export default function CreateWorkshopScreen() {
   const handleClear = useCallback(() => {
     setTitle('');
     setDescription('');
-    setCapacity('');
-    setPrice('');
     setIsOnline(false);
     setMeetingLink('');
     setAddress('');
     setImages([]);
     setTags([]);
+    setCapacity('');
+    setTokens('');
     setStartAt(new Date());
     setEndAt(new Date(Date.now() + 2 * 60 * 60 * 1000));
   }, []);
@@ -192,9 +244,13 @@ export default function CreateWorkshopScreen() {
         behavior={Platform.select({ ios: 'padding', android: undefined })}
         keyboardVerticalOffset={Platform.select({ ios: 64, android: 0 })}
       >
-        <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          style={styles.container}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 48 }}
+        >
           <View style={styles.headerView}>
-            <Text style={styles.title}>Criar Workshop</Text>
+            <Text style={styles.title}>{isEdit ? 'Editar Workshop' : 'Criar Workshop'}</Text>
             <Text style={styles.subtitle}>
               Divulgue seu evento e compartilhe conhecimento ao vivo
             </Text>
@@ -247,7 +303,7 @@ export default function CreateWorkshopScreen() {
               />
             ) : (
               <AppInput
-                placeholder="Endereço do local (rua, número, cidade)"
+                placeholder="Endereço do local (apenas visual)"
                 value={address}
                 onChangeText={setAddress}
                 autoCapitalize="sentences"
@@ -293,7 +349,7 @@ export default function CreateWorkshopScreen() {
               </View>
             </View>
 
-            {/* Capacidade e preço */}
+            {/* Capacidade / Tokens — UI (não enviados ainda) */}
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Capacidade</Text>
@@ -306,12 +362,12 @@ export default function CreateWorkshopScreen() {
               </View>
               <View style={{ width: 12 }} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Preço (R$)</Text>
+                <Text style={styles.label}>Tokens</Text>
                 <AppInput
-                  placeholder="Ex.: 99.90 (opcional)"
-                  value={price}
-                  onChangeText={setPrice}
-                  keyboardType="decimal-pad"
+                  placeholder="Ex.: 100"
+                  value={tokens}
+                  onChangeText={(v: string) => setTokens(v.replace(/[^0-9]/g, ''))}
+                  keyboardType="number-pad"
                 />
               </View>
             </View>
@@ -344,10 +400,13 @@ export default function CreateWorkshopScreen() {
                 <Text style={styles.btnText}>Limpar</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={canPublish ? handlePublish : undefined}
-                activeOpacity={0.9}
-                disabled={!canPublish}
+              {/* Botão SEMPRE chama handlePublish; opacidade usa canPublish só pra UX */}
+              <Pressable
+                onPress={handlePublish}
+                hitSlop={12}
+                style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+                accessibilityRole="button"
+                accessibilityLabel={isEdit ? 'Salvar workshop' : 'Publicar workshop'}
               >
                 <LinearGradient
                   colors={['#00FFA3', '#7C73FF']}
@@ -359,15 +418,15 @@ export default function CreateWorkshopScreen() {
                     <ActivityIndicator />
                   ) : (
                     <Text style={[styles.btnText, { color: '#000', fontWeight: '800' }]}>
-                      Publicar
+                      {isEdit ? 'Salvar' : 'Publicar'}
                     </Text>
                   )}
                 </LinearGradient>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
 
-          {/* Dica visual (opcional) */}
+          {/* Dicas */}
           <LinearGradient
             colors={['#00FFA3', '#7C73FF']}
             start={{ x: 0, y: 0 }}

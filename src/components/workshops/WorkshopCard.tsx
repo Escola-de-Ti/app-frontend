@@ -20,28 +20,48 @@ export default function WorkshopCard({
   primaryLabel,
   secondaryLabel,
 }: Props) {
+  const isOnline = !!item.linkMeet;
+
   return (
     <View style={s.card}>
       <Text style={s.title} numberOfLines={2}>
         {item.titulo}
       </Text>
 
-      {item.local ? <Text style={s.local}>{item.local}</Text> : null}
+      {/* Tema (se houver) */}
+      {item.descricao?.tema ? (
+        <Text style={s.subTitle} numberOfLines={1}>
+          {item.descricao.tema}
+        </Text>
+      ) : null}
 
-      <Text style={s.desc} numberOfLines={3}>
-        {item.descricao}
-      </Text>
+      {/* Instrutor */}
+      {!!item.instrutorNome && (
+        <Text style={s.meta} numberOfLines={1}>
+          Instrutor: {item.instrutorNome}
+        </Text>
+      )}
 
+      {/* Descrição curta */}
+      {!!item.descricao?.descricao && (
+        <Text style={s.desc} numberOfLines={3}>
+          {item.descricao.descricao}
+        </Text>
+      )}
+
+      {/* Badges */}
       <View style={s.badgesRow}>
-        <Badge>{item.nivel}</Badge>
-        <Badge>{item.tokens} tokens</Badge>
-        {typeof item.vagasDisponiveis === 'number' && typeof item.vagasTotais === 'number' ? (
-          <Badge>
-            {item.vagasDisponiveis}/{item.vagasTotais} vagas
-          </Badge>
-        ) : null}
+        <Badge>
+          {item.status === 'ABERTO'
+            ? 'Aberto'
+            : item.status === 'EM_ANDAMENTO'
+              ? 'Em andamento'
+              : 'Concluído'}
+        </Badge>
+        <Badge>{isOnline ? 'Online' : 'Presencial'}</Badge>
       </View>
 
+      {/* Quando */}
       <Text style={s.when}>{formatWorkshopDateRange(item)}</Text>
 
       {(onPrimary || onSecondary) && (
@@ -106,7 +126,8 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   title: { color: '#fff', fontSize: 18, fontWeight: '600' },
-  local: { color: '#9ca3af', marginTop: 4 },
+  subTitle: { color: '#bdbdbd', marginTop: 4 },
+  meta: { color: '#9ca3af', marginTop: 4 },
   desc: { color: '#d1d5db', marginTop: 8 },
   badgesRow: {
     flexDirection: 'row',

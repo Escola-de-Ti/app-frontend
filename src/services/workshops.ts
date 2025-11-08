@@ -1,27 +1,43 @@
 // === src/services/workshops.ts ===
 import { api } from '../api/client';
-import type { Workshop, WorkshopDTO } from '../types';
+import type { Workshop, WorkshopDTO, WorkshopCreateDTO, WorkshopUpdateDTO } from '../types';
 import { mapWorkshopDTO } from '../types';
 
-export async function listAvailableWorkshops(): Promise<Workshop[]> {
-  const { data } = await api.get<WorkshopDTO[]>('/api/workshops/available');
+export async function listAll(params?: {
+  status?: 'ABERTO' | 'EM_ANDAMENTO' | 'CONCLUIDO';
+  instrutorId?: number;
+}): Promise<Workshop[]> {
+  const { data } = await api.get<WorkshopDTO[]>('/api/workshops', { params });
   return data.map(mapWorkshopDTO);
 }
 
-export async function listMyWorkshops(): Promise<Workshop[]> {
-  const { data } = await api.get<WorkshopDTO[]>('/api/workshops/mine');
+export async function listOpen(): Promise<Workshop[]> {
+  const { data } = await api.get<WorkshopDTO[]>('/api/workshops/abertos');
   return data.map(mapWorkshopDTO);
 }
 
-export async function listEnrolledWorkshops(): Promise<Workshop[]> {
-  const { data } = await api.get<WorkshopDTO[]>('/api/workshops/enrolled');
+export async function searchByTitle(termo: string): Promise<Workshop[]> {
+  const { data } = await api.get<WorkshopDTO[]>('/api/workshops/buscar', {
+    params: { termo },
+  });
   return data.map(mapWorkshopDTO);
 }
 
-export async function enrollInWorkshop(id: number): Promise<void> {
-  await api.post(`/api/workshops/${id}/enroll`);
+export async function getWorkshopById(id: number): Promise<Workshop> {
+  const { data } = await api.get<WorkshopDTO>(`/api/workshops/${id}`);
+  return mapWorkshopDTO(data);
 }
 
-export async function cancelEnrollment(id: number): Promise<void> {
-  await api.post(`/api/workshops/${id}/cancel`);
+export async function createWorkshop(payload: WorkshopCreateDTO): Promise<Workshop> {
+  const { data } = await api.post<WorkshopDTO>('/api/workshops', payload);
+  return mapWorkshopDTO(data);
+}
+
+export async function updateWorkshop(id: number, payload: WorkshopUpdateDTO): Promise<Workshop> {
+  const { data } = await api.put<WorkshopDTO>(`/api/workshops/${id}`, payload);
+  return mapWorkshopDTO(data);
+}
+
+export async function deleteWorkshop(id: number): Promise<void> {
+  await api.delete(`/api/workshops/${id}`);
 }

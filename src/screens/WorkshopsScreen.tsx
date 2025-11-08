@@ -14,23 +14,17 @@ import { Feather } from '@expo/vector-icons';
 import AppLayout from '../components/AppLayout';
 import { useNavigation } from '@react-navigation/native';
 
-import type { Workshop } from '../types';
+import type { Workshop, StatusWorkshop } from '../types';
 import AvailableWorkshops from '../components/workshops/AvailableWorkshops';
 import MyWorkshops from '../components/workshops/MyWorkshops';
 import EnrolledWorkshops from '../components/workshops/EnrolledWorkshops';
-import {
-  listAvailableWorkshops,
-  listMyWorkshops,
-  listEnrolledWorkshops,
-  enrollInWorkshop,
-  cancelEnrollment,
-} from '../services/workshops';
+import { listAll, listOpen } from '../services/workshops';
 
 type Mode = 'Disponíveis' | 'Meus Workshops' | 'Inscritos';
 
-const USE_MOCK = true; // mude para false quando ligar no back
+const USE_MOCK = true;
+const MY_INSTRUTOR_ID = 77;
 
-// --- Dropdown de modo (igual ao seu visual) ---
 function ModeDropdown({ value, onChange }: { value: Mode; onChange: (v: Mode) => void }) {
   const [open, setOpen] = useState(false);
   const opts: Mode[] = ['Disponíveis', 'Meus Workshops', 'Inscritos'];
@@ -71,13 +65,11 @@ export default function WorkshopsScreen() {
   const [mode, setMode] = useState<Mode>('Disponíveis');
   const navigation = useNavigation<any>();
 
-  // estados das listas
   const [loading, setLoading] = useState(false);
   const [available, setAvailable] = useState<Workshop[]>([]);
   const [mine, setMine] = useState<Workshop[]>([]);
   const [enrolled, setEnrolled] = useState<Workshop[]>([]);
 
-  // mocks no formato do nosso tipo Workshop
   const load = async () => {
     setLoading(true);
     try {
@@ -86,52 +78,56 @@ export default function WorkshopsScreen() {
           {
             id: 1,
             titulo: 'Introdução ao React Hooks',
-            descricao: 'Aprenda os conceitos fundamentais dos React Hooks e como utilizá-los.',
-            dataInicio: new Date(Date.now() + 86400000),
-            local: 'Online',
-            nivel: 'BASICO',
-            tokens: 500,
-            vagasTotais: 100,
-            vagasDisponiveis: 82,
-            criadoPorUsuarioId: 10,
-            inscrito: false,
+            linkMeet: 'https://meet.google.com/xxx-xxxx-xxx',
+            status: 'ABERTO',
+            instrutorId: 10,
+            instrutorNome: 'Matheus Rossini',
+            dataCriacao: new Date(),
+            dataInicio: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+            dataTermino: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000),
+            descricao: { tema: 'React Hooks', descricao: 'Fundamentos e boas práticas.' },
           },
           {
             id: 2,
             titulo: 'Python para Análise de Dados',
-            descricao: 'Manipule, analise e visualize dados com Python e Pandas.',
-            dataInicio: new Date(Date.now() + 172800000),
-            local: 'São Paulo — Centro',
-            nivel: 'INTERMEDIARIO',
-            tokens: 650,
-            vagasTotais: 40,
-            vagasDisponiveis: 12,
-            criadoPorUsuarioId: 77,
-            inscrito: true,
+            linkMeet: undefined,
+            status: 'EM_ANDAMENTO',
+            instrutorId: 77,
+            instrutorNome: 'Você',
+            dataCriacao: new Date(),
+            dataInicio: new Date(Date.now() - 1 * 60 * 60 * 1000),
+            dataTermino: new Date(Date.now() + 1 * 60 * 60 * 1000),
+            descricao: { tema: 'Pandas e DataFrames', descricao: 'Hands-on com datasets.' },
           },
           {
             id: 3,
             titulo: 'TypeScript Avançado',
-            descricao: 'Funcionalidades avançadas do TS e padrões de projeto.',
-            dataInicio: new Date(Date.now() + 259200000),
-            nivel: 'AVANCADO',
-            tokens: 300,
-            criadoPorUsuarioId: 77,
-            inscrito: true,
+            linkMeet: 'https://meet.google.com/yyy-yyyy-yyy',
+            status: 'CONCLUIDO',
+            instrutorId: 77,
+            instrutorNome: 'Você',
+            dataCriacao: new Date(),
+            dataInicio: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+            dataTermino: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000),
+            descricao: { tema: 'TS avançado', descricao: 'Generics, Utility Types e patterns.' },
           },
         ];
-        setAvailable(base.filter((b) => !b.inscrito));
-        setMine(base.filter((b) => b.criadoPorUsuarioId === 77));
-        setEnrolled(base.filter((b) => b.inscrito));
+        setAvailable(base.filter((w) => w.status === 'ABERTO'));
+        setMine(base.filter((w) => w.instrutorId === MY_INSTRUTOR_ID));
+        setEnrolled(base.filter((w) => w.status === 'EM_ANDAMENTO' || w.status === 'CONCLUIDO'));
       } else {
-        const [a, m, e] = await Promise.all([
-          listAvailableWorkshops(),
-          listMyWorkshops(),
-          listEnrolledWorkshops(),
+        const [abertos, meus, andamento, concluido] = await Promise.all([
+          listOpen(),
+          listAll({ instrutorId: MY_INSTRUTOR_ID }),
+          listAll({ status: 'EM_ANDAMENTO' }),
+          listAll({ status: 'CONCLUIDO' }),
         ]);
-        setAvailable(a);
-        setMine(m);
-        setEnrolled(e);
+        setAvailable(abertos);
+        setMine(meus);
+        const merged = [...andamento, ...concluido];
+        const uniq = new Map<number, Workshop>();
+        merged.forEach((w) => uniq.set(w.id, w));
+        setEnrolled(Array.from(uniq.values()));
       }
     } finally {
       setLoading(false);
@@ -142,17 +138,13 @@ export default function WorkshopsScreen() {
     load();
   }, []);
 
-  // Handlers (casam com os botões das listas)
+  // Handlers
   const onInscrever = async (id: number) => {
-    if (!USE_MOCK) await enrollInWorkshop(id);
-    Alert.alert('Inscrição', `Você se inscreveu no workshop #${id}`);
-    load();
+    Alert.alert('Inscrição', `Ação de inscrição simulada para o workshop #${id}`);
   };
 
   const onCancelar = async (id: number) => {
-    if (!USE_MOCK) await cancelEnrollment(id);
-    Alert.alert('Inscrição', `Inscrição cancelada para o workshop #${id}`);
-    load();
+    Alert.alert('Inscrição', `Cancelamento de inscrição simulado para o workshop #${id}`);
   };
 
   const onEditar = (id: number) => {
@@ -163,7 +155,6 @@ export default function WorkshopsScreen() {
     navigation.navigate('CreateWorkshopScreen');
   };
 
-  // qual lista mostrar
   const content = useMemo(() => {
     if (mode === 'Disponíveis') {
       return (
@@ -193,12 +184,11 @@ export default function WorkshopsScreen() {
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
 
-        {/* header (igual ao seu layout) */}
+        {/* header */}
         <View style={styles.header}>
           <View style={styles.titleRow}>
             <Text style={styles.h1}>Workshops</Text>
 
-            {/* Botão "Criar workshop" só em "Meus Workshops" */}
             {mode === 'Meus Workshops' && (
               <TouchableOpacity activeOpacity={0.9} onPress={goCreateWorkshop}>
                 <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.createBtn}>
@@ -246,7 +236,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
 
-  /* Botão criar */
   createBtn: {
     borderRadius: 10,
     paddingVertical: 8,

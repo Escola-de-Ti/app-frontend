@@ -1,7 +1,7 @@
 export type ID = string;
 export type OrdenacaoTipo = 'MAIS_RECENTES' | 'MAIS_ANTIGOS' | 'MAIS_POPULARES';
 export type Direcao = 'ASC' | 'DESC';
-export type NivelWorkshop = 'BASICO' | 'INTERMEDIARIO' | 'AVANCADO';
+export type StatusWorkshop = 'ABERTO' | 'EM_ANDAMENTO' | 'CONCLUIDO';
 
 export interface AuthTokens {
   accessToken: string;
@@ -61,38 +61,86 @@ export interface CreatePostDTO {
   imagemIds?: ID[];
 }
 
-export interface Paged<T> {
-  content: T[];
-  totalElements: number;
-  totalPages: number;
-  number: number;
-  size: number;
+export interface DescricaoWorkshopDTO {
+  tema: string;
+  descricao?: string;
 }
 
 export interface WorkshopDTO {
   id: number;
   titulo: string;
-  descricao: string;
+  linkMeet?: string;
+  status: StatusWorkshop;
+  instrutorId: number;
+  instrutorNome: string;
+  dataCriacao: string;
   dataInicio: string;
-  dataFim?: string;
-  local?: string;
-  nivel: NivelWorkshop;
-  tokens: number;
-  vagasTotais?: number;
-  vagasDisponiveis?: number;
-  criadoPorUsuarioId: number;
-  inscrito?: boolean;
+  dataTermino: string;
+  descricao?: DescricaoWorkshopDTO;
 }
 
-export interface Workshop extends Omit<WorkshopDTO, 'dataInicio' | 'dataFim'> {
+export interface Workshop extends Omit<WorkshopDTO, 'dataCriacao' | 'dataInicio' | 'dataTermino'> {
+  dataCriacao: Date;
   dataInicio: Date;
-  dataFim?: Date;
+  dataTermino: Date;
 }
+
+export interface WorkshopCreateDTO {
+  titulo: string;
+  instrutorId: number;
+  linkMeet?: string;
+  dataInicio: string;
+  dataTermino: string;
+  descricao: DescricaoWorkshopDTO;
+}
+
+export type WorkshopUpdateDTO = Partial<{
+  titulo: string;
+  linkMeet?: string;
+  dataInicio: string;
+  dataTermino: string;
+  descricao: DescricaoWorkshopDTO;
+  status: StatusWorkshop;
+}>;
+
+export function toUtcNoMillis(date: Date): string {
+  const two = (n: number) => String(n).padStart(2, '0');
+  const y = date.getUTCFullYear();
+  const m = two(date.getUTCMonth() + 1);
+  const d = two(date.getUTCDate());
+  const hh = two(date.getUTCHours());
+  const mm = two(date.getUTCMinutes());
+  const ss = two(date.getUTCSeconds());
+  return `${y}-${m}-${d}T${hh}:${mm}:${ss}`;
+}
+
+export const toIsoWithMillis = (date: Date) => date.toISOString();
 
 export const mapWorkshopDTO = (dto: WorkshopDTO): Workshop => ({
   ...dto,
+  dataCriacao: new Date(dto.dataCriacao),
   dataInicio: new Date(dto.dataInicio),
-  dataFim: dto.dataFim ? new Date(dto.dataFim) : undefined,
+  dataTermino: new Date(dto.dataTermino),
+});
+
+export const toWorkshopCreateDTO = (w: {
+  titulo: string;
+  instrutorId: number;
+  dataInicio: Date;
+  dataTermino: Date;
+  descricao?: string;
+  tema?: string;
+  linkMeet?: string;
+}): WorkshopCreateDTO => ({
+  titulo: w.titulo.trim(),
+  instrutorId: w.instrutorId,
+  linkMeet: w.linkMeet?.trim() || undefined,
+  dataInicio: toUtcNoMillis(w.dataInicio),
+  dataTermino: toUtcNoMillis(w.dataTermino),
+  descricao: {
+    tema: (w.tema ?? w.titulo).trim(),
+    descricao: w.descricao?.trim() || undefined,
+  },
 });
 
 export const formatWorkshopDateRange = (w: Workshop) => {
@@ -102,5 +150,5 @@ export const formatWorkshopDateRange = (w: Workshop) => {
         ' ' +
         d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '';
-  return w.dataFim ? `${fmt(w.dataInicio)} — ${fmt(w.dataFim)}` : fmt(w.dataInicio);
+  return `${fmt(w.dataInicio)} — ${fmt(w.dataTermino)}`;
 };
