@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 type CommentProps = {
@@ -32,13 +32,23 @@ export function CommentItem({ comment, depth, onReply }: CommentProps) {
     setShowReplyInput(false);
   };
 
+  const handleProfilePress = () => {
+    Alert.alert('Perfil', `Abrir perfil de ${comment.user}`);
+  };
+
   return (
     <View style={[styles.commentContainer, { marginLeft: depth * 20 }]}>
       <View style={styles.commentHeader}>
-        <View style={styles.commentAvatar}>
-          <Text style={styles.commentAvatarText}>{comment.user.charAt(0).toUpperCase()}</Text>
-        </View>
-        <Text style={styles.commentUser}>{comment.user}</Text>
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          activeOpacity={0.8}
+          onPress={handleProfilePress}
+        >
+          <View style={styles.commentAvatar}>
+            <Text style={styles.commentAvatarText}>{comment.user.charAt(0).toUpperCase()}</Text>
+          </View>
+          <Text style={styles.commentUser}>{comment.user}</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.commentBox}>

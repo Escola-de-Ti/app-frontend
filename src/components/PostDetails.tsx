@@ -9,6 +9,7 @@ import {
   TextInput,
   Modal,
   TouchableWithoutFeedback,
+  Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { CommentItem } from '../components/CommentItem';
@@ -76,15 +77,43 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
       upvotes: 0,
       replies: [],
     };
-
     setComments((prev) => [newEntry, ...prev]);
     setNewComment('');
+  };
+
+  const handleReply = (parentId: string, replyText: string) => {
+    const addReply = (list: Comment[]): Comment[] =>
+      list.map((comment) => {
+        if (comment.id === parentId) {
+          const newReply: Comment = {
+            id: Date.now().toString(),
+            user: currentUser,
+            content: replyText,
+            upvotes: 0,
+            replies: [],
+          };
+          return {
+            ...comment,
+            replies: comment.replies ? [...comment.replies, newReply] : [newReply],
+          };
+        }
+        if (comment.replies) {
+          return { ...comment, replies: addReply(comment.replies) };
+        }
+        return comment;
+      });
+
+    setComments((prev) => addReply(prev));
+  };
+
+  const handleProfilePress = () => {
+    Alert.alert('Perfil', `Abrir perfil de ${postAuthor}`);
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.userInfo}>
+        <TouchableOpacity style={styles.userInfo} onPress={handleProfilePress} activeOpacity={0.8}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>W</Text>
           </View>
@@ -97,7 +126,7 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
             </View>
             <Text style={styles.postDate}>2d atrás</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {isAuthor && (
           <TouchableOpacity onPress={() => setMenuVisible(true)}>
@@ -144,33 +173,9 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
         </View>
 
         {comments.map((comment) => (
-          <CommentItem key={comment.id} comment={comment} depth={0} onReply={() => {}} />
+          <CommentItem key={comment.id} comment={comment} depth={0} onReply={handleReply} />
         ))}
       </View>
-
-      {isAuthor && (
-        <Modal
-          transparent
-          visible={menuVisible}
-          animationType="fade"
-          onRequestClose={() => setMenuVisible(false)}
-        >
-          <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
-            <View style={styles.modalOverlay}>
-              <View style={styles.menu}>
-                <TouchableOpacity style={styles.menuItem}>
-                  <Feather name="edit-3" size={14} color="#fff" />
-                  <Text style={styles.menuText}>Editar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.menuItem}>
-                  <Feather name="trash-2" size={14} color="#ff6666" />
-                  <Text style={[styles.menuText, { color: '#ff6666' }]}>Apagar</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableWithoutFeedback>
-        </Modal>
-      )}
     </ScrollView>
   );
 }
@@ -240,22 +245,4 @@ const styles = StyleSheet.create({
   },
   commentInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 8 },
   sendButton: { marginLeft: 10, backgroundColor: '#5b2eff', padding: 8, borderRadius: 8 },
-  modalOverlay: { flex: 1, backgroundColor: 'transparent' },
-  menu: {
-    position: 'absolute',
-    right: 20,
-    top: 60,
-    backgroundColor: '#1f1f23',
-    borderRadius: 8,
-    paddingVertical: 6,
-    width: 120,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-  },
-  menuText: { color: '#fff', fontSize: 13, fontWeight: '500' },
 });

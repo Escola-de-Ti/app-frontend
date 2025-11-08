@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Modal,
+  Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
@@ -46,11 +47,19 @@ export function PostCard({ onPress, onCommentPress }: PostCardProps) {
     onCommentPress();
   };
 
+  const handleProfilePress = () => {
+    Alert.alert('Perfil', `Abrir perfil de ${post.userName}`);
+  };
+
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
       <View style={styles.card}>
         <View style={styles.header}>
-          <View style={styles.userInfo}>
+          <TouchableOpacity
+            style={styles.userInfo}
+            activeOpacity={0.8}
+            onPress={handleProfilePress}
+          >
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{post.userName.charAt(0).toUpperCase()}</Text>
             </View>
@@ -63,7 +72,7 @@ export function PostCard({ onPress, onCommentPress }: PostCardProps) {
               </View>
               <Text style={styles.postDate}>{post.postDate}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           {isAuthor && (
             <TouchableOpacity onPress={() => setMenuVisible(true)} activeOpacity={0.7}>
@@ -155,37 +164,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   avatarText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-
   userName: { color: '#fff', fontWeight: '600', fontSize: 15 },
-
   levelContainer: {
     backgroundColor: '#182848',
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-
   levelText: { color: '#82caff', fontSize: 12, fontWeight: '600' },
-
   postDate: { color: '#aaa', fontSize: 12 },
-
   body: { marginTop: 14 },
-
   title: { color: '#fff', fontWeight: '700', fontSize: 16, marginBottom: 6 },
-
   description: { color: '#ccc', fontSize: 14, lineHeight: 20 },
-
   footer: {
     marginTop: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-
   tagContainer: {
     borderColor: '#8a73ff',
     borderWidth: 1.8,
@@ -193,10 +191,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
   },
-
   tagText: { color: '#8a73ff', fontSize: 13, fontWeight: '600' },
   stats: { flexDirection: 'row', gap: 20 },
-
   upvoteContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -204,12 +200,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 10,
   },
-
   upvoteText: { color: '#ccc', fontSize: 13 },
   upvoteActive: { backgroundColor: '#6ef7c3', borderRadius: 20 },
-
   upvoteTextActive: { color: '#003d2b', fontWeight: '600' },
-
   commentContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -219,9 +212,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  commentContainerActive: {
-    backgroundColor: '#4a334d',
-  },
+  commentContainerActive: { backgroundColor: '#4a334d' },
   commentText: { color: '#ccc', fontSize: 13 },
   commentTextActive: { color: '#ffeaff', fontWeight: '600' },
   modalOverlay: { flex: 1, backgroundColor: 'transparent' },
