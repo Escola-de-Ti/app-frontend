@@ -110,6 +110,16 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
     Alert.alert('Perfil', `Abrir perfil de ${postAuthor}`);
   };
 
+  const handleEdit = () => {
+    setMenuVisible(false);
+    Alert.alert('Editar', 'Função de edição será implementada aqui.');
+  };
+
+  const handleDelete = () => {
+    setMenuVisible(false);
+    Alert.alert('Excluir', 'Função de exclusão será implementada aqui.');
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -135,6 +145,28 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
         )}
       </View>
 
+      <Modal
+        transparent
+        visible={menuVisible}
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.menu}>
+              <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
+                <Feather name="edit-3" size={14} color="#fff" />
+                <Text style={styles.menuText}>Editar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
+                <Feather name="trash-2" size={14} color="#ff6666" />
+                <Text style={[styles.menuText, { color: '#ff6666' }]}>Apagar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       <Text style={styles.title}>Como implementar Clean Architecture em projetos Node.js</Text>
       <Image source={{ uri: 'https://placehold.co/600x300' }} style={styles.image} />
       <Text style={styles.content}>
@@ -153,7 +185,6 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
       </TouchableOpacity>
 
       <View style={styles.divider} />
-
       <View style={styles.commentsSection}>
         <Text style={styles.commentTitle}>Comentários ({comments.length})</Text>
 
@@ -245,4 +276,22 @@ const styles = StyleSheet.create({
   },
   commentInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 8, minHeight: 50 },
   sendButton: { marginLeft: 10, backgroundColor: '#5b2eff', padding: 8, borderRadius: 8 },
+  modalOverlay: { flex: 1, backgroundColor: 'transparent' },
+  menu: {
+    position: 'absolute',
+    right: 20,
+    top: 80,
+    backgroundColor: '#1f1f23',
+    borderRadius: 8,
+    paddingVertical: 6,
+    width: 120,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  menuText: { color: '#fff', fontSize: 13, fontWeight: '500' },
 });
