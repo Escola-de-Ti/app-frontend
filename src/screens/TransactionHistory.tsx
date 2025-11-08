@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
@@ -24,14 +24,21 @@ const transactions: Transaction[] = [
 ];
 
 export function TransactionHistory() {
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+
   const handleSupportPress = () => {
     Alert.alert('Suporte', 'Você entrou em contato com o suporte.');
+  };
+
+  const handleMenuToggle = (id: string) => {
+    setExpandedCard((prev) => (prev === id ? null : id));
   };
 
   const renderItem = ({ item }: { item: Transaction }) => {
     const isPositive = item.amount > 0;
     const amountColor = isPositive ? '#6ef7c3' : '#F08E90';
     const sign = isPositive ? '+' : '';
+    const isExpanded = expandedCard === item.id;
 
     return (
       <View style={styles.card}>
@@ -45,12 +52,14 @@ export function TransactionHistory() {
           </View>
 
           <View style={styles.rightContainer}>
-            <TouchableOpacity style={styles.supportButton} onPress={handleSupportPress}>
-              <Text style={styles.supportText}>Contatar suporte</Text>
-            </TouchableOpacity>
+            {isExpanded && (
+              <TouchableOpacity style={styles.supportButton} onPress={handleSupportPress}>
+                <Text style={styles.supportText}>Contatar suporte</Text>
+              </TouchableOpacity>
+            )}
 
-            <TouchableOpacity activeOpacity={0.8}>
-              <Feather name="info" size={18} color="#ccc" />
+            <TouchableOpacity activeOpacity={0.8} onPress={() => handleMenuToggle(item.id)}>
+              <Feather name="more-horizontal" size={18} color="#ccc" />
             </TouchableOpacity>
           </View>
         </View>
