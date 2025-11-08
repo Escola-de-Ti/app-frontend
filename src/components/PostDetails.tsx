@@ -30,7 +30,7 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
   const [postUpvoted, setPostUpvoted] = useState(false);
   const [postUpvotes, setPostUpvotes] = useState(0);
 
-  const currentUser = 'Willyan Tomaz'; // mock de usuário logado
+  const currentUser = 'Willyan Tomaz';
   const postAuthor = 'Willyan Tomaz';
   const isAuthor = currentUser === postAuthor;
 
@@ -76,7 +76,8 @@ export function PostDetails({ focusComment = false }: PostDetailsProps) {
       upvotes: 0,
       replies: [],
     };
-    setComments((prev) => [...prev, newEntry]);
+
+    setComments((prev) => [newEntry, ...prev]);
     setNewComment('');
   };
 
