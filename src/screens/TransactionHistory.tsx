@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 
 // Tipo compatível com o back-end (HistoricoTransacaoResponseDTO)
 type Transaction = {
-  id: string;
+  id: number;
   quantidade: number;
   motivoDescricao: string;
   descricao: string;
@@ -30,73 +30,72 @@ type HistoricoResponse = {
   totalElements: number;
 };
 
-// Mock local
 const mockTransactions: Transaction[] = [
   {
-    id: '1',
+    id: 1,
     quantidade: 50,
     motivoDescricao: 'Up vote em comentário',
     descricao: 'Recebimento por comentário',
     dataTransacao: '2025-09-13T21:40:00Z',
   },
   {
-    id: '2',
+    id: 2,
     quantidade: -650,
     motivoDescricao: 'Inscrição em workshop como aluno',
     descricao: 'Compra de Workshop',
     dataTransacao: '2025-09-12T20:40:00Z',
   },
   {
-    id: '3',
+    id: 3,
     quantidade: 100,
     motivoDescricao: 'Up vote em comentário',
     descricao: 'Recebimento por comentário',
     dataTransacao: '2025-08-10T13:30:00Z',
   },
   {
-    id: '4',
+    id: 4,
     quantidade: 50,
     motivoDescricao: 'Up vote em comentário',
     descricao: 'Recebimento por comentário',
     dataTransacao: '2025-08-07T12:12:00Z',
   },
   {
-    id: '5',
+    id: 5,
     quantidade: 200,
     motivoDescricao: 'Super vote em comentário',
     descricao: 'Recebimento por SuperVote',
     dataTransacao: '2025-06-13T14:10:00Z',
   },
   {
-    id: '6',
+    id: 6,
     quantidade: -400,
     motivoDescricao: 'Punição por denúncia aceita',
     descricao: 'Dedução por punição',
     dataTransacao: '2025-06-11T21:00:00Z',
   },
   {
-    id: '7',
+    id: 7,
     quantidade: 50,
     motivoDescricao: 'Up vote em comentário',
     descricao: 'Recebimento por comentário',
     dataTransacao: '2025-06-10T20:40:00Z',
   },
   {
-    id: '8',
+    id: 8,
     quantidade: -650,
     motivoDescricao: 'Inscrição em workshop como aluno',
     descricao: 'Compra de Workshop',
     dataTransacao: '2025-06-10T20:35:00Z',
   },
   {
-    id: '9',
+    id: 9,
     quantidade: 50,
     motivoDescricao: 'Up vote em comentário',
     descricao: 'Recebimento por comentário',
     dataTransacao: '2025-06-10T20:30:00Z',
   },
   {
-    id: '10',
+    id: 10,
     quantidade: 50,
     motivoDescricao: 'Up vote em comentário',
     descricao: 'Recebimento por comentário',
@@ -105,15 +104,19 @@ const mockTransactions: Transaction[] = [
 ];
 
 export function TransactionHistory() {
-  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [expandedCard, setExpandedCard] = useState<string | number | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
   const [loading, setLoading] = useState(true);
+
+  // trocar essa URL quando integrar com o back real
+  const API_URL = 'http://localhost:8080/api/historico-transacoes?page=0&size=20';
+  // ou se for rodar no celular: 'http://192.168.0.10:8080/api/historico-transacoes?page=0&size=20'
 
   const handleSupportPress = () => {
     Alert.alert('Suporte', 'Você entrou em contato com o suporte.');
   };
 
-  const handleMenuToggle = (id: string) => {
+  const handleMenuToggle = (id: string | number) => {
     setExpandedCard((prev) => (prev === id ? null : id));
   };
 
@@ -127,11 +130,10 @@ export function TransactionHistory() {
     return { formattedDate, formattedTime };
   };
 
-  // Busca na API, com fallback para mock
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        const response = await fetch('https://sua-api.com/api/historico-transacoes?page=0&size=20');
+        const response = await fetch(API_URL);
 
         if (!response.ok) {
           throw new Error(`Erro ${response.status}`);
@@ -205,14 +207,15 @@ export function TransactionHistory() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Histórico de transações</Text>
+      <Text style={styles.title}>Histórico de Transações</Text>
 
       <FlatList
         data={transactions}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 30 }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 30 }}
+        style={{ flex: 1 }}
       />
     </View>
   );
