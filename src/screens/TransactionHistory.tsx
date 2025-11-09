@@ -1,30 +1,113 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
+// Tipo compatível com o back-end (HistoricoTransacaoResponseDTO)
 type Transaction = {
   id: string;
-  type: string;
-  amount: number;
-  date: string;
-  time: string;
+  quantidade: number;
+  motivoDescricao: string;
+  descricao: string;
+  dataTransacao: string;
 };
 
-const transactions: Transaction[] = [
-  { id: '1', type: 'Recebimento por comentário', amount: 50, date: '13/09/2025', time: '21:40' },
-  { id: '2', type: 'Compra de Workshop', amount: -650, date: '12/09/2025', time: '20:40' },
-  { id: '3', type: 'Recebimento por comentário', amount: 100, date: '10/08/2025', time: '13:30' },
-  { id: '4', type: 'Recebimento por comentário', amount: 50, date: '07/08/2025', time: '12:12' },
-  { id: '5', type: 'Recebimento por SuperVote', amount: 200, date: '13/06/2025', time: '14:10' },
-  { id: '6', type: 'Dedução por demência', amount: -400, date: '11/06/2025', time: '21:00' },
-  { id: '7', type: 'Recebimento por comentário', amount: 50, date: '10/06/2025', time: '20:40' },
-  { id: '8', type: 'Compra de Workshop', amount: -650, date: '10/06/2025', time: '20:35' },
-  { id: '9', type: 'Recebimento por comentário', amount: 50, date: '10/06/2025', time: '20:30' },
-  { id: '10', type: 'Recebimento por comentário', amount: 50, date: '13/05/2025', time: '21:40' },
+// Tipo para o retorno completo da API (HistoricoTransacaoListResponseDTO)
+type HistoricoResponse = {
+  transacoes: Transaction[];
+  totalRecebido: number;
+  totalGasto: number;
+  saldoAtual: number;
+  hasMore: boolean;
+  totalPages: number;
+  totalElements: number;
+};
+
+// Mock local
+const mockTransactions: Transaction[] = [
+  {
+    id: '1',
+    quantidade: 50,
+    motivoDescricao: 'Up vote em comentário',
+    descricao: 'Recebimento por comentário',
+    dataTransacao: '2025-09-13T21:40:00Z',
+  },
+  {
+    id: '2',
+    quantidade: -650,
+    motivoDescricao: 'Inscrição em workshop como aluno',
+    descricao: 'Compra de Workshop',
+    dataTransacao: '2025-09-12T20:40:00Z',
+  },
+  {
+    id: '3',
+    quantidade: 100,
+    motivoDescricao: 'Up vote em comentário',
+    descricao: 'Recebimento por comentário',
+    dataTransacao: '2025-08-10T13:30:00Z',
+  },
+  {
+    id: '4',
+    quantidade: 50,
+    motivoDescricao: 'Up vote em comentário',
+    descricao: 'Recebimento por comentário',
+    dataTransacao: '2025-08-07T12:12:00Z',
+  },
+  {
+    id: '5',
+    quantidade: 200,
+    motivoDescricao: 'Super vote em comentário',
+    descricao: 'Recebimento por SuperVote',
+    dataTransacao: '2025-06-13T14:10:00Z',
+  },
+  {
+    id: '6',
+    quantidade: -400,
+    motivoDescricao: 'Punição por denúncia aceita',
+    descricao: 'Dedução por punição',
+    dataTransacao: '2025-06-11T21:00:00Z',
+  },
+  {
+    id: '7',
+    quantidade: 50,
+    motivoDescricao: 'Up vote em comentário',
+    descricao: 'Recebimento por comentário',
+    dataTransacao: '2025-06-10T20:40:00Z',
+  },
+  {
+    id: '8',
+    quantidade: -650,
+    motivoDescricao: 'Inscrição em workshop como aluno',
+    descricao: 'Compra de Workshop',
+    dataTransacao: '2025-06-10T20:35:00Z',
+  },
+  {
+    id: '9',
+    quantidade: 50,
+    motivoDescricao: 'Up vote em comentário',
+    descricao: 'Recebimento por comentário',
+    dataTransacao: '2025-06-10T20:30:00Z',
+  },
+  {
+    id: '10',
+    quantidade: 50,
+    motivoDescricao: 'Up vote em comentário',
+    descricao: 'Recebimento por comentário',
+    dataTransacao: '2025-05-13T21:40:00Z',
+  },
 ];
 
 export function TransactionHistory() {
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
+  const [loading, setLoading] = useState(true);
 
   const handleSupportPress = () => {
     Alert.alert('Suporte', 'Você entrou em contato com o suporte.');
@@ -34,20 +117,61 @@ export function TransactionHistory() {
     setExpandedCard((prev) => (prev === id ? null : id));
   };
 
+  const formatDateTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const formattedDate = date.toLocaleDateString('pt-BR');
+    const formattedTime = date.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    return { formattedDate, formattedTime };
+  };
+
+  // Busca na API, com fallback para mock
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        const response = await fetch('https://sua-api.com/api/historico-transacoes?page=0&size=20');
+
+        if (!response.ok) {
+          throw new Error(`Erro ${response.status}`);
+        }
+
+        const data: HistoricoResponse = await response.json();
+
+        if (data && Array.isArray(data.transacoes)) {
+          setTransactions(data.transacoes);
+        } else {
+          console.warn('Resposta inesperada da API, usando mock.');
+          setTransactions(mockTransactions);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar histórico:', error);
+        setTransactions(mockTransactions);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, []);
+
   const renderItem = ({ item }: { item: Transaction }) => {
-    const isPositive = item.amount > 0;
+    const isPositive = item.quantidade > 0;
     const amountColor = isPositive ? '#6ef7c3' : '#F08E90';
     const sign = isPositive ? '+' : '';
+
+    const { formattedDate, formattedTime } = formatDateTime(item.dataTransacao);
     const isExpanded = expandedCard === item.id;
 
     return (
       <View style={styles.card}>
         <View style={styles.row}>
           <View style={styles.infoContainer}>
-            <Text style={styles.typeText}>{item.type}</Text>
+            <Text style={styles.typeText}>{item.motivoDescricao}</Text>
             <Text style={[styles.amountText, { color: amountColor }]}>
               {sign}
-              {item.amount} tokens
+              {item.quantidade} tokens
             </Text>
           </View>
 
@@ -65,11 +189,19 @@ export function TransactionHistory() {
         </View>
 
         <Text style={styles.dateText}>
-          {item.date} {item.time}
+          {formattedDate} {formattedTime}
         </Text>
       </View>
     );
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#6ef7c3" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -77,7 +209,7 @@ export function TransactionHistory() {
 
       <FlatList
         data={transactions}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 30 }}
         showsVerticalScrollIndicator={false}
