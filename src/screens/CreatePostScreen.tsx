@@ -16,7 +16,7 @@ import ImageUploader from '../components/ImageUploader';
 import TagManager from '../components/TagManager';
 
 import { useAuth } from '../hooks/useAuth';
-import { uploadImages } from '../services/storage';
+// ⬇️ removido: import { uploadImages } from '../services/storage';
 import { createPost } from '../services/posts';
 import { createOrGetTagIds } from '../services/tags';
 
@@ -32,8 +32,9 @@ export default function CreatePostScreen() {
   const { userId } = useAuth(); // necessário pro campo usuarioId (number)
 
   const handlePublish = async () => {
-    if (!title.trim() || !content.trim()) {
-      Alert.alert('Campos obrigatórios', 'Preencha título e conteúdo antes de publicar.');
+    // ✅ só título é obrigatório para a API
+    if (!title.trim()) {
+      Alert.alert('Campos obrigatórios', 'Preencha o título antes de publicar.');
       return;
     }
     if (!userId || isNaN(Number(userId))) {
@@ -51,7 +52,8 @@ export default function CreatePostScreen() {
 
       const payload = {
         titulo: title.trim(),
-        descricao: content.trim(),
+        // ✅ descrição opcional
+        descricao: content.trim() || undefined,
         usuarioId: Number(userId),
         tagIds: tagIds.length ? tagIds : undefined,
       };
