@@ -176,22 +176,57 @@ export async function getPostDetails(
   }
 }
 
-/** POST /api/comentarios */
+/** POST /api/comentarios
+ * Body esperado pelo back: { postId, texto, comentarioPaiId }
+ */
 export async function createComment(args: {
   postId: number;
   texto: string;
   comentarioPaiId?: number | null;
 }) {
   try {
-    const body = {
-      postId: Number(args.postId),
-      texto: trimOrUndefined(args.texto),
-      comentarioPaiId:
-        typeof args.comentarioPaiId === 'number' ? Number(args.comentarioPaiId) : null,
+    const postId = Number(args.postId);
+    const parent =
+      args.comentarioPaiId == null
+        ? null
+        : Number.isFinite(Number(args.comentarioPaiId))
+          ? Number(args.comentarioPaiId)
+          : null;
+
+    const payload = {
+      postId, // obrigatório
+      texto: (args.texto ?? '').trim(), // string limpa
+      comentarioPaiId: parent, // null p/ raiz, número p/ reply
     };
-    const { data } = await api.post<ComentarioDTO>(COMMENTS_ENDPOINT, body);
+
+    const { data } = await api.post<ComentarioDTO>(COMMENTS_ENDPOINT, payload, {
+      headers: { 'Content-Type': 'application/json' },
+    });
     return data;
   } catch (err: any) {
+    console.log('[createComment][ERR]', err?.response?.status, err?.response?.data);
+    throw new Error(extractErrorMessage(err));
+  }
+}
+
+/** GET /api/comentarios/{comentarioId}/respostas?pageSize= */
+export async function getCommentReplies(
+  comentarioId: number,
+  pageSize: number = 50
+): Promise<ComentarioDTO[]> {
+  try {
+    const { data } = await api.get(`${COMMENTS_ENDPOINT}/${comentarioId}/respostas`, {
+      params: { pageSize },
+    });
+
+    // aceita variações de payload
+    if (Array.isArray(data)) return data as ComentarioDTO[];
+    if (Array.isArray((data as any)?.comentarios))
+      return (data as any).comentarios as ComentarioDTO[];
+    if (Array.isArray((data as any)?.items)) return (data as any).items as ComentarioDTO[];
+    return [];
+  } catch (err: any) {
+    console.log('[getCommentReplies][ERR]', err?.response?.status, err?.response?.data);
     throw new Error(extractErrorMessage(err));
   }
 }
@@ -216,7 +251,7 @@ export async function upvotePost(postId: number): Promise<UpvoteResponse> {
     const totalRaw = (data as any)?.totalUpVotes ?? (data as any)?.upvotes ?? (data as any)?.total;
 
     return {
-      userVoted: Boolean(userVotedRaw ?? true), // se o endpoint não mandar, assume que ficou votado
+      userVoted: Boolean(userVotedRaw ?? true), // se o endpoint não mandar, assume votado
       totalUpVotes: typeof totalRaw === 'number' ? totalRaw : undefined,
     };
   } catch (err: any) {

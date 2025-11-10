@@ -1,6 +1,6 @@
 // src/components/posts/PostCard.tsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Pressable, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import RNModal from 'react-native-modal';
 import { PostDetails } from './PostDetails';
@@ -36,8 +36,6 @@ export function PostCard({
   commentCount,
   initiallyUpvoted,
   onUpvote,
-  onEdit,
-  onDelete,
 }: PostCardProps) {
   const [menuVisible, setMenuVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
@@ -52,7 +50,6 @@ export function PostCard({
     Number(typeof commentCount === 'number' ? commentCount : (post.totalComentarios ?? 0))
   );
 
-  // reidrata quando o item mudar (refresh/paginação)
   useEffect(() => {
     setHasUpvoted(typeof initiallyUpvoted === 'boolean' ? initiallyUpvoted : !!post.usuarioJaVotou);
     setUpvotes(Number(post.totalUpVotes ?? 0));
@@ -71,37 +68,35 @@ export function PostCard({
   const isAuthor = currentUserName && currentUserName === post.nomeUsuario;
   const createdAt = useMemo(() => formatDate(post.dataCriacao), [post.dataCriacao]);
 
-  // TOGGLE no Card (otimista + reconcilia resposta do parent)
   const handleUpvote = async () => {
-    const next = !hasUpvoted;
+    const prevVoted = hasUpvoted;
+    const next = !prevVoted;
 
-    // otimista
     setHasUpvoted(next);
     setUpvotes((prev) => Math.max(0, prev + (next ? 1 : -1)));
 
     try {
-      const result = await onUpvote?.(post.id, next);
+      const result = await onUpvote?.(Number(post.id), next);
       const resp = result as UpvoteResponse | void;
 
-      if (resp && typeof resp === 'object') {
-        const final = typeof resp.userVoted === 'boolean' ? resp.userVoted : next;
-        if (final !== next) {
-          // corrige caso o back discorde do otimista
-          setUpvotes((final) => {
-            // troca para final
-            return final === final ? final : final; // linha neutra; só pra satisfazer TS
-          });
-          setHasUpvoted(final);
-          setUpvotes((prev) => Math.max(0, prev + (final ? 1 : -1)));
-        }
-        if (typeof resp.totalUpVotes === 'number') {
-          setUpvotes(resp.totalUpVotes);
-        }
+      const finalUserVoted =
+        resp && typeof resp === 'object' && typeof resp.userVoted === 'boolean'
+          ? resp.userVoted
+          : next;
+
+      if (finalUserVoted !== next) {
+        setUpvotes((prev) => Math.max(0, prev + (finalUserVoted ? 1 : -1)));
+      }
+      setHasUpvoted(finalUserVoted);
+
+      if (resp && typeof resp.totalUpVotes === 'number') {
+        setUpvotes(resp.totalUpVotes);
       }
     } catch {
-      // rollback
-      setHasUpvoted((prev) => !prev);
-      setUpvotes((prev) => Math.max(0, prev + (hasUpvoted ? 1 : -1)));
+      setHasUpvoted(prevVoted);
+      // desfaz o delta otimista anterior
+      setUpvotes((prev) => Math.max(0, prev + (prevVoted ? 1 : -1)));
+      Alert.alert('Erro', 'Não foi possível registrar seu voto.');
     }
   };
 
@@ -120,7 +115,6 @@ export function PostCard({
     Alert.alert('Perfil', `Abrir perfil de ${post.nomeUsuario}`);
   };
 
-  // sincroniza com o Details (quando ele toggle lá)
   const handleMetaChange = (meta: {
     comments?: number;
     upvotes?: number;
@@ -131,10 +125,14 @@ export function PostCard({
     if (typeof meta.userUpvoted === 'boolean') setHasUpvoted(meta.userUpvoted);
   };
 
-  const closeModal = () => setDetailsVisible(false);
+  const closeModal = () => {
+    setDetailsVisible(false);
+    setFocusComment(false);
+  };
 
   return (
     <>
+      {/* Card */}
       <TouchableOpacity activeOpacity={0.9} onPress={handlePostPress}>
         <View style={styles.card}>
           <View style={styles.header}>
@@ -208,11 +206,10 @@ export function PostCard({
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* menu autor ficou igual, omitido aqui pra encurtar */}
         </View>
       </TouchableOpacity>
 
+      {/* Modal de detalhes */}
       <RNModal
         isVisible={detailsVisible}
         onSwipeComplete={closeModal}
@@ -231,7 +228,7 @@ export function PostCard({
             <Text style={styles.modalTitle}>Comentários</Text>
           </View>
           <PostDetails
-            postId={post.id}
+            postId={Number(post.id)}
             focusComment={focusComment}
             initiallyUpvoted={hasUpvoted}
             initiallyUpvotes={upvotes}
@@ -244,7 +241,6 @@ export function PostCard({
 }
 
 const styles = StyleSheet.create({
-  // ... (mesmos estilos que você já tinha)
   card: {
     backgroundColor: '#141417',
     borderRadius: 14,

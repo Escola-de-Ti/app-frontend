@@ -1,10 +1,22 @@
-import React, { useState } from 'react';
+// src/components/CommentItem.tsx
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
-type CommentModel = {
-  id: string;
-  user: string;
+type ID = string | number;
+
+type UserRef = {
+  id?: ID;
+  nome?: string;
+  name?: string;
+  email?: string;
+  avatarUrl?: string | null;
+};
+
+export type CommentModel = {
+  id: ID;
+  user?: string;
+  author?: UserRef | null;
   content: string;
   upvotes: number;
   replies?: CommentModel[];
@@ -12,26 +24,32 @@ type CommentModel = {
 
 type CommentProps = {
   comment: CommentModel;
-  depth: number;
-  onReply: (parentId: string, replyText: string) => void;
-  onUpvote?: (commentId: string, willUpvote: boolean) => Promise<void> | void;
+  depth?: number;
+  maxDepth?: number;
+  onReply: (parentId: ID, replyText: string) => void;
+  onUpvote?: (commentId: ID, willUpvote: boolean) => Promise<void> | void;
 };
 
-export function CommentItem({ comment, depth, onReply, onUpvote }: CommentProps) {
+export function CommentItem({ comment, depth = 0, maxDepth = 3, onReply, onUpvote }: CommentProps) {
   const [upvoted, setUpvoted] = useState(false);
-  const [upvotes, setUpvotes] = useState(comment.upvotes);
+  const [upvotes, setUpvotes] = useState<number>(Number(comment.upvotes) || 0);
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyText, setReplyText] = useState('');
+
+  const displayUser = useMemo(() => {
+    return comment.user || comment.author?.name || comment.author?.nome || 'Usuário';
+  }, [comment.user, comment.author?.name, comment.author?.nome]);
+
+  const canNest = depth < (maxDepth ?? 3);
 
   const handleUpvote = async () => {
     const willUpvote = !upvoted;
     setUpvoted(willUpvote);
     setUpvotes((prev) => (willUpvote ? prev + 1 : Math.max(0, prev - 1)));
-
     try {
       await onUpvote?.(comment.id, willUpvote);
     } catch {
-      setUpvoted(!willUpvote);
+      setUpvoted((prev) => !prev);
       setUpvotes((prev) => (!willUpvote ? prev + 1 : Math.max(0, prev - 1)));
       Alert.alert('Erro', 'Não foi possível registrar seu voto neste comentário.');
     }
@@ -48,13 +66,13 @@ export function CommentItem({ comment, depth, onReply, onUpvote }: CommentProps)
   const borderColor = depth > 0 ? '#F08E90' : '#5b2eff';
 
   return (
-    <View style={[styles.commentContainer, { marginLeft: depth * 20 }]}>
+    <View style={[styles.commentContainer, { marginLeft: depth * 20 }]} testID="comment-item">
       <View style={styles.commentHeader}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <View style={styles.commentAvatar}>
-            <Text style={styles.commentAvatarText}>{comment.user.charAt(0).toUpperCase()}</Text>
+          <View style={styles.commentAvatar} accessibilityLabel={`Avatar de ${displayUser}`}>
+            <Text style={styles.commentAvatarText}>{displayUser.charAt(0).toUpperCase()}</Text>
           </View>
-          <Text style={styles.commentUser}>{comment.user}</Text>
+          <Text style={styles.commentUser}>{displayUser}</Text>
         </View>
       </View>
 
@@ -63,7 +81,7 @@ export function CommentItem({ comment, depth, onReply, onUpvote }: CommentProps)
       </View>
 
       <View style={styles.commentFooter}>
-        <TouchableOpacity onPress={handleUpvote} activeOpacity={0.8}>
+        <TouchableOpacity onPress={handleUpvote} activeOpacity={0.8} accessibilityRole="button">
           <View style={[styles.commentUpvoteContainer, upvoted && styles.commentUpvoteActive]}>
             <Feather name="arrow-up" size={13} color={upvoted ? '#003d2b' : '#fff'} />
             <Text style={[styles.commentStatText, upvoted && styles.commentUpvoteTextActive]}>
@@ -72,12 +90,18 @@ export function CommentItem({ comment, depth, onReply, onUpvote }: CommentProps)
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => setShowReplyInput((v) => !v)}>
-          <Text style={styles.replyText}>Responder</Text>
-        </TouchableOpacity>
+        {canNest && (
+          <TouchableOpacity
+            onPress={() => setShowReplyInput((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel="Responder"
+          >
+            <Text style={styles.replyText}>Responder</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {showReplyInput && (
+      {canNest && showReplyInput && (
         <View style={styles.replyInputContainer}>
           <TextInput
             style={styles.replyInput}
@@ -86,22 +110,32 @@ export function CommentItem({ comment, depth, onReply, onUpvote }: CommentProps)
             value={replyText}
             onChangeText={setReplyText}
             multiline
+            testID="reply-input"
           />
-          <TouchableOpacity style={styles.replySendButton} onPress={handleSendReply}>
+          <TouchableOpacity
+            style={styles.replySendButton}
+            onPress={handleSendReply}
+            accessibilityRole="button"
+          >
             <Feather name="send" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
       )}
 
-      {comment.replies?.map((reply) => (
-        <CommentItem
-          key={reply.id}
-          comment={reply}
-          depth={depth + 1}
-          onReply={onReply}
-          onUpvote={onUpvote}
-        />
-      ))}
+      {canNest && Array.isArray(comment.replies) && comment.replies.length > 0 && (
+        <View>
+          {comment.replies.map((reply) => (
+            <CommentItem
+              key={String(reply.id)}
+              comment={reply}
+              depth={depth + 1}
+              maxDepth={maxDepth}
+              onReply={onReply}
+              onUpvote={onUpvote}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 }

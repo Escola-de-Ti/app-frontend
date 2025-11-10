@@ -1,14 +1,25 @@
 // src/types/index.ts
-export type ID = string;
+
+export type ID = string | number;
+
 export type OrdenacaoTipo = 'MAIS_RECENTES' | 'MAIS_ANTIGOS' | 'MAIS_POPULARES';
 export type Direcao = 'ASC' | 'DESC';
 export type StatusWorkshop = 'ABERTO' | 'EM_ANDAMENTO' | 'CONCLUIDO';
 
+// ======== Auth / Tokens ========
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
 }
 
+export interface JwtTokenDTO {
+  access_token?: string | null;
+  token_type?: string | null;
+  expires_in?: number | null;
+  refresh_token?: string | null;
+}
+
+// ======== Usuário ========
 export interface Usuario {
   id: ID;
   nome: string;
@@ -33,6 +44,7 @@ export interface RegisterRequest {
   tipoUsuario?: string;
 }
 
+// ======== Mídia / Tag ========
 export interface Imagem {
   id: ID;
   url: string;
@@ -40,10 +52,11 @@ export interface Imagem {
 }
 
 export type Tag = {
-  id: number | string;
+  id: ID;
   nome: string;
 };
 
+// ======== Posts (CRUD básico) ========
 export interface PostItem {
   id: ID;
   titulo: string;
@@ -62,17 +75,18 @@ export interface CreatePostDTO {
   imagemIds?: ID[];
 }
 
+// ======== Workshops ========
 export interface DescricaoWorkshopDTO {
   tema: string;
   descricao?: string;
 }
 
 export interface WorkshopDTO {
-  id: number;
+  id: ID;
   titulo: string;
   linkMeet?: string;
   status: StatusWorkshop;
-  instrutorId: number;
+  instrutorId: ID;
   instrutorNome: string;
   dataCriacao: string;
   dataInicio: string;
@@ -88,7 +102,7 @@ export interface Workshop extends Omit<WorkshopDTO, 'dataCriacao' | 'dataInicio'
 
 export interface WorkshopCreateDTO {
   titulo: string;
-  instrutorId: number;
+  instrutorId: ID;
   linkMeet?: string;
   dataInicio: string;
   dataTermino: string;
@@ -104,6 +118,7 @@ export type WorkshopUpdateDTO = Partial<{
   status: StatusWorkshop;
 }>;
 
+// ======== Utils de data ========
 export function toUtcNoMillis(date: Date): string {
   const two = (n: number) => String(n).padStart(2, '0');
   const y = date.getUTCFullYear();
@@ -126,7 +141,7 @@ export const mapWorkshopDTO = (dto: WorkshopDTO): Workshop => ({
 
 export const toWorkshopCreateDTO = (w: {
   titulo: string;
-  instrutorId: number;
+  instrutorId: ID;
   dataInicio: Date;
   dataTermino: Date;
   descricao?: string;
@@ -155,34 +170,17 @@ export const formatWorkshopDateRange = (w: Workshop) => {
 };
 
 // ======== Feed de Posts ========
-
 export type PostTagModel = Tag;
 
-export interface PostFeedModel {
-  id: number;
-  usuarioId: number;
-  nomeUsuario: string;
-  titulo: string;
-  descricao?: string | null; // <- opcional
-  totalUpVotes: number;
-  totalComentarios?: number; // <- opcional
-  usuarioJaVotou?: boolean; // <- opcional
-  tags: PostTagModel[];
-  dataCriacao: string; // ISO
-  relevanceScore?: number | null; // <- opcional
-  tagsEmComum?: number | null; // <- opcional
-}
-
-// Aceita back mandando "nome" OU "name"
 export interface PostFeedTagDTO {
-  id: number | string;
+  id: ID;
   nome?: string;
   name?: string;
 }
 
 export interface PostFeedDTO {
-  id: number | string;
-  usuarioId: number | string;
+  id: ID;
+  usuarioId: ID;
   nomeUsuario: string;
   titulo: string;
   descricao?: string | null;
@@ -196,9 +194,50 @@ export interface PostFeedDTO {
   tagsEmComum?: number | null;
 }
 
+export interface PostFeedModel {
+  id: ID;
+  usuarioId: ID;
+  nomeUsuario: string;
+  titulo: string;
+  descricao?: string | null;
+  totalUpVotes: number;
+  totalComentarios?: number;
+  usuarioJaVotou?: boolean;
+  tags: PostTagModel[];
+  dataCriacao: string;
+  relevanceScore?: number | null;
+  tagsEmComum?: number | null;
+}
+
 export interface GetFeedResponseDTO {
   posts: PostFeedDTO[];
   lastPostId?: number | null;
   lastScore?: number | null;
   hasMore?: boolean;
 }
+
+// ======== Comentários ========
+export interface UserRef {
+  id: ID;
+  nome?: string;
+  name?: string;
+  avatarUrl?: string | null;
+  email?: string;
+}
+
+export interface CommentDTO {
+  id: ID;
+  postId: ID;
+  autorId?: ID;
+  author?: UserRef | null;
+  conteudo?: string; // pode vir com esse nome em outras telas
+  texto?: string; // alias comum
+  createdAt?: string;
+  updatedAt?: string;
+  parentId?: ID | null;
+  comentarioPaiId?: ID | null;
+  children?: CommentDTO[];
+  repliesCount?: number | null;
+}
+
+export type Comment = CommentDTO;

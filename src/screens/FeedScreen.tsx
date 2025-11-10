@@ -30,14 +30,15 @@ export default function FeedScreen() {
   const didInitRef = useRef(false);
   const initialLoadedRef = useRef(false);
 
-  // cache local de votos (pra manter verdinho pós-F5)
   const votedSetRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const s = await getVotedSet();
-      if (mounted) votedSetRef.current = s;
+      try {
+        const s = await getVotedSet();
+        if (mounted) votedSetRef.current = s;
+      } catch {}
     })();
     return () => {
       mounted = false;
@@ -45,23 +46,30 @@ export default function FeedScreen() {
   }, []);
 
   const mergeById = useCallback((prev: PostFeedModel[], next: PostFeedModel[]) => {
-    const map = new Map<number | string, PostFeedModel>();
+    const map = new Map<string | number, PostFeedModel>();
     for (const p of prev) map.set(p.id, p);
-    for (const n of next) map.set(n.id, n);
-    return Array.from(map.values());
+    for (const n of next) map.set(n.id, { ...(map.get(n.id) ?? ({} as any)), ...n });
+    const out: PostFeedModel[] = [];
+    for (const p of prev) out.push(map.get(p.id)!);
+    for (const n of next) if (!prev.some((p) => p.id === n.id)) out.push(map.get(n.id)!);
+    return out;
   }, []);
 
   const mapPost = useCallback((p: PostFeedDTO): PostFeedModel => {
+    const idNum = Number(p.id);
+    const usuarioIdNum = Number(p.usuarioId);
+    const totalComentarios = Number(
+      (p as any).totalComentarios ?? (p as any).comentariosCount ?? (p as any).comments ?? 0
+    );
+
     const base: PostFeedModel = {
-      id: Number(p.id),
-      usuarioId: Number(p.usuarioId),
+      id: Number.isFinite(idNum) ? idNum : (p.id as any),
+      usuarioId: Number.isFinite(usuarioIdNum) ? usuarioIdNum : (p.usuarioId as any),
       nomeUsuario: p.nomeUsuario,
       titulo: p.titulo,
       descricao: p.descricao ?? '',
       totalUpVotes: Number(p.totalUpVotes ?? 0),
-      totalComentarios: Number(
-        (p as any).totalComentarios ?? (p as any).comentariosCount ?? (p as any).comments ?? 0
-      ),
+      totalComentarios,
       usuarioJaVotou: Boolean((p as any).usuarioJaVotou ?? (p as any).userVoted ?? false),
       tags:
         p.tags?.map((t: any) => ({
@@ -73,8 +81,9 @@ export default function FeedScreen() {
       tagsEmComum: p.tagsEmComum ?? undefined,
     };
 
-    // aplica memória local (verdinho)
-    if (votedSetRef.current.has(base.id)) base.usuarioJaVotou = true;
+    if (typeof base.id === 'number' && votedSetRef.current.has(base.id)) {
+      base.usuarioJaVotou = true;
+    }
     return base;
   }, []);
 
@@ -84,8 +93,8 @@ export default function FeedScreen() {
       const params =
         !isReset && cursorRef.current?.lastPostId != null && cursorRef.current?.lastScore != null
           ? {
-              lastPostId: cursorRef.current.lastPostId,
-              lastScore: cursorRef.current.lastScore,
+              lastPostId: cursorRef.current.lastPostId!,
+              lastScore: cursorRef.current.lastScore!,
             }
           : {};
 
@@ -95,7 +104,7 @@ export default function FeedScreen() {
         lastPostId: (dto as any)?.lastPostId ?? null,
         lastScore: (dto as any)?.lastScore ?? null,
       };
-      setHasMore(!!(dto as any)?.hasMore);
+      setHasMore(Boolean((dto as any)?.hasMore));
 
       const mapped = (dto.posts ?? []).map(mapPost);
       setData((prev) => (isReset ? mapped : mergeById(prev, mapped)));
@@ -108,7 +117,6 @@ export default function FeedScreen() {
   useEffect(() => {
     if (didInitRef.current) return;
     didInitRef.current = true;
-
     (async () => {
       try {
         await fetchFeed({ reset: true });
@@ -132,7 +140,6 @@ export default function FeedScreen() {
   const onEndReached = useCallback(async () => {
     if (!initialLoadedRef.current) return;
     if (loadingMore || !hasMore) return;
-
     setLoadingMore(true);
     try {
       await fetchFeed();
@@ -141,35 +148,29 @@ export default function FeedScreen() {
     }
   }, [fetchFeed, hasMore, loadingMore]);
 
-  // TOGGLE de voto centralizado aqui (fonte da verdade)
   const handleUpvote = useCallback(
     async (postId: number, willUpvote: boolean): Promise<UpvoteResponse | void> => {
       try {
-        const resp = await upvotePost(postId); // deve devolver o estado FINAL
+        const resp = await upvotePost(postId);
         const final = typeof resp?.userVoted === 'boolean' ? resp.userVoted : willUpvote;
 
-        // persiste local
         if (final) {
-          await markVoted(postId);
-          votedSetRef.current.add(postId);
+          await markVoted(Number(postId));
+          votedSetRef.current.add(Number(postId));
         } else {
-          await unmarkVoted(postId);
-          votedSetRef.current.delete(postId);
+          await unmarkVoted(Number(postId));
+          votedSetRef.current.delete(Number(postId));
         }
 
-        // reconcilia na lista
         setData((prev) =>
           prev.map((p) => {
-            if (p.id !== postId) return p;
+            if (Number(p.id) !== Number(postId)) return p;
             const prevVoted = !!p.usuarioJaVotou;
-
             let nextCount =
               typeof resp?.totalUpVotes === 'number'
                 ? resp.totalUpVotes
-                : p.totalUpVotes + (final === prevVoted ? 0 : final ? 1 : -1);
-
+                : (p.totalUpVotes ?? 0) + (final === prevVoted ? 0 : final ? 1 : -1);
             if (!Number.isFinite(nextCount)) nextCount = p.totalUpVotes ?? 0;
-
             return {
               ...p,
               usuarioJaVotou: final,
