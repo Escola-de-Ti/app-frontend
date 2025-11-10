@@ -1,3 +1,4 @@
+// src/types/index.ts
 export type ID = string;
 export type OrdenacaoTipo = 'MAIS_RECENTES' | 'MAIS_ANTIGOS' | 'MAIS_POPULARES';
 export type Direcao = 'ASC' | 'DESC';
@@ -152,3 +153,52 @@ export const formatWorkshopDateRange = (w: Workshop) => {
       : '';
   return `${fmt(w.dataInicio)} — ${fmt(w.dataTermino)}`;
 };
+
+// ======== Feed de Posts ========
+
+export type PostTagModel = Tag;
+
+export interface PostFeedModel {
+  id: number;
+  usuarioId: number;
+  nomeUsuario: string;
+  titulo: string;
+  descricao?: string | null; // <- opcional
+  totalUpVotes: number;
+  totalComentarios?: number; // <- opcional
+  usuarioJaVotou?: boolean; // <- opcional
+  tags: PostTagModel[];
+  dataCriacao: string; // ISO
+  relevanceScore?: number | null; // <- opcional
+  tagsEmComum?: number | null; // <- opcional
+}
+
+// Aceita back mandando "nome" OU "name"
+export interface PostFeedTagDTO {
+  id: number | string;
+  nome?: string;
+  name?: string;
+}
+
+export interface PostFeedDTO {
+  id: number | string;
+  usuarioId: number | string;
+  nomeUsuario: string;
+  titulo: string;
+  descricao?: string | null;
+  totalUpVotes?: number | null;
+  totalComentarios?: number | string | null;
+  userVoted?: boolean | null;
+  usuarioJaVotou?: boolean | null;
+  tags?: PostFeedTagDTO[] | null;
+  dataCriacao: string;
+  relevanceScore?: number | null;
+  tagsEmComum?: number | null;
+}
+
+export interface GetFeedResponseDTO {
+  posts: PostFeedDTO[];
+  lastPostId?: number | null;
+  lastScore?: number | null;
+  hasMore?: boolean;
+}
