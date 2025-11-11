@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,18 +12,21 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import AppLayout from '../components/AppLayout';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
-import type { Workshop, StatusWorkshop } from '../types';
+import type { Workshop } from '../types';
 import AvailableWorkshops from '../components/workshops/AvailableWorkshops';
 import MyWorkshops from '../components/workshops/MyWorkshops';
 import EnrolledWorkshops from '../components/workshops/EnrolledWorkshops';
 import { listAll, listOpen } from '../services/workshops';
 
-type Mode = 'Disponíveis' | 'Meus Workshops' | 'Inscritos';
+// 🔑 resolução de usuário “do jeito certo”
+import { useAuth } from '../hooks/useAuth';
+import { getAccessToken } from '../lib/secure';
+import { getUserIdFromJwt, getEmailFromJwt } from '../lib/jwt';
+import { getUsuarioIdByEmail } from '../services/user';
 
-const USE_MOCK = true;
-const MY_INSTRUTOR_ID = 77;
+type Mode = 'Disponíveis' | 'Meus Workshops' | 'Inscritos';
 
 function ModeDropdown({ value, onChange }: { value: Mode; onChange: (v: Mode) => void }) {
   const [open, setOpen] = useState(false);
@@ -62,89 +65,98 @@ function ModeDropdown({ value, onChange }: { value: Mode; onChange: (v: Mode) =>
 }
 
 export default function WorkshopsScreen() {
-  const [mode, setMode] = useState<Mode>('Disponíveis');
   const navigation = useNavigation<any>();
+  const { userId } = useAuth();
 
+  const [mode, setMode] = useState<Mode>('Disponíveis');
   const [loading, setLoading] = useState(false);
+
   const [available, setAvailable] = useState<Workshop[]>([]);
   const [mine, setMine] = useState<Workshop[]>([]);
   const [enrolled, setEnrolled] = useState<Workshop[]>([]);
 
-  const load = async () => {
+  // 🔑 resolve instrutorId: useAuth → token(userId) → token(email) → API
+  const resolveUserId = useCallback(async (): Promise<number | null> => {
+    if (userId && Number.isFinite(Number(userId))) return Number(userId);
+
+    const at = await getAccessToken().catch(() => null);
+    if (at) {
+      const idFromJwt = getUserIdFromJwt(at);
+      if (idFromJwt && Number.isFinite(Number(idFromJwt))) return Number(idFromJwt);
+
+      const email = getEmailFromJwt(at);
+      if (email) {
+        try {
+          const idByEmail = await getUsuarioIdByEmail(email);
+          if (idByEmail && Number.isFinite(Number(idByEmail))) return Number(idByEmail);
+        } catch {
+          /* silencioso; tratamos no load() */
+        }
+      }
+    }
+    return null;
+  }, [userId]);
+
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      if (USE_MOCK) {
-        const base: Workshop[] = [
-          {
-            id: 1,
-            titulo: 'Introdução ao React Hooks',
-            linkMeet: 'https://meet.google.com/xxx-xxxx-xxx',
-            status: 'ABERTO',
-            instrutorId: 10,
-            instrutorNome: 'Matheus Rossini',
-            dataCriacao: new Date(),
-            dataInicio: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-            dataTermino: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000),
-            descricao: { tema: 'React Hooks', descricao: 'Fundamentos e boas práticas.' },
-          },
-          {
-            id: 2,
-            titulo: 'Python para Análise de Dados',
-            linkMeet: undefined,
-            status: 'EM_ANDAMENTO',
-            instrutorId: 77,
-            instrutorNome: 'Você',
-            dataCriacao: new Date(),
-            dataInicio: new Date(Date.now() - 1 * 60 * 60 * 1000),
-            dataTermino: new Date(Date.now() + 1 * 60 * 60 * 1000),
-            descricao: { tema: 'Pandas e DataFrames', descricao: 'Hands-on com datasets.' },
-          },
-          {
-            id: 3,
-            titulo: 'TypeScript Avançado',
-            linkMeet: 'https://meet.google.com/yyy-yyyy-yyy',
-            status: 'CONCLUIDO',
-            instrutorId: 77,
-            instrutorNome: 'Você',
-            dataCriacao: new Date(),
-            dataInicio: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-            dataTermino: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000),
-            descricao: { tema: 'TS avançado', descricao: 'Generics, Utility Types e patterns.' },
-          },
-        ];
-        setAvailable(base.filter((w) => w.status === 'ABERTO'));
-        setMine(base.filter((w) => w.instrutorId === MY_INSTRUTOR_ID));
-        setEnrolled(base.filter((w) => w.status === 'EM_ANDAMENTO' || w.status === 'CONCLUIDO'));
-      } else {
-        const [abertos, meus, andamento, concluido] = await Promise.all([
-          listOpen(),
-          listAll({ instrutorId: MY_INSTRUTOR_ID }),
-          listAll({ status: 'EM_ANDAMENTO' }),
-          listAll({ status: 'CONCLUIDO' }),
-        ]);
-        setAvailable(abertos);
-        setMine(meus);
-        const merged = [...andamento, ...concluido];
-        const uniq = new Map<number, Workshop>();
-        merged.forEach((w) => uniq.set(w.id, w));
-        setEnrolled(Array.from(uniq.values()));
+      const myId = await resolveUserId();
+
+      // Disponíveis (ABERTOS)
+      let abertos = await listOpen();
+      // se o DTO trouxer `inscrito`, não listar como disponível algo já inscrito
+      abertos = abertos.filter((w: any) => !w?.inscrito);
+      setAvailable(abertos);
+
+      // Meus (por instrutorId)
+      const meus = myId ? await listAll({ instrutorId: myId }) : [];
+      setMine(meus);
+
+      // Inscritos (heurística até existir endpoint dedicado)
+      const andamento = await listAll({ status: 'EM_ANDAMENTO' });
+      const concluido = await listAll({ status: 'CONCLUIDO' });
+
+      let inscritos = [...andamento, ...concluido];
+
+      // 1) se vier `inscrito` do back, usa-o como verdade
+      if (inscritos.some((w: any) => 'inscrito' in w)) {
+        inscritos = inscritos.filter((w: any) => w?.inscrito === true);
       }
+
+      // 2) exclui workshops em que eu sou o instrutor
+      if (myId) {
+        inscritos = inscritos.filter((w) => Number(w.instrutorId) !== Number(myId));
+      }
+
+      // 3) remove duplicatas por id
+      const uniq = new Map<number, Workshop>();
+      inscritos.forEach((w) => uniq.set(Number(w.id), w));
+      setEnrolled(Array.from(uniq.values()));
+    } catch (e: any) {
+      console.log('[WorkshopsScreen] load error:', e?.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [resolveUserId]);
 
-  useEffect(() => {
-    load();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      load(); // chama sua função que já busca listOpen/listAll
+      return () => {}; // cleanup opcional
+    }, [load])
+  );
 
-  // Handlers
+  // Handlers — plugue seus endpoints quando tiver (inscrever/cancelar)
   const onInscrever = async (id: number) => {
     Alert.alert('Inscrição', `Ação de inscrição simulada para o workshop #${id}`);
+    // TODO: await inscreverNoWorkshop(id)
+    // await load();
   };
 
   const onCancelar = async (id: number) => {
     Alert.alert('Inscrição', `Cancelamento de inscrição simulado para o workshop #${id}`);
+    // TODO: await cancelarInscricao(id)
+    // await load();
   };
 
   const onEditar = (id: number) => {
@@ -177,7 +189,7 @@ export default function WorkshopsScreen() {
       );
     }
     return <MyWorkshops data={mine} loading={loading} onRefresh={load} onEdit={onEditar} />;
-  }, [mode, available, enrolled, mine, loading]);
+  }, [mode, available, enrolled, mine, loading, load]);
 
   return (
     <AppLayout initialActivePage="Workshops">
