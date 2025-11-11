@@ -18,25 +18,20 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AppLayout from '../components/AppLayout';
 import AppInput from '../components/AppInput';
 import ImageUploader from '../components/ImageUploader';
-import TagManager from '../components/TagManager';
+// ❌ removido: TagManager
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Toast from 'react-native-toast-message';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
 import type { Workshop } from '../types';
+import { toUtcNoMillis, toIsoWithMillis } from '../types';
 import { getWorkshopById, createWorkshop, updateWorkshop } from '../services/workshops';
-import { getCurrentUserId } from '../lib/secure';
 
-/* ===== Helpers de data locais (independentes de outros módulos) ===== */
-function toIsoWithMillis(d: Date): string {
-  // ISO completo com milissegundos (ex.: 2025-11-08T14:23:45.123Z)
-  return new Date(d).toISOString();
-}
-function toUtcNoMillis(d: Date): string {
-  // ISO UTC SEM milissegundos (ex.: 2025-11-08T14:23:45Z)
-  return new Date(d).toISOString().replace(/\.\d{3}Z$/, 'Z');
-}
-/* ==================================================================== */
+// ✅ resolução de usuário "do jeito certo"
+import { useAuth } from '../hooks/useAuth';
+import { getAccessToken } from '../lib/secure';
+import { getUserIdFromJwt, getEmailFromJwt } from '../lib/jwt';
+import { getUsuarioIdByEmail } from '../services/user';
 
 type RouteParams = { id?: number };
 
@@ -48,7 +43,6 @@ export default function CreateWorkshopScreen() {
 
   // Media & meta
   const [images, setImages] = useState<string[]>([]);
-  const [tags, setTags] = useState<string[]>([]);
 
   // Campos principais
   const [title, setTitle] = useState('');
@@ -74,6 +68,8 @@ export default function CreateWorkshopScreen() {
   const titleCount = title.trim().length;
   const descriptionCount = description.trim().length;
 
+  const { userId } = useAuth(); // pode vir vazio dependendo do fluxo
+
   const formatDateTime = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -87,8 +83,6 @@ export default function CreateWorkshopScreen() {
         setLoading(true);
         const w: Workshop = await getWorkshopById(id!);
         setTitle(w.titulo ?? '');
-        // alguns backs modelam descrição como objeto { tema, descricao }
-        // outros como string simples; tratamos os dois:
         const desc = (w as any)?.descricao?.descricao ?? (w as any)?.descricao ?? '';
         setDescription(desc);
         setStartAt(w.dataInicio ?? new Date());
@@ -99,7 +93,6 @@ export default function CreateWorkshopScreen() {
         setMeetingLink(link);
         setAddress('');
 
-        // Se o back já trouxer:
         if ((w as any)?.vagasTotais != null) setCapacity(String((w as any).vagasTotais));
         if ((w as any)?.tokens != null) setTokens(String((w as any).tokens));
       } catch (e: any) {
@@ -118,9 +111,30 @@ export default function CreateWorkshopScreen() {
     const baseOk = _title.length >= 4 && _desc.length >= 20;
     const linkOk = isOnline ? meetingLink.trim().length >= 6 : true;
     const timeOk = startAt.getTime() < endAt.getTime();
-    const mediaOk = tags.length <= 10 && images.length <= 10;
-    return baseOk && linkOk && timeOk && mediaOk && !loading;
-  }, [title, description, isOnline, meetingLink, startAt, endAt, tags, images, loading]);
+    return baseOk && linkOk && timeOk && !loading;
+  }, [title, description, isOnline, meetingLink, startAt, endAt, images, loading]);
+
+  // 🔑 Resolve instrutorId na ordem: useAuth → token(userId) → token(email)→ API
+  const resolveInstructorId = async (): Promise<number | null> => {
+    if (userId && Number.isFinite(Number(userId))) return Number(userId);
+
+    const at = await getAccessToken().catch(() => null);
+    if (at) {
+      const idFromJwt = getUserIdFromJwt(at);
+      if (idFromJwt && Number.isFinite(Number(idFromJwt))) return Number(idFromJwt);
+
+      const email = getEmailFromJwt(at);
+      if (email) {
+        try {
+          const idByEmail = await getUsuarioIdByEmail(email);
+          if (idByEmail && Number.isFinite(Number(idByEmail))) return Number(idByEmail);
+        } catch {
+          // silencioso
+        }
+      }
+    }
+    return null;
+  };
 
   const handlePublish = useCallback(async () => {
     Toast.show({ type: 'info', text1: 'Publicar', text2: 'Disparando validação...' });
@@ -144,11 +158,6 @@ export default function CreateWorkshopScreen() {
       Alert.alert('Horário inválido', 'A data/hora de início deve ser antes do término.');
       return;
     }
-    if (tags.length > 10) {
-      Toast.show({ type: 'error', text1: 'Tags demais', text2: 'Máx. 10 tags.' });
-      Alert.alert('Tags demais', 'Use no máximo 10 tags.');
-      return;
-    }
     if (images.length > 10) {
       Toast.show({ type: 'error', text1: 'Imagens demais', text2: 'Máx. 10 imagens.' });
       Alert.alert('Imagens demais', 'Envie no máximo 10 imagens.');
@@ -169,27 +178,31 @@ export default function CreateWorkshopScreen() {
         const payload = {
           titulo: _title,
           linkMeet: isOnline ? meetingLink.trim() : undefined,
-          dataInicio: toIsoWithMillis(startAt),
-          dataTermino: toIsoWithMillis(endAt),
+          dataInicio: toIsoWithMillis(startAt), // ✅ 2025-11-10T18:30:00.000Z
+          dataTermino: toIsoWithMillis(endAt), // ✅ idem
           descricao: { tema, descricao: _desc },
         };
-        await updateWorkshop(id!, payload as any);
+        await updateWorkshop(id!, payload);
         Toast.show({ type: 'success', text1: 'Workshop atualizado!' });
       } else {
-        // Tenta obter instrutorId; se não vier, deixa o back deduzir pelo token
-        const maybeId = await getCurrentUserId();
+        const instrutorId = await resolveInstructorId();
+        if (!instrutorId) {
+          Alert.alert(
+            'Sessão',
+            'Não consegui identificar seu usuário (instrutor). Faça login novamente.'
+          );
+          Toast.show({ type: 'error', text1: 'Sessão', text2: 'Instrutor não identificado.' });
+          return;
+        }
 
         const basePayload: any = {
           titulo: _title,
           linkMeet: isOnline ? meetingLink.trim() : undefined,
-          dataInicio: toUtcNoMillis(startAt),
-          dataTermino: toUtcNoMillis(endAt),
+          dataInicio: toUtcNoMillis(startAt), // ✅ "yyyy-MM-dd'T'HH:mm:ss" (SEM Z)
+          dataTermino: toUtcNoMillis(endAt), // ✅ idem
           descricao: { tema, descricao: _desc },
+          instrutorId, // ✅ obrigatório no back
         };
-        if (Number.isFinite(Number(maybeId))) {
-          basePayload.instrutorId = Number(maybeId);
-        }
-
         await createWorkshop(basePayload);
         Toast.show({ type: 'success', text1: 'Workshop criado!' });
       }
@@ -209,19 +222,7 @@ export default function CreateWorkshopScreen() {
     } finally {
       setLoading(false);
     }
-  }, [
-    isEdit,
-    id,
-    title,
-    description,
-    isOnline,
-    meetingLink,
-    startAt,
-    endAt,
-    navigation,
-    tags,
-    images,
-  ]);
+  }, [isEdit, id, title, description, isOnline, meetingLink, startAt, endAt, navigation, images]);
 
   const handleClear = useCallback(() => {
     setTitle('');
@@ -230,7 +231,6 @@ export default function CreateWorkshopScreen() {
     setMeetingLink('');
     setAddress('');
     setImages([]);
-    setTags([]);
     setCapacity('');
     setTokens('');
     setStartAt(new Date());
@@ -386,13 +386,6 @@ export default function CreateWorkshopScreen() {
                 ))}
               </View>
             )}
-
-            {/* Tags */}
-            <View style={styles.inlineHeader}>
-              <Text style={styles.label}>Tags</Text>
-              <Text style={styles.hint}>{tags.length}/10</Text>
-            </View>
-            <TagManager tags={tags} onChange={setTags} />
 
             {/* Footer */}
             <View style={styles.footer}>
