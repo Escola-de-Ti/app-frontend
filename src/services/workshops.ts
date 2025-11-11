@@ -34,7 +34,7 @@ export async function createWorkshop(payload: WorkshopCreateDTO): Promise<Worksh
 }
 
 export async function updateWorkshop(id: number, payload: WorkshopUpdateDTO): Promise<Workshop> {
-  const { data } = await api.put<WorkshopDTO>(`/api/workshops/${id}`, payload);
+  const { data } = await api.patch<WorkshopDTO>(`/api/workshops/${id}`, payload);
   return mapWorkshopDTO(data);
 }
 

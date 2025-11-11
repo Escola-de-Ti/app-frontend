@@ -87,11 +87,13 @@ export default function CreateWorkshopScreen() {
         setDescription(desc);
         setStartAt(w.dataInicio ?? new Date());
         setEndAt((w as any).dataTermino ?? new Date(Date.now() + 2 * 60 * 60 * 1000));
+        setCapacity(String(w.capacidade))
+        setTokens(String(w.custo))
 
         const link = (w as any).linkMeet ?? '';
         setIsOnline(!!link);
         setMeetingLink(link);
-        setAddress('');
+        setAddress(String(w.linkMeet || ''));
 
         if ((w as any)?.vagasTotais != null) setCapacity(String((w as any).vagasTotais));
         if ((w as any)?.tokens != null) setTokens(String((w as any).tokens));
@@ -180,7 +182,9 @@ export default function CreateWorkshopScreen() {
           linkMeet: isOnline ? meetingLink.trim() : undefined,
           dataInicio: toIsoWithMillis(startAt), // ✅ 2025-11-10T18:30:00.000Z
           dataTermino: toIsoWithMillis(endAt), // ✅ idem
-          descricao: { tema, descricao: _desc },
+          descricao: { tema, descricao: _desc }, 
+          capacidade: Number(capacity),
+          custo: Number(tokens)
         };
         await updateWorkshop(id!, payload);
         Toast.show({ type: 'success', text1: 'Workshop atualizado!' });
@@ -201,7 +205,9 @@ export default function CreateWorkshopScreen() {
           dataInicio: toUtcNoMillis(startAt), // ✅ "yyyy-MM-dd'T'HH:mm:ss" (SEM Z)
           dataTermino: toUtcNoMillis(endAt), // ✅ idem
           descricao: { tema, descricao: _desc },
-          instrutorId, // ✅ obrigatório no back
+          instrutorId, 
+          capacidade: Number(capacity),
+          custo: Number(tokens)
         };
         await createWorkshop(basePayload);
         Toast.show({ type: 'success', text1: 'Workshop criado!' });
@@ -222,7 +228,7 @@ export default function CreateWorkshopScreen() {
     } finally {
       setLoading(false);
     }
-  }, [isEdit, id, title, description, isOnline, meetingLink, startAt, endAt, navigation, images]);
+  }, [isEdit, id, title, description, isOnline, meetingLink, startAt, endAt, navigation, images, tokens, capacity]);
 
   const handleClear = useCallback(() => {
     setTitle('');
