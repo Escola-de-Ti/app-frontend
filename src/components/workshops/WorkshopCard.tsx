@@ -5,9 +5,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { Workshop } from '../../types';
 import { formatWorkshopDateRange } from '../../types';
 
-interface Props {
+interface WorkshopCardProps {
   item: Workshop;
-  onPrimary?: (id: number) => void; // inscrever/ver
+  onPrimary?: (id: number) => void; // inscrever/ver/editar
   onSecondary?: (id: number) => void; // cancelar/editar
   primaryLabel?: string;
   secondaryLabel?: string;
@@ -19,8 +19,9 @@ export default function WorkshopCard({
   onSecondary,
   primaryLabel,
   secondaryLabel,
-}: Props) {
+}: WorkshopCardProps) {
   const isOnline = !!item.linkMeet;
+  const idNum = Number(item.id);
 
   return (
     <View style={s.card}>
@@ -68,14 +69,14 @@ export default function WorkshopCard({
         <View style={s.actions}>
           {onPrimary ? (
             <GradientButton
-              onPress={() => onPrimary?.(item.id)}
+              onPress={() => onPrimary(idNum)}
               label={primaryLabel ?? 'Ver detalhes'}
             />
           ) : null}
 
           {onSecondary ? (
             <OutlineButton
-              onPress={() => onSecondary?.(item.id)}
+              onPress={() => onSecondary(idNum)}
               label={secondaryLabel ?? 'Cancelar'}
             />
           ) : null}

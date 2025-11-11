@@ -1,26 +1,32 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { FlatList, RefreshControl, View, Text, StyleSheet } from 'react-native';
 import type { Workshop } from '../../types';
 import WorkshopCard from './WorkshopCard';
 
-interface Props {
+interface MyWorkshopsProps {
   data: Workshop[];
   loading?: boolean;
   onRefresh?: () => void;
   onEdit?: (id: number) => void;
 }
 
-export default function MyWorkshops({ data, loading, onRefresh, onEdit }: Props) {
+export default function MyWorkshops({ data, loading, onRefresh, onEdit }: MyWorkshopsProps) {
+  const keyExtractor = useCallback((w: Workshop) => String(w.id), []);
+  const renderItem = useCallback(
+    ({ item }: { item: Workshop }) => (
+      <WorkshopCard item={item} onPrimary={(id: number) => onEdit?.(id)} primaryLabel="Editar" />
+    ),
+    [onEdit]
+  );
+
   return (
     <FlatList
       data={data}
-      keyExtractor={(w) => String(w.id)}
+      keyExtractor={keyExtractor}
       refreshControl={<RefreshControl refreshing={!!loading} onRefresh={onRefresh ?? (() => {})} />}
       contentContainerStyle={s.content}
       ListEmptyComponent={<EmptyState text="Você ainda não criou workshops." />}
-      renderItem={({ item }) => (
-        <WorkshopCard item={item} onPrimary={onEdit} primaryLabel="Editar" />
-      )}
+      renderItem={renderItem}
     />
   );
 }

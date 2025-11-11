@@ -1,30 +1,44 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { FlatList, RefreshControl, View, Text, StyleSheet } from 'react-native';
 import type { Workshop } from '../../types';
 import WorkshopCard from './WorkshopCard';
 
-interface Props {
+interface AvailableWorkshopsProps {
   data: Workshop[];
   loading?: boolean;
   onRefresh?: () => void;
   onEnroll?: (id: number) => void;
 }
 
-export default function AvailableWorkshops({ data, loading, onRefresh, onEnroll }: Props) {
+export default function AvailableWorkshops({
+  data,
+  loading,
+  onRefresh,
+  onEnroll,
+}: AvailableWorkshopsProps) {
+  const keyExtractor = useCallback((w: Workshop) => String(w.id), []);
+  const renderItem = useCallback(
+    ({ item }: { item: Workshop }) => {
+      const inscrito = Boolean((item as any)?.inscrito);
+      return (
+        <WorkshopCard
+          item={item}
+          onPrimary={(id: number) => onEnroll?.(id)}
+          primaryLabel={inscrito ? 'Inscrito' : 'Inscrever-se'}
+        />
+      );
+    },
+    [onEnroll]
+  );
+
   return (
     <FlatList
       data={data}
-      keyExtractor={(w) => String(w.id)}
+      keyExtractor={keyExtractor}
       refreshControl={<RefreshControl refreshing={!!loading} onRefresh={onRefresh ?? (() => {})} />}
       contentContainerStyle={s.content}
       ListEmptyComponent={<EmptyState text="Nenhum workshop disponível no momento." />}
-      renderItem={({ item }) => (
-        <WorkshopCard
-          item={item}
-          onPrimary={onEnroll}
-          primaryLabel={item.inscrito ? 'Inscrito' : 'Inscrever-se'}
-        />
-      )}
+      renderItem={renderItem}
     />
   );
 }
