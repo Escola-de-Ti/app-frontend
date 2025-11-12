@@ -104,7 +104,6 @@ export interface Workshop extends Omit<WorkshopDTO, 'dataCriacao' | 'dataInicio'
 
 export interface WorkshopCreateDTO {
   titulo: string;
-  instrutorId: ID;
   linkMeet?: string;
   dataInicio: string;
   dataTermino: string;
@@ -147,7 +146,6 @@ export const mapWorkshopDTO = (dto: WorkshopDTO): Workshop => ({
 
 export const toWorkshopCreateDTO = (w: {
   titulo: string;
-  instrutorId: ID;
   dataInicio: Date;
   dataTermino: Date;
   descricao?: string;
@@ -157,7 +155,6 @@ export const toWorkshopCreateDTO = (w: {
   capacidade: Number;
 }): WorkshopCreateDTO => ({
   titulo: w.titulo.trim(),
-  instrutorId: w.instrutorId,
   linkMeet: w.linkMeet?.trim() || undefined,
   dataInicio: toUtcNoMillis(w.dataInicio),
   dataTermino: toUtcNoMillis(w.dataTermino),
