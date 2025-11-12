@@ -9,14 +9,14 @@ import {
   Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { PostDetails } from './PostDetails';
+import RNModal from 'react-native-modal';
 
-type PostCardProps = {
-  onPress: () => void;
-  onCommentPress: () => void;
-};
-
-export function PostCard({ onPress, onCommentPress }: PostCardProps) {
+export function PostCard() {
   const [menuVisible, setMenuVisible] = useState(false);
+  const [detailsVisible, setDetailsVisible] = useState(false);
+  const [focusComment, setFocusComment] = useState(false);
+
   const [hasUpvoted, setHasUpvoted] = useState(false);
   const [hasCommented, setHasCommented] = useState(false);
   const [upvotes, setUpvotes] = useState(0);
@@ -44,105 +44,136 @@ export function PostCard({ onPress, onCommentPress }: PostCardProps) {
   const handleCommentPress = () => {
     setHasCommented(true);
     setComments((prev) => prev + 1);
-    onCommentPress();
+    setFocusComment(true);
+    setDetailsVisible(true);
+  };
+
+  const handlePostPress = () => {
+    setFocusComment(false);
+    setDetailsVisible(true);
   };
 
   const handleProfilePress = () => {
     Alert.alert('Perfil', `Abrir perfil de ${post.userName}`);
   };
 
+  const closeModal = () => setDetailsVisible(false);
+
   return (
-    <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
-      <View style={styles.card}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.userInfo}
-            activeOpacity={0.8}
-            onPress={handleProfilePress}
-          >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{post.userName.charAt(0).toUpperCase()}</Text>
-            </View>
-            <View>
-              <View style={styles.nameRow}>
-                <Text style={styles.userName}>{post.userName}</Text>
-                <View style={styles.levelContainer}>
-                  <Text style={styles.levelText}>Nvl. {post.userLevel}</Text>
-                </View>
+    <>
+      <TouchableOpacity activeOpacity={0.9} onPress={handlePostPress}>
+        <View style={styles.card}>
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.userInfo}
+              activeOpacity={0.8}
+              onPress={handleProfilePress}
+            >
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{post.userName.charAt(0).toUpperCase()}</Text>
               </View>
-              <Text style={styles.postDate}>{post.postDate}</Text>
+              <View>
+                <View style={styles.nameRow}>
+                  <Text style={styles.userName}>{post.userName}</Text>
+                  <View style={styles.levelContainer}>
+                    <Text style={styles.levelText}>Nvl. {post.userLevel}</Text>
+                  </View>
+                </View>
+                <Text style={styles.postDate}>{post.postDate}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {isAuthor && (
+              <TouchableOpacity onPress={() => setMenuVisible(true)} activeOpacity={0.7}>
+                <Feather name="more-horizontal" size={22} color="#ccc" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.body}>
+            <Text style={styles.title}>{post.title}</Text>
+            <Text style={styles.description}>{post.description}</Text>
+          </View>
+
+          <View style={styles.footer}>
+            <View style={styles.tagContainer}>
+              <Text style={styles.tagText}>{post.tag}</Text>
             </View>
-          </TouchableOpacity>
+
+            <View style={styles.stats}>
+              <TouchableOpacity onPress={handleUpvote} activeOpacity={0.8}>
+                <View style={[styles.upvoteContainer, hasUpvoted && styles.upvoteActive]}>
+                  <Feather name="arrow-up" size={16} color={hasUpvoted ? '#003d2b' : '#fff'} />
+                  <Text style={[styles.upvoteText, hasUpvoted && styles.upvoteTextActive]}>
+                    {upvotes}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={handleCommentPress} activeOpacity={0.8}>
+                <View
+                  style={[styles.commentContainer, hasCommented && styles.commentContainerActive]}
+                >
+                  <Feather
+                    name="message-circle"
+                    size={16}
+                    color={hasCommented ? '#ffeaff' : '#fff'}
+                  />
+                  <Text style={[styles.commentText, hasCommented && styles.commentTextActive]}>
+                    {comments}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
 
           {isAuthor && (
-            <TouchableOpacity onPress={() => setMenuVisible(true)} activeOpacity={0.7}>
-              <Feather name="more-horizontal" size={22} color="#ccc" />
-            </TouchableOpacity>
+            <Modal
+              transparent
+              visible={menuVisible}
+              animationType="fade"
+              onRequestClose={() => setMenuVisible(false)}
+            >
+              <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+                <View style={styles.modalOverlay}>
+                  <View style={styles.menu}>
+                    <TouchableOpacity style={styles.menuItem}>
+                      <Feather name="edit-3" size={14} color="#fff" />
+                      <Text style={styles.menuText}>Editar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.menuItem}>
+                      <Feather name="trash-2" size={14} color="#ff6666" />
+                      <Text style={[styles.menuText, { color: '#ff6666' }]}>Apagar</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
+            </Modal>
           )}
         </View>
+      </TouchableOpacity>
 
-        <View style={styles.body}>
-          <Text style={styles.title}>{post.title}</Text>
-          <Text style={styles.description}>{post.description}</Text>
-        </View>
-
-        <View style={styles.footer}>
-          <View style={styles.tagContainer}>
-            <Text style={styles.tagText}>{post.tag}</Text>
+      <RNModal
+        isVisible={detailsVisible}
+        onSwipeComplete={closeModal}
+        swipeDirection="down"
+        onBackdropPress={closeModal}
+        propagateSwipe={true}
+        style={styles.modal}
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
+        backdropOpacity={0.6}
+        useNativeDriverForBackdrop
+      >
+        <View style={styles.modalContent}>
+          <View style={styles.swipeIndicatorContainer}>
+            <View style={styles.swipeIndicator} />
+            <Text style={styles.modalTitle}>Comentários</Text>
           </View>
-
-          <View style={styles.stats}>
-            <TouchableOpacity onPress={handleUpvote} activeOpacity={0.8}>
-              <View style={[styles.upvoteContainer, hasUpvoted && styles.upvoteActive]}>
-                <Feather name="arrow-up" size={16} color={hasUpvoted ? '#003d2b' : '#fff'} />
-                <Text style={[styles.upvoteText, hasUpvoted && styles.upvoteTextActive]}>
-                  {upvotes}
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={handleCommentPress} activeOpacity={0.8}>
-              <View
-                style={[styles.commentContainer, hasCommented && styles.commentContainerActive]}
-              >
-                <Feather
-                  name="message-circle"
-                  size={16}
-                  color={hasCommented ? '#ffeaff' : '#fff'}
-                />
-                <Text style={[styles.commentText, hasCommented && styles.commentTextActive]}>
-                  {comments}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
+          <PostDetails focusComment={focusComment} />
         </View>
-
-        {isAuthor && (
-          <Modal
-            transparent
-            visible={menuVisible}
-            animationType="fade"
-            onRequestClose={() => setMenuVisible(false)}
-          >
-            <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
-              <View style={styles.modalOverlay}>
-                <View style={styles.menu}>
-                  <TouchableOpacity style={styles.menuItem}>
-                    <Feather name="edit-3" size={14} color="#fff" />
-                    <Text style={styles.menuText}>Editar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.menuItem}>
-                    <Feather name="trash-2" size={14} color="#ff6666" />
-                    <Text style={[styles.menuText, { color: '#ff6666' }]}>Apagar</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </Modal>
-        )}
-      </View>
-    </TouchableOpacity>
+      </RNModal>
+    </>
   );
 }
 
@@ -233,4 +264,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   menuText: { color: '#fff', fontSize: 13, fontWeight: '500' },
+  modal: {
+    justifyContent: 'flex-end',
+    margin: 0,
+  },
+  modalContent: {
+    height: '95%',
+    backgroundColor: '#0b0b0f',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+  },
+  swipeIndicatorContainer: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#222',
+    marginBottom: 8,
+  },
+  swipeIndicator: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#555',
+    marginBottom: 8,
+  },
+  modalTitle: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
 });

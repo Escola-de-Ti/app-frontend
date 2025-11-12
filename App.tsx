@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, Text } from 'react-native';
+import React from 'react';
+import { StyleSheet, View, ScrollView } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import Modal from 'react-native-modal';
 
 import { PostCard } from './src/components/posts/PostCard';
 import { PostDetails } from './src/components/posts/PostDetails';
@@ -12,6 +11,9 @@ export default function App() {
     <SafeAreaProvider>
       <View style={styles.container}>
         <TransactionHistory />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <PostCard />
+        </ScrollView>
       </View>
     </SafeAreaProvider>
   );
@@ -21,5 +23,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0b0b0f',
+  },
+  scrollContent: {
+    padding: 20,
+    alignItems: 'center',
   },
 });
