@@ -57,7 +57,7 @@ export async function register(payload: {
 
 export async function logout(): Promise<void> {
   try {
-    await api.post('/api/usuarios/logout');
+    await api.options('/api/usuarios/logout');
   } catch {}
   await clearTokens();
 }
