@@ -1,493 +1,4 @@
-// import React, { useEffect, useMemo, useState } from 'react';
-// import {
-//   View,
-//   Text,
-//   StyleSheet,
-//   ActivityIndicator,
-//   TouchableOpacity,
-//   Image,
-//   Modal,
-//   Alert,
-//   ScrollView,
-// } from 'react-native';
-// import { LinearGradient } from 'expo-linear-gradient';
-// import { Feather } from '@expo/vector-icons';
-
-// import AppLayout from '../components/AppLayout';
-// import AppInput from '../components/AppInput';
-// import Tag from '../components/Tag';
-
-// import { useAuth } from '../hooks/useAuth';
-// import { getUsuarioById, updateUsuario } from '../services/user';
-
-// type Perfil = {
-//   id: number | string;
-//   nome?: string;
-//   email?: string;
-//   bio?: string;
-//   avatarUrl?: string;
-//   nivel?: number;   // opcional
-//   tokens?: number;  // opcional
-//   tags?: string[];  // opcional
-//   stats?: {
-//     posts?: number;
-//     respostas?: number;
-//     workshops?: number;
-//     seguidores?: number;
-//     seguindo?: number;
-//   };
-// };
-
-// export default function ProfileScreen() {
-//   const { userId, logout } = useAuth();
-
-//   const [loading, setLoading] = useState(true);
-//   const [perfil, setPerfil] = useState<Perfil | null>(null);
-
-//   const [editOpen, setEditOpen] = useState(false);
-//   const [editNome, setEditNome] = useState('');
-//   const [editBio, setEditBio] = useState('');
-
-//   // carregamento do perfil
-//   useEffect(() => {
-//     (async () => {
-//       try {
-//         if (!userId) {
-//           setLoading(false);
-//           return;
-//         }
-//         const idNum = Number(userId);
-//         const data = await getUsuarioById(idNum);
-//         const normalized: Perfil = {
-//           id: data?.id ?? idNum,
-//           nome: data?.nome ?? '',
-//           email: data?.email ?? '',
-//           bio: data?.bio ?? '',
-//           avatarUrl: data?.avatarUrl ?? '',
-//           nivel: Number.isFinite(Number(data?.nivel)) ? Number(data?.nivel) : undefined,
-//           tokens: Number.isFinite(Number(data?.tokens)) ? Number(data?.tokens) : undefined,
-//           tags: Array.isArray(data?.tags)
-//             ? data.tags.map((t: any) => String(t?.name ?? t ?? '')).filter(Boolean)
-//             : [],
-//           stats: {
-//             posts: Number.isFinite(Number(data?.posts)) ? Number(data?.posts) : data?.stats?.posts,
-//             respostas: Number.isFinite(Number(data?.respostas))
-//               ? Number(data?.respostas)
-//               : data?.stats?.respostas,
-//             workshops: Number.isFinite(Number(data?.workshops))
-//               ? Number(data?.workshops)
-//               : data?.stats?.workshops,
-//             seguidores: Number.isFinite(Number(data?.seguidores))
-//               ? Number(data?.seguidores)
-//               : data?.stats?.seguidores,
-//             seguindo: Number.isFinite(Number(data?.seguindo))
-//               ? Number(data?.seguindo)
-//               : data?.stats?.seguindo,
-//           },
-//         };
-//         setPerfil(normalized);
-//       } catch (e: any) {
-//         console.log('[Profile] load error', e?.message);
-//         Alert.alert('Ops', 'Não foi possível carregar seu perfil.');
-//       } finally {
-//         setLoading(false);
-//       }
-//     })();
-//   }, [userId]);
-
-//   // derive iniciais
-//   const initials = useMemo(() => {
-//     const n = perfil?.nome?.trim() || '';
-//     const parts = n.split(/\s+/).slice(0, 2);
-//     return parts.map((p) => p[0]?.toUpperCase?.() || '').join('');
-//   }, [perfil?.nome]);
-
-//   // abrir modal de edição preenchendo os campos
-//   const openEdit = () => {
-//     setEditNome(perfil?.nome ?? '');
-//     setEditBio(perfil?.bio ?? '');
-//     setEditOpen(true);
-//   };
-
-//   const saveEdit = async () => {
-//     try {
-//       if (!perfil) return;
-//       const idNum = Number(perfil.id);
-//       const payload: any = {
-//         nome: editNome.trim(),
-//         bio: editBio.trim(),
-//       };
-//       await updateUsuario(idNum, payload);
-//       setPerfil((prev) =>
-//         prev
-//           ? {
-//               ...prev,
-//               nome: payload.nome ?? prev.nome,
-//               bio: payload.bio ?? prev.bio,
-//             }
-//           : prev
-//       );
-//       setEditOpen(false);
-//       Alert.alert('Pronto!', 'Perfil atualizado com sucesso.');
-//     } catch (e: any) {
-//       const msg = e?.response?.data?.message || e?.message || 'Falha ao salvar.';
-//       Alert.alert('Erro', msg);
-//     }
-//   };
-
-//   const handleLogout = async () => {
-//     try {
-//       await logout();
-//       // a tua stack já trata o fluxo pós-logout (AuthScreen)
-//     } catch (e) {
-//       // silencioso
-//     }
-//   };
-
-//   if (loading) {
-//     return (
-//       <AppLayout initialActivePage="Perfil">
-//         <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
-//           <ActivityIndicator />
-//         </View>
-//       </AppLayout>
-//     );
-//   }
-
-//   return (
-//     <AppLayout initialActivePage="Perfil">
-//       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 24 }}>
-//         {/* capa com gradiente */}
-//         <LinearGradient
-//           colors={['#00FFA3', '#7C73FF']}
-//           start={{ x: 0, y: 0 }}
-//           end={{ x: 1, y: 1 }}
-//           style={styles.cover}
-//         >
-//           <View style={styles.avatarWrap}>
-//             {perfil?.avatarUrl ? (
-//               <Image source={{ uri: perfil.avatarUrl }} style={styles.avatar} />
-//             ) : (
-//               <View style={[styles.avatar, styles.avatarFallback]}>
-//                 <Text style={styles.avatarInitials}>{initials || 'U'}</Text>
-//               </View>
-//             )}
-//           </View>
-
-//           <View style={styles.identity}>
-//             <Text style={styles.name}>{perfil?.nome || 'Seu nome'}</Text>
-//             {!!perfil?.email && (
-//               <View style={styles.userRow}>
-//                 <Feather name="at-sign" size={14} color="#0B0B0E" />
-//                 <Text style={styles.username}>{perfil.email}</Text>
-//               </View>
-//             )}
-//           </View>
-
-//           {/* badges de nível/tokens se existirem */}
-//           <View style={styles.badgesRow}>
-//             {Number.isFinite(perfil?.nivel as any) && (
-//               <View style={styles.pill}>
-//                 <Feather name="bar-chart-2" size={14} color="#0B0B0E" />
-//                 <Text style={styles.pillText}>Nvl. {perfil?.nivel}</Text>
-//               </View>
-//             )}
-//             {Number.isFinite(perfil?.tokens as any) && (
-//               <View style={styles.pill}>
-//                 <Feather name="award" size={14} color="#0B0B0E" />
-//                 <Text style={styles.pillText}>{perfil?.tokens} tokens</Text>
-//               </View>
-//             )}
-//           </View>
-//         </LinearGradient>
-
-//         {/* cartão principal */}
-//         <View style={styles.card}>
-//           {/* Ações */}
-//           <View style={styles.actionsRow}>
-//             <TouchableOpacity onPress={openEdit} activeOpacity={0.85} style={{ flex: 1 }}>
-//               <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.primaryBtn}>
-//                 <Feather name="edit-3" size={16} color="#0B0B0E" />
-//                 <Text style={styles.primaryText}>Editar Perfil</Text>
-//               </LinearGradient>
-//             </TouchableOpacity>
-
-//             <TouchableOpacity onPress={handleLogout} activeOpacity={0.8} style={styles.ghostBtn}>
-//               <Feather name="log-out" size={16} color="#C9C9D4" />
-//               <Text style={styles.ghostText}>Sair</Text>
-//             </TouchableOpacity>
-//           </View>
-
-//           {/* Bio */}
-//           {!!perfil?.bio && (
-//             <View style={{ marginTop: 12 }}>
-//               <Text style={styles.sectionTitle}>Bio</Text>
-//               <Text style={styles.bioText}>{perfil.bio}</Text>
-//             </View>
-//           )}
-
-//           {/* Tags */}
-//           {!!(perfil?.tags && perfil.tags.length) && (
-//             <View style={{ marginTop: 16 }}>
-//               <Text style={styles.sectionTitle}>Interesses</Text>
-//               <View style={styles.tagsWrap}>
-//                 {perfil.tags.map((t, i) => (
-//                   <Tag key={`t-${i}`} name={t} type="suggested" />
-//                 ))}
-//               </View>
-//             </View>
-//           )}
-
-//           {/* Stats */}
-//           <View style={[styles.statsCard, { marginTop: 16 }]}>
-//             <Stat label="Posts" value={perfil?.stats?.posts ?? 0} />
-//             <Stat label="Respostas" value={perfil?.stats?.respostas ?? 0} />
-//             <Stat label="Workshops" value={perfil?.stats?.workshops ?? 0} />
-//             <Stat label="Seguidores" value={perfil?.stats?.seguidores ?? 0} />
-//             <Stat label="Seguindo" value={perfil?.stats?.seguindo ?? 0} />
-//           </View>
-//         </View>
-
-//         {/* Atividades recentes (placeholder) */}
-//         <View style={styles.card}>
-//           <Text style={styles.sectionTitle}>Atividades recentes</Text>
-//           <View style={{ gap: 10, marginTop: 8 }}>
-//             <ActivityItem
-//               icon="message-square"
-//               title="Comentou em um post"
-//               subtitle="“Gostei muito do conteúdo!”"
-//               when="há 2 dias"
-//             />
-//             <ActivityItem
-//               icon="bookmark"
-//               title="Favoritou um post"
-//               subtitle="Clean Architecture na prática"
-//               when="há 4 dias"
-//             />
-//             <ActivityItem
-//               icon="users"
-//               title="Inscreveu-se em um workshop"
-//               subtitle="APIs com Node.js e Express"
-//               when="há 1 semana"
-//             />
-//           </View>
-//         </View>
-//       </ScrollView>
-
-//       {/* Modal de Edição */}
-//       <Modal
-//         transparent
-//         visible={editOpen}
-//         animationType="fade"
-//         onRequestClose={() => setEditOpen(false)}
-//       >
-//         <View style={styles.backdrop}>
-//           <View style={styles.modalCard}>
-//             <Text style={styles.modalTitle}>Editar Perfil</Text>
-
-//             <Text style={styles.modalLabel}>Nome</Text>
-//             <AppInput value={editNome} onChangeText={setEditNome} placeholder="Seu nome" />
-
-//             <Text style={styles.modalLabel}>Bio</Text>
-//             <AppInput
-//               value={editBio}
-//               onChangeText={setEditBio}
-//               placeholder="Conte um pouco sobre você"
-//               multiline
-//               style={{ height: 100, textAlignVertical: 'top' }}
-//             />
-
-//             <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-//               <TouchableOpacity onPress={() => setEditOpen(false)} style={styles.ghostBtn}>
-//                 <Feather name="x" size={16} color="#C9C9D4" />
-//                 <Text style={styles.ghostText}>Cancelar</Text>
-//               </TouchableOpacity>
-
-//               <TouchableOpacity onPress={saveEdit} style={{ flex: 1 }}>
-//                 <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.primaryBtn}>
-//                   <Feather name="save" size={16} color="#0B0B0E" />
-//                   <Text style={styles.primaryText}>Salvar</Text>
-//                 </LinearGradient>
-//               </TouchableOpacity>
-//             </View>
-//           </View>
-//         </View>
-//       </Modal>
-//     </AppLayout>
-//   );
-// }
-
-// function Stat({ label, value }: { label: string; value: number }) {
-//   return (
-//     <View style={styles.statItem}>
-//       <Text style={styles.statValue}>{value}</Text>
-//       <Text style={styles.statLabel}>{label}</Text>
-//     </View>
-//   );
-// }
-
-// function ActivityItem({
-//   icon,
-//   title,
-//   subtitle,
-//   when,
-// }: {
-//   icon: keyof typeof Feather.glyphMap;
-//   title: string;
-//   subtitle?: string;
-//   when?: string;
-// }) {
-//   return (
-//     <View style={styles.activityItem}>
-//       <View style={styles.activityIcon}>
-//         <Feather name={icon} size={16} color="#0B0B0E" />
-//       </View>
-//       <View style={{ flex: 1 }}>
-//         <Text style={styles.activityTitle}>{title}</Text>
-//         {subtitle ? <Text style={styles.activitySub}>{subtitle}</Text> : null}
-//       </View>
-//       {when ? <Text style={styles.activityWhen}>{when}</Text> : null}
-//     </View>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   container: { flex: 1, backgroundColor: 'rgb(17, 17, 17)' },
-
-//   cover: {
-//     borderRadius: 0,
-//     paddingHorizontal: 16,
-//     paddingTop: 18,
-//     paddingBottom: 80,
-//   },
-//   avatarWrap: { alignItems: 'center', marginTop: 4 },
-//   avatar: {
-//     width: 84,
-//     height: 84,
-//     borderRadius: 42,
-//     borderWidth: 3,
-//     borderColor: '#0B0B0E',
-//     backgroundColor: '#0B0B0E',
-//   },
-//   avatarFallback: {
-//     alignItems: 'center',
-//     justifyContent: 'center',
-//   },
-//   avatarInitials: { color: '#fff', fontWeight: '800', fontSize: 28 },
-
-//   identity: { alignItems: 'center', marginTop: 10 },
-//   name: { color: '#0B0B0E', fontWeight: '900', fontSize: 20, letterSpacing: 0.2 },
-//   userRow: {
-//     marginTop: 4,
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     gap: 6,
-//     backgroundColor: 'rgba(11,11,14,0.1)',
-//     borderRadius: 999,
-//     paddingHorizontal: 10,
-//     paddingVertical: 4,
-//   },
-//   username: { color: '#0B0B0E', fontWeight: '700', fontSize: 12 },
-
-//   badgesRow: {
-//     marginTop: 12,
-//     flexDirection: 'row',
-//     justifyContent: 'center',
-//     gap: 10,
-//   },
-//   pill: {
-//     backgroundColor: 'rgba(11,11,14,0.2)',
-//     borderRadius: 999,
-//     paddingHorizontal: 10,
-//     paddingVertical: 6,
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     gap: 6,
-//   },
-//   pillText: { color: '#0B0B0E', fontWeight: '800', fontSize: 12 },
-
-//   card: {
-//     backgroundColor: '#1A1A1A',
-//     borderRadius: 16,
-//     padding: 16,
-//     marginHorizontal: 16,
-//     marginTop: -50,
-//     borderWidth: 1,
-//     borderColor: '#2A2A33',
-//   },
-
-//   actionsRow: { flexDirection: 'row', gap: 10 },
-//   primaryBtn: {
-//     borderRadius: 12,
-//     paddingVertical: 12,
-//     alignItems: 'center',
-//     justifyContent: 'center',
-//     flexDirection: 'row',
-//     gap: 8,
-//   },
-//   primaryText: { color: '#0B0B0E', fontWeight: '800' },
-//   ghostBtn: {
-//     paddingHorizontal: 14,
-//     paddingVertical: 12,
-//     borderRadius: 12,
-//     borderWidth: 1,
-//     borderColor: '#2A2A33',
-//     backgroundColor: '#15151A',
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     gap: 8,
-//   },
-//   ghostText: { color: '#C9C9D4', fontWeight: '700' },
-
-//   sectionTitle: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-//   bioText: { color: '#D8D8E3', marginTop: 6, lineHeight: 18 },
-
-//   tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-
-//   statsCard: {
-//     backgroundColor: '#17171C',
-//     borderRadius: 12,
-//     borderWidth: 1,
-//     borderColor: '#2A2A33',
-//     padding: 12,
-//     flexDirection: 'row',
-//     flexWrap: 'wrap',
-//     justifyContent: 'space-between',
-//   },
-//   statItem: { width: '48%', marginVertical: 6 },
-//   statValue: { color: '#EDEDF5', fontSize: 18, fontWeight: '900' },
-//   statLabel: { color: '#A9A9B2' },
-
-//   activityItem: {
-//     backgroundColor: '#17171C',
-//     borderRadius: 12,
-//     borderWidth: 1,
-//     borderColor: '#2A2A33',
-//     padding: 12,
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     gap: 10,
-//   },
-//   activityIcon: {
-//     backgroundColor: '#00FFA3',
-//     borderRadius: 999,
-//     padding: 8,
-//   },
-//   activityTitle: { color: '#EDEDF5', fontWeight: '800' },
-//   activitySub: { color: '#BDBDCC', marginTop: 2 },
-//   activityWhen: { color: '#A9A9B2', fontSize: 12 },
-//   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', padding: 16, justifyContent: 'center' },
-//   modalCard: {
-//     backgroundColor: '#1A1A1A',
-//     borderRadius: 16,
-//     borderWidth: 1,
-//     borderColor: '#2A2A33',
-//     padding: 16,
-//   },
-//   modalTitle: { color: '#fff', fontWeight: '900', fontSize: 18, marginBottom: 10 },
-//   modalLabel: { color: '#C9C9D4', marginTop: 10, marginBottom: 6 },
-// });
-
+// === src/screens/ProfileScreen.tsx ===
 import React, { useMemo, useState } from 'react';
 import {
   View,
@@ -501,6 +12,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../hooks/useAuth';
 import AppLayout from '../components/AppLayout';
 import Tag from '../components/Tag';
 
@@ -538,6 +51,9 @@ function normalizeHex(s: string, fallback: string) {
 }
 
 export default function ProfileOverviewScreen() {
+  const navigation = useNavigation<any>();
+  const { userId, logout } = useAuth();
+
   // MOCK visual
   const [profile] = useState({
     nome: 'Matheus Toscano',
@@ -584,6 +100,21 @@ export default function ProfileOverviewScreen() {
     setOpacityPct(pct);
     setEditBgOpen(false);
   };
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (e) {}
+  };
+  const handleEdit = () => {
+    try {
+      navigation.navigate('EditProfileScreen');
+    } catch (e) {}
+  };
+  const handleHistory = () => {
+    try {
+      navigation.navigate('TransactionHistoryScreen');
+    } catch (e) {}
+  };
 
   return (
     <AppLayout initialActivePage="Perfil">
@@ -595,10 +126,32 @@ export default function ProfileOverviewScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.cover}
         >
-          {/* Botão lápis (editar fundo) */}
-          <TouchableOpacity style={styles.editFab} onPress={openBgEditor} activeOpacity={0.85}>
-            <Feather name="edit-2" size={16} color="#0B0B0E" />
+          {/* Botão de Logout (topo direito) */}
+          <TouchableOpacity
+            onPress={handleLogout}
+            activeOpacity={0.8}
+            style={styles.logOutButton}
+            hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+          >
+            <Feather name="log-out" size={16} color="#656565" />
           </TouchableOpacity>
+
+          {/* Botão de Editar Cor de Fundo (topo esquerdo) com BORDA GRADIENTE */}
+          <LinearGradient
+            colors={['#55F6C9', '#F985CD', '#5468FF', '#8476D9', '#F08E90']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.editFabBorder}
+          >
+            <TouchableOpacity
+              style={styles.editFabInner}
+              onPress={openBgEditor}
+              activeOpacity={0.85}
+              hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+            >
+              <Feather name="edit-2" size={16} color="#656565" />
+            </TouchableOpacity>
+          </LinearGradient>
 
           {/* Avatar central */}
           <View style={styles.avatarWrap}>
@@ -637,10 +190,10 @@ export default function ProfileOverviewScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.sectionTitle}>Visão geral</Text>
-            <View style={styles.iconGhostBtn}>
-              <Feather name="share-2" size={16} color="#C9C9D4" />
-              <Text style={styles.iconGhostText}>Compartilhar</Text>
-            </View>
+            <TouchableOpacity style={styles.iconGhostBtn} onPress={handleEdit}>
+              <Feather name="edit-2" size={16} color="#C9C9D4" />
+              <Text style={styles.iconGhostText}>Editar Perfil</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Bio */}
@@ -667,6 +220,14 @@ export default function ProfileOverviewScreen() {
             <Stat label="Seguidores" value={profile.stats.seguidores} />
             <Stat label="Seguindo" value={profile.stats.seguindo} />
           </View>
+
+          {/* Histórico de Transferências */}
+          <TouchableOpacity onPress={handleHistory} activeOpacity={0.8} style={{ marginTop: 15 }}>
+            <View style={styles.ghostBtn}>
+              <Feather name="log-out" size={16} color="#C9C9D4" />
+              <Text style={styles.ghostText}>Histórico de Tranferências</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.cardAlt}>
@@ -839,15 +400,41 @@ const styles = StyleSheet.create({
     paddingTop: TOKENS.coverPaddingTop,
     paddingBottom: TOKENS.coverPaddingBottom,
   },
-  editFab: {
+
+  // Wrapper com a borda gradiente do botão Editar
+  editFabBorder: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    borderRadius: 999,
+    padding: 2, // espessura da borda gradiente
+    zIndex: 100,
+    elevation: 10,
+  },
+  // Conteúdo interno do botão (fundo sólido)
+  editFabInner: {
+    backgroundColor: '#171717',
+    borderRadius: 999,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  logOutButton: {
     position: 'absolute',
     top: 12,
     right: 12,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    paddingHorizontal: 10,
+    backgroundColor: 'rgb(17,17,17)',
+    paddingHorizontal: 13,
     paddingVertical: 8,
     borderRadius: 999,
+    borderWidth: 2,
+    borderColor: '#656565',
+    zIndex: 100,
+    elevation: 10,
   },
+
   avatarWrap: { alignItems: 'center', marginTop: 6 },
   avatar: {
     width: TOKENS.avatarSize,
