@@ -11,63 +11,23 @@ import {
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import AppLayout from '../components/AppLayout';
-import { useAuth } from '../hooks/useAuth';
-import { getRanking, getMyRankingStats, type RankingUser } from '../services/ranking';
-
-const MOCK: RankingUser[] = [
-  { id: 1, nome: 'Matheus Rossini', posicao: 1, cor: '#b14cb3', xp: 940, nivel: 15, tokens: 2780 },
-  { id: 2, nome: 'Kauan Bertalha', posicao: 2, cor: '#2edba7', xp: 910, nivel: 14, tokens: 2510 },
-  { id: 3, nome: 'Andre Jacob', posicao: 3, cor: '#4562f0', xp: 880, nivel: 13, tokens: 2480 },
-  { id: 4, nome: 'Gabriel Marassi', posicao: 4, cor: '#a65bf7', xp: 850, nivel: 12, tokens: 2250 },
-  { id: 5, nome: 'Willyan Tomaz', posicao: 5, cor: '#d36d6d', xp: 810, nivel: 12, tokens: 2180 },
-];
-
-// cor fallback por posição (se o back não mandar "cor")
-const fallbackColor = (pos: number) =>
-  pos === 1 ? '#b14cb3' : pos === 2 ? '#2edba7' : pos === 3 ? '#4562f0' : '#6b7280';
+import { getRankingModel } from '../services/ranking';
+import type { RankingUser } from '../types';
 
 export default function RankingScreen() {
-  const { userId } = useAuth(); // usamos pra descobrir sua posição se a API de stats não existir
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [items, setItems] = useState<RankingUser[]>([]);
-  const [minhaPos, setMinhaPos] = useState<number | undefined>(undefined);
-  const [meuXpMes, setMeuXpMes] = useState<number | undefined>(undefined);
+  const [minhaPos, setMinhaPos] = useState<number | undefined>();
+  const [meuXpMes, setMeuXpMes] = useState<number | undefined>();
 
   const load = async () => {
     setLoading(true);
     try {
-      // 1) pega ranking (com fallback de rotas e ordenação)
-      let ranking: RankingUser[] = [];
-      try {
-        ranking = await getRanking();
-      } catch {
-        // fallback pro mock se a API não estiver pronta
-        ranking = [...MOCK];
-      }
-
-      // aplica cor fallback quando necessário
-      ranking = ranking.map((u) => ({
-        ...u,
-        cor: u.cor || fallbackColor(u.posicao),
-      }));
-
-      setItems(ranking);
-
-      // 2) tenta buscar suas stats na API
-      try {
-        const stats = await getMyRankingStats();
-        if (typeof stats.posicaoAtual === 'number') setMinhaPos(stats.posicaoAtual);
-        if (typeof stats.xpMes === 'number') setMeuXpMes(stats.xpMes);
-      } catch {
-        // se não houver endpoint de "me", tenta inferir pelos dados do ranking
-        if (userId != null) {
-          const uid = Number(userId);
-          const me = ranking.find((u) => Number(u.id) === uid);
-          if (me) setMinhaPos(me.posicao);
-        }
-        // XP do mês não dá pra inferir de forma confiável — deixo indefinido
-      }
+      const { users, me } = await getRankingModel();
+      setItems(users ?? []);
+      setMinhaPos(me?.posicaoAtual);
+      setMeuXpMes(me?.xpMes);
     } finally {
       setLoading(false);
     }
@@ -84,10 +44,9 @@ export default function RankingScreen() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]); // se trocar usuário, recarrega ranking
+  }, []);
 
-  const data = useMemo(() => items.sort((a, b) => a.posicao - b.posicao), [items]);
+  const data = useMemo(() => items, [items]);
 
   return (
     <AppLayout initialActivePage={null}>
@@ -108,7 +67,9 @@ export default function RankingScreen() {
             <View>
               <Text style={s.statTitle}>Ranking Atual</Text>
               <Text style={[s.statValue, { color: '#6ef7c3' }]}>
-                {typeof minhaPos === 'number' ? `#${String(minhaPos).padStart(2, '0')}` : '--'}
+                {typeof minhaPos === 'number' && minhaPos > 0
+                  ? `#${String(minhaPos).padStart(2, '0')}`
+                  : '--'}
               </Text>
             </View>
           </View>
@@ -118,7 +79,7 @@ export default function RankingScreen() {
               <FontAwesome5 name="star" size={18} color="#7da6ff" />
             </View>
             <View>
-              <Text style={s.statTitle}>XP esse mês</Text>
+              <Text style={s.statTitle}>XP (últimos 30 dias)</Text>
               <Text style={[s.statValue, { color: '#7da6ff' }]}>
                 {typeof meuXpMes === 'number' ? `+${meuXpMes}` : '--'}
               </Text>
@@ -141,7 +102,7 @@ export default function RankingScreen() {
         ) : (
           <FlatList
             data={data}
-            keyExtractor={(u) => String(u.id)}
+            keyExtractor={(u) => `${u.posicao}-${u.nome}`}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
             }
@@ -161,7 +122,8 @@ export default function RankingScreen() {
 
 function RankingCard({ user }: { user: RankingUser }) {
   const topThree = user.posicao <= 3;
-  const bg = topThree ? hexWithAlpha(user.cor || '#6b7280', 0.13) : '#141417';
+  const color = user.cor || '#6b7280';
+  const bg = topThree ? hexWithAlpha(color, 0.13) : '#141417';
 
   return (
     <View
@@ -169,7 +131,7 @@ function RankingCard({ user }: { user: RankingUser }) {
         s.card,
         {
           borderLeftWidth: 4,
-          borderLeftColor: user.cor || '#6b7280',
+          borderLeftColor: color,
           backgroundColor: bg,
         },
       ]}
@@ -177,7 +139,7 @@ function RankingCard({ user }: { user: RankingUser }) {
       <View style={s.cardRow}>
         <View style={s.leftCol}>
           <View style={s.headerRow}>
-            {topThree && <FontAwesome5 name="trophy" size={16} color={user.cor || '#6b7280'} />}
+            {topThree && <FontAwesome5 name="trophy" size={16} color={color} />}
             <Text style={s.position}>#{user.posicao}</Text>
             <Text style={s.name} numberOfLines={1}>
               {user.nome}
@@ -189,7 +151,7 @@ function RankingCard({ user }: { user: RankingUser }) {
               <Text style={[s.badgeText, { color: '#82caff' }]}>Nvl. {user.nivel}</Text>
             </View>
             <View style={s.badge}>
-              <Text style={[s.badgeText, { color: '#ffd580' }]}>{user.tokens} tokens</Text>
+              <Text style={[s.badgeText, { color: '#ffd580' }]}>{user.xp} XP</Text>
             </View>
           </View>
         </View>
@@ -198,7 +160,7 @@ function RankingCard({ user }: { user: RankingUser }) {
   );
 }
 
-/** Util pra aplicar alpha em hex #RRGGBB */
+/** Aplica alpha em hex #RRGGBB */
 function hexWithAlpha(hex: string, alpha: number) {
   const a = Math.max(0, Math.min(1, alpha));
   const val = Math.round(a * 255);
@@ -233,11 +195,7 @@ const s = StyleSheet.create({
   listHeader: { marginTop: 6, marginBottom: 10 },
   listHeaderText: { color: '#ccc', fontSize: 16, fontWeight: '600' },
 
-  loadingBox: {
-    paddingVertical: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  loadingBox: { paddingVertical: 28, alignItems: 'center', justifyContent: 'center' },
 
   card: {
     borderRadius: 10,

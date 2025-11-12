@@ -248,3 +248,60 @@ export interface CommentDTO {
 }
 
 export type Comment = CommentDTO;
+
+// ======== Ranking ======== //
+export interface RankingApiItem {
+  posicao: number;
+  nome: string;
+  qntdXp: number;
+  nivel: number;
+}
+
+export interface RankingApiUsuarioLogado {
+  posicao: number;
+  xpRecebidoUltimos30Dias: number;
+}
+
+export interface RankingApiResponse {
+  rankingList: RankingApiItem[];
+  usuarioLogado: RankingApiUsuarioLogado;
+}
+
+export interface RankingUser {
+  posicao: number;
+  nome: string;
+  xp: number;
+  nivel: number;
+  cor?: string;
+}
+
+export interface MyRankingStats {
+  posicaoAtual?: number;
+  xpMes?: number;
+}
+
+export const fallbackRankingColor = (pos: number) =>
+  pos === 1 ? '#b14cb3' : pos === 2 ? '#2edba7' : pos === 3 ? '#4562f0' : '#6b7280';
+
+export const sortRanking = <T extends { posicao: number }>(arr: T[]): T[] =>
+  [...arr].sort((a, b) => a.posicao - b.posicao);
+
+export function mapRankingApiToModel(resp: RankingApiResponse): {
+  users: RankingUser[];
+  me: MyRankingStats;
+} {
+  const users: RankingUser[] = (resp?.rankingList ?? []).map((u) => ({
+    posicao: u.posicao,
+    nome: u.nome,
+    xp: u.qntdXp,
+    nivel: u.nivel,
+    cor: fallbackRankingColor(u.posicao),
+  }));
+
+  const me: MyRankingStats = {
+    posicaoAtual: resp?.usuarioLogado?.posicao,
+    xpMes: resp?.usuarioLogado?.xpRecebidoUltimos30Dias,
+  };
+
+  return { users: sortRanking(users), me };
+}

@@ -16,7 +16,7 @@ const ROUTES = {
   CREATE_POST: 'CreatePost',
   CREATE_WORKSHOP: 'WorkshopScreen',
   FEED: 'FeedScreen',
-  RANKING: 'Ranking',
+  RANKING: 'RankingScreen',
   PROFILE: 'ProfileScreen',
 };
 
