@@ -9,7 +9,7 @@ import {
 
 /** Busca o response bruto exatamente como a API retorna */
 export async function getRanking(): Promise<RankingApiResponse> {
-  const { data } = await api.get<RankingApiResponse>('/api/ranking');
+  const { data } = await api.get<RankingApiResponse>('/api/usuarios/ranking');
   return data;
 }
 
