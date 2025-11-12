@@ -155,7 +155,7 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <AppLayout initialActivePage="Perfil">
+      <AppLayout initialActivePage="Perfil" backgroundColor="rgb(17, 17, 17)">
         <View
           style={{
             flex: 1,
@@ -173,7 +173,7 @@ export default function ProfileScreen() {
 
   if (error || !profile) {
     return (
-      <AppLayout initialActivePage="Perfil">
+      <AppLayout initialActivePage="Perfil" backgroundColor="rgb(17, 17, 17)">
         <View
           style={{
             flex: 1,
@@ -200,7 +200,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <AppLayout initialActivePage="Perfil">
+    <AppLayout initialActivePage="Perfil" backgroundColor="rgb(17, 17, 17)">
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
         {/* CAPA / HERO */}
         <LinearGradient

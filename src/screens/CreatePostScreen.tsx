@@ -81,7 +81,7 @@ export default function CreatePostScreen() {
 
   return (
     // não queremos nenhuma aba do footer “verdinha” aqui
-    <AppLayout initialActivePage={null}>
+    <AppLayout initialActivePage={null} backgroundColor="rgb(17, 17, 17)">
       <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.headerView}>
           <Text style={styles.title}>Criar Post</Text>

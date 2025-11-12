@@ -49,7 +49,7 @@ export default function RankingScreen() {
   const data = useMemo(() => items, [items]);
 
   return (
-    <AppLayout initialActivePage={null}>
+    <AppLayout initialActivePage={null} backgroundColor="rgb(11,11,15)">
       <StatusBar barStyle="light-content" />
       <View style={s.container}>
         {/* Header */}
@@ -170,7 +170,8 @@ function hexWithAlpha(hex: string, alpha: number) {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', padding: 16 },
+  // container: { flex: 1, backgroundColor: 'rgb(11, 11, 11)', padding: 16 },
+  container: { flex: 1, padding: 16 },
   header: { marginBottom: 12 },
   title: { color: '#fff', fontSize: 24, fontWeight: '700' },
   subtitle: { color: '#aaa', marginTop: 4 },

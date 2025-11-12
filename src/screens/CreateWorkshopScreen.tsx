@@ -238,7 +238,7 @@ export default function CreateWorkshopScreen() {
   }, []);
 
   return (
-    <AppLayout initialActivePage="Workshops">
+    <AppLayout initialActivePage="Workshops" backgroundColor="rgb(17, 17, 17)">
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.select({ ios: 'padding', android: undefined })}

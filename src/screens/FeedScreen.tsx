@@ -214,7 +214,7 @@ export default function FeedScreen() {
   );
 
   return (
-    <AppLayout initialActivePage="Feed">
+    <AppLayout initialActivePage="Feed" backgroundColor="rgb(17, 17, 17)">
       <FlatList
         style={styles.container}
         contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 110, paddingTop: 8 }}

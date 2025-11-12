@@ -192,7 +192,7 @@ export default function WorkshopsScreen() {
   }, [mode, available, enrolled, mine, loading, load]);
 
   return (
-    <AppLayout initialActivePage="Workshops">
+    <AppLayout initialActivePage="Workshops" backgroundColor="rgb(17, 17, 17)">
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
 

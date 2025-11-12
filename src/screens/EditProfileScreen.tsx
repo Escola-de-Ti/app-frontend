@@ -169,7 +169,7 @@ export default function EditProfileScreen() {
 
   if (loading) {
     return (
-      <AppLayout initialActivePage={null}>
+      <AppLayout initialActivePage={null} backgroundColor="rgb(17, 17, 17)">
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
           <ActivityIndicator size="large" color="#00FFA3" />
           <Text style={{ color: '#ccc', marginTop: 12 }}>Carregando perfil…</Text>
@@ -179,7 +179,7 @@ export default function EditProfileScreen() {
   }
 
   return (
-    <AppLayout initialActivePage={null}>
+    <AppLayout initialActivePage={null} backgroundColor="rgb(17, 17, 17)">
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }}>
         {/* Header: Voltar + Título */}
         <View style={styles.headerWrap}>
