@@ -78,7 +78,7 @@ export default function AuthScreen() {
     try {
       await login(emailLogin.trim(), senhaLogin);
       // ✅ logou: navega para FeedScreen
-      navigation.reset({ index: 0, routes: [{ name: 'FeedScreen' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'TransactionHistoryScreen' }] });
     } catch (e: any) {
       Toast.show({
         type: 'error',

@@ -230,8 +230,8 @@ export interface CommentDTO {
   postId: ID;
   autorId?: ID;
   author?: UserRef | null;
-  conteudo?: string; // pode vir com esse nome em outras telas
-  texto?: string; // alias comum
+  conteudo?: string;
+  texto?: string;
   createdAt?: string;
   updatedAt?: string;
   parentId?: ID | null;
@@ -298,3 +298,30 @@ export function mapRankingApiToModel(resp: RankingApiResponse): {
 
   return { users: sortRanking(users), me };
 }
+
+// ======== Transações / Tokens ========
+export type Transaction = {
+  id: number;
+  quantidade: number;
+  motivoDescricao: string;
+  descricao: string;
+  dataTransacao: string;
+};
+
+export type HistoricoResponse = {
+  transacoes: Transaction[];
+  totalRecebido: number;
+  totalGasto: number;
+  saldoAtual: number;
+  hasMore: boolean;
+  totalPages: number;
+  totalElements: number;
+};
+
+export const isCredito = (qtd: number) => qtd > 0;
+export const formatarDataHoraBR = (iso: string) => {
+  const d = new Date(iso);
+  const data = d.toLocaleDateString('pt-BR');
+  const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return { data, hora };
+};
