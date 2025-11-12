@@ -3,11 +3,14 @@ import { StyleSheet, View, ScrollView } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { PostCard } from './src/components/posts/PostCard';
+import { PostDetails } from './src/components/posts/PostDetails';
+import { TransactionHistory } from './src/screens/TransactionHistory';
 
 export default function App() {
   return (
     <SafeAreaProvider>
       <View style={styles.container}>
+        <TransactionHistory />
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <PostCard />
         </ScrollView>
