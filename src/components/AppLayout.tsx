@@ -10,15 +10,15 @@ interface AppLayoutProps {
   children?: React.ReactNode;
   hideHeader?: boolean;
   hideFooter?: boolean;
-  /** Define qual aba começa ativa nesta tela. Use null para nenhuma. */
-  initialActivePage?: Page | null; // 👈 NOVO
+  initialActivePage?: Page | null;
+  backgroundColor: 'rgb(17, 17, 17)';
 }
 
 export default function AppLayout({
   children,
   hideHeader,
   hideFooter,
-  initialActivePage = 'Feed', // 👈 padrão antigo preservado
+  initialActivePage = 'Feed',
 }: AppLayoutProps) {
   const scrollY = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
@@ -56,7 +56,7 @@ export default function AppLayout({
       )}
 
       <Animated.ScrollView
-        style={styles.content}
+        style={styles.container}
         scrollEventThrottle={16}
         onScroll={handleScroll}
         contentContainerStyle={{
@@ -86,7 +86,7 @@ export default function AppLayout({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'rgba(17, 17, 17);' },
+  container: { flex: 1, backgroundColor: 'rgb(17, 17, 17)' },
   header: { position: 'absolute', top: 0, width: '100%', zIndex: 10 },
   content: { flex: 1 },
   footer: { position: 'absolute', bottom: 0, width: '100%', zIndex: 10 },

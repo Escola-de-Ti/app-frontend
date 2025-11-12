@@ -44,6 +44,48 @@ export interface RegisterRequest {
   tipoUsuario?: string;
 }
 
+// ======== Perfil (edição alinhada ao back) ========
+export type TipoUsuario = 'ALUNO' | 'INSTRUTOR' | 'ADMIN' | string;
+
+export interface TagNameDTO {
+  name: string;
+}
+
+/**
+ * Update do próprio usuário (PUT /api/usuarios/user)
+ * -> Parcial de verdade: envie só o que quiser alterar.
+ */
+export interface UpdateUserRequest {
+  email?: string | null;
+  nome?: string | null;
+
+  cpf?: string | null;
+  telefone?: string | null;
+  telefone2?: string | null;
+  biografia?: string | null;
+  senha?: string | null; // só envie se for trocar
+  tipoUsuario?: TipoUsuario; // mantenha se o back permitir mudar
+  tags?: TagNameDTO[]; // ex.: [{ name: "C" }, { name: "JAVA" }]
+}
+
+// Estrutura base do "meu perfil" (ajuste se o GET retornar mais campos)
+export interface MyProfile {
+  email: string;
+  nome: string;
+  cpf?: string | null;
+  telefone?: string | null;
+  telefone2?: string | null;
+  biografia?: string | null;
+  tipoUsuario?: TipoUsuario; // deixado como opcional
+  tags?: TagNameDTO[];
+
+  // campos adicionais opcionais (se houver no back)
+  avatarUrl?: string | null;
+  bannerColorHex?: string | null;
+  bannerOpacity?: number | null;
+  sobrenome?: string | null;
+}
+
 // ======== Mídia / Tag ========
 export interface Imagem {
   id: ID;

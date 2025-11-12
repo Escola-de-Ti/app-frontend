@@ -1,36 +1,16 @@
 // === src/services/profile.ts ===
 import { api } from '../api/client';
+import type { MyProfile, UpdateUserRequest, ID } from '../types';
 
-export type MyProfile = {
-  id: number;
-  nome: string;
-  sobrenome?: string;
-  email: string;
-  telefone?: string;
-  avatarUrl?: string | null;
-
-  // preferências visuais (opcionais no back)
-  bannerColorHex?: string | null; // ex: "#b14cb3"
-  bannerOpacity?: number | null; // 0..1
-};
-
-export type UpdateMyProfileDTO = Partial<{
-  nome: string;
-  sobrenome: string;
-  telefone: string;
-  avatarUrl: string | null;
-  bannerColorHex: string | null; // ex: "#b14cb3"
-  bannerOpacity: number | null; // 0..1
-}>;
-
-// GET /api/usuarios/me
-export async function getMyProfile(): Promise<MyProfile> {
-  const { data } = await api.get<MyProfile>('/api/usuarios/me');
+export async function getUserById(id: ID): Promise<MyProfile> {
+  const numId = Number(id);
+  if (Number.isNaN(numId)) throw new Error(`ID inválido: ${id}`);
+  const { data } = await api.get<MyProfile>(`/api/usuarios/${numId}`);
   return data;
 }
 
-// PUT /api/usuarios/me
-export async function updateMyProfile(payload: UpdateMyProfileDTO): Promise<MyProfile> {
-  const { data } = await api.put<MyProfile>('/api/usuarios/me', payload);
+export async function updateMyProfile(payload: UpdateUserRequest): Promise<MyProfile> {
+  // PUT exclusivo para o usuário logado
+  const { data } = await api.put<MyProfile>('/api/usuarios/user', payload);
   return data;
 }

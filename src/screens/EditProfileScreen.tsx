@@ -1,4 +1,3 @@
-// === src/screens/EditProfileScreen.tsx ===
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View,
@@ -10,20 +9,25 @@ import {
   Platform,
   Alert,
   Modal,
+  TextInput,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 import AppLayout from '../components/AppLayout';
 import AppInput from '../components/AppInput';
 import ImageUploader from '../components/ImageUploader';
 import Toast from 'react-native-toast-message';
 
-import { getMyProfile, updateMyProfile, type MyProfile } from '../services/profile';
+import { getUserById, updateMyProfile } from '../services/profile';
+import type { UpdateUserRequest, MyProfile } from '../types';
+import { useAuth } from '../hooks/useAuth';
 
 const COLOR_PRESETS = ['#b14cb3', '#2edba7', '#4562f0', '#a65bf7', '#d36d6d', '#00FFA3', '#7C73FF'];
 
-/** Converte HEX + opacidade (0..1) -> rgba() pra mostrar na UI */
+/** HEX + opacidade -> rgba() (só pra UI do banner) */
 function hexToRgba(hex?: string | null, opacity?: number | null) {
   const safeHex = (hex || '#141417').replace('#', '');
   const o = typeof opacity === 'number' ? Math.min(1, Math.max(0, opacity)) : 0.2;
@@ -33,42 +37,60 @@ function hexToRgba(hex?: string | null, opacity?: number | null) {
   const b = bigint & 255;
   return `rgba(${r}, ${g}, ${b}, ${o})`;
 }
+// parser local seguro
+function parseUserIdLocal(v: unknown): number | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!/^\d+$/.test(s)) return null;
+  const n = parseInt(s, 10);
+  return n > 0 ? n : null;
+}
 
 export default function EditProfileScreen() {
+  const navigation = useNavigation<any>();
+  const { userId: authUserId } = useAuth();
+  const myIdNum = parseUserIdLocal(authUserId);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  // dados do usuário
   const [profile, setProfile] = useState<MyProfile | null>(null);
 
   // campos editáveis
   const [nome, setNome] = useState('');
-  const [sobrenome, setSobrenome] = useState('');
+  const [biografia, setBiografia] = useState('');
   const [telefone, setTelefone] = useState('');
-  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [email, setEmail] = useState(''); // editável
+  const [cpf, setCpf] = useState(''); // editável
 
-  // banner
+  // UI only
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [bannerHex, setBannerHex] = useState<string>('#141417');
   const [bannerOpacity, setBannerOpacity] = useState<number>(0.2);
+  const [openBannerModal, setOpenBannerModal] = useState(false);
+
   const bannerColorPreview = useMemo(
     () => hexToRgba(bannerHex, bannerOpacity),
     [bannerHex, bannerOpacity]
   );
 
-  // modal de edição do banner
-  const [openBannerModal, setOpenBannerModal] = useState(false);
-
   const load = useCallback(async () => {
+    if (myIdNum === null) {
+      Toast.show({ type: 'error', text1: 'Sem ID do usuário logado.' });
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const me = await getMyProfile();
+      // preenche a tela com GET /api/usuarios/{id}
+      const me = await getUserById(myIdNum);
       setProfile(me);
 
       setNome(me.nome ?? '');
-      setSobrenome(me.sobrenome ?? '');
+      setBiografia(me.biografia ?? '');
       setTelefone(me.telefone ?? '');
+      setEmail(me.email ?? '');
+      setCpf((me.cpf as any as string) ?? ''); // se vier null/undefined, fica vazio
       setAvatarUri(me.avatarUrl ?? null);
-
       setBannerHex(me.bannerColorHex ?? '#141417');
       setBannerOpacity(
         typeof me.bannerOpacity === 'number' && !Number.isNaN(me.bannerOpacity)
@@ -81,36 +103,51 @@ export default function EditProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [myIdNum]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const canSave = useMemo(() => {
-    return nome.trim().length >= 2 && !saving;
-  }, [nome, saving]);
+  // validação simples
+  const emailOk = /\S+@\S+\.\S+/.test(email.trim());
+  const cpfDigits = (cpf || '').replace(/\D/g, '');
+  const cpfOk = cpfDigits.length === 11;
+
+  const canSave = useMemo(
+    () => nome.trim().length >= 2 && emailOk && cpfOk && !saving,
+    [nome, emailOk, cpfOk, saving]
+  );
 
   const handleSave = useCallback(async () => {
     if (!canSave) {
-      Alert.alert('Validação', 'Informe pelo menos o nome (mínimo 2 caracteres).');
+      Alert.alert(
+        'Validação',
+        !emailOk ? 'E-mail inválido.' : !cpfOk ? 'CPF deve ter 11 dígitos.' : 'Verifique os campos.'
+      );
       return;
     }
     try {
       setSaving(true);
-      // se você tiver um fluxo de upload real de avatar, faça aqui e pegue a URL final
-      // por enquanto, mandamos a URI local como avatarUrl (se o back ignorar, ok)
-      const payload = {
+
+      // Monta payload conforme teu PUT /api/usuarios/user aceita
+      const payload: UpdateUserRequest = {
+        email: email.trim(),
         nome: nome.trim(),
-        sobrenome: sobrenome.trim() || undefined,
+        cpf: cpfDigits || undefined,
         telefone: telefone.trim() || undefined,
-        avatarUrl: avatarUri || null,
-        bannerColorHex: bannerHex || null,
-        bannerOpacity: Number.isFinite(bannerOpacity) ? bannerOpacity : 0.2,
+        telefone2: profile?.telefone2 ?? undefined,
+        biografia: biografia.trim() || undefined,
+        // senha: undefined, // só enviar se for alterar
+        tipoUsuario: profile?.tipoUsuario, // preserva se existir
+        tags: profile?.tags ?? [],
       };
+
       const updated = await updateMyProfile(payload);
       setProfile(updated);
       Toast.show({ type: 'success', text1: 'Perfil atualizado!' });
+      // se quiser voltar após salvar:
+      // navigation.goBack();
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || 'Não foi possível salvar.';
       Toast.show({ type: 'error', text1: 'Erro ao salvar', text2: msg });
@@ -118,7 +155,17 @@ export default function EditProfileScreen() {
     } finally {
       setSaving(false);
     }
-  }, [avatarUri, bannerHex, bannerOpacity, nome, sobrenome, telefone, canSave]);
+  }, [
+    canSave,
+    email,
+    nome,
+    cpfDigits,
+    telefone,
+    biografia,
+    profile?.telefone2,
+    profile?.tipoUsuario,
+    profile?.tags,
+  ]);
 
   if (loading) {
     return (
@@ -134,22 +181,29 @@ export default function EditProfileScreen() {
   return (
     <AppLayout initialActivePage={null}>
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }}>
-        {/* BANNER */}
-        <View style={[styles.banner, { backgroundColor: bannerColorPreview }]}>
-          <View style={styles.bannerRow}>
-            <Text style={styles.bannerTitle}>Seu banner</Text>
-            <TouchableOpacity style={styles.editPill} onPress={() => setOpenBannerModal(true)}>
-              <Feather name="edit-3" size={14} color="#0B0B0E" />
-              <Text style={styles.editPillText}>Editar</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Header: Voltar + Título */}
+        <View style={styles.headerWrap}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            style={styles.backBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="chevron-left" size={20} color="#EDEDF5" />
+            <Text style={styles.backText}>Voltar</Text>
+          </TouchableOpacity>
 
-          {/* Avatar */}
-          <View style={{ marginTop: 12 }}>
-            <Text style={styles.label}>Foto de perfil</Text>
+          <Text style={styles.pageTitle}>Editar Perfil</Text>
+        </View>
+
+        {/* BANNER (UI only) */}
+        <View style={[styles.banner, { backgroundColor: bannerColorPreview }]}>
+          <View style={{ marginTop: 0 }}>
             <ImageUploader
-              onChange={(uris) => setAvatarUri(uris?.[0] ?? null)}
+              onChange={(uris) => setAvatarUri(uris?.[0] ?? null)} // UI only
               initialUris={avatarUri ? [avatarUri] : []}
+              maxImages={1}
+              label="Foto de perfil"
             />
           </View>
         </View>
@@ -166,12 +220,24 @@ export default function EditProfileScreen() {
             returnKeyType="next"
           />
 
-          <Text style={styles.label}>Sobrenome</Text>
+          <Text style={styles.label}>E-mail</Text>
           <AppInput
-            value={sobrenome}
-            onChangeText={setSobrenome}
-            placeholder="Seu sobrenome"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="seu@email.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
             returnKeyType="next"
+          />
+
+          <Text style={styles.label}>CPF</Text>
+          <AppInput
+            value={cpf}
+            onChangeText={setCpf}
+            placeholder="Somente números"
+            keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
+            maxLength={14}
           />
 
           <Text style={styles.label}>Telefone</Text>
@@ -182,8 +248,15 @@ export default function EditProfileScreen() {
             keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'phone-pad'}
           />
 
-          <Text style={styles.label}>E-mail</Text>
-          <AppInput value={profile?.email ?? ''} editable={false} />
+          <Text style={styles.label}>Biografia</Text>
+          <AppInput
+            value={biografia}
+            onChangeText={setBiografia}
+            placeholder="Sua biografia"
+            multiline
+            style={{ height: 180, textAlignVertical: 'top' }}
+            returnKeyType="done"
+          />
 
           <View style={styles.footer}>
             <TouchableOpacity
@@ -209,7 +282,7 @@ export default function EditProfileScreen() {
         </View>
       </ScrollView>
 
-      {/* MODAL DO BANNER */}
+      {/* MODAL DO BANNER (UI only) */}
       <Modal
         transparent
         visible={openBannerModal}
@@ -245,7 +318,6 @@ export default function EditProfileScreen() {
             Opacidade: {Math.round(bannerOpacity * 100)}%
           </Text>
           <View style={styles.opacityRow}>
-            {/* Slider “manual” com 5 steps sem lib externa */}
             {[0, 0.25, 0.5, 0.75, 1].map((v) => {
               const active = Math.abs(bannerOpacity - v) < 0.001;
               return (
@@ -281,24 +353,20 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0b0b0f' },
 
-  banner: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-  },
-  bannerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  bannerTitle: { color: '#fff', fontWeight: '800', fontSize: 16 },
-
-  editPill: {
-    backgroundColor: '#00FFA3',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 10,
+  headerWrap: { paddingHorizontal: 16, paddingTop: 16, marginBottom: 8 },
+  backBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    paddingVertical: 4,
+    paddingRight: 8,
+    paddingLeft: 2,
+    alignSelf: 'flex-start',
   },
-  editPillText: { color: '#0B0B0E', fontWeight: '800', fontSize: 12 },
+  backText: { color: '#EDEDF5', fontWeight: '700', fontSize: 14 },
+  pageTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginTop: 8 },
+
+  banner: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 0 },
 
   card: {
     backgroundColor: '#1a1a1a',

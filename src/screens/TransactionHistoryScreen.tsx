@@ -8,13 +8,18 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  TouchableOpacity,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+
 import AppLayout from '../components/AppLayout';
 import TransactionItem from '../components/transactions/TransactionItem';
 import { getTransactionHistory, type GetHistoryParams } from '../services/transactions';
 import type { Transaction } from '../types';
 
 export default function TransactionHistoryScreen() {
+  const navigation = useNavigation<any>();
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const [items, setItems] = useState<Transaction[]>([]);
@@ -59,7 +64,6 @@ export default function TransactionHistoryScreen() {
 
         // lista + paginação
         setItems((prev) => (reset ? resp.transacoes : [...prev, ...resp.transacoes]));
-        // regra: usa hasMore do back + totalPages
         const stillHasMore = Boolean(resp.hasMore) && currentPage + 1 < (resp.totalPages ?? 1);
         setHasMore(stillHasMore);
 
@@ -93,7 +97,6 @@ export default function TransactionHistoryScreen() {
   };
 
   useEffect(() => {
-    // primeira carga
     loadPage(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -103,7 +106,20 @@ export default function TransactionHistoryScreen() {
   return (
     <AppLayout initialActivePage={null}>
       <View style={s.container}>
-        <Text style={s.title}>Histórico de Transações</Text>
+        {/* Header com botão de voltar */}
+        <View style={s.headerWrap}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            style={s.backBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="chevron-left" size={20} color="#EDEDF5" />
+            <Text style={s.backText}>Voltar</Text>
+          </TouchableOpacity>
+
+          <Text style={s.title}>Histórico de Transações</Text>
+        </View>
 
         {/* Resumo */}
         <View style={s.summaryRow}>
@@ -164,8 +180,20 @@ function SummaryPill({ label, value, color }: { label: string; value: number; co
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0b0b0f', padding: 16 },
-  title: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 12 },
-
+  headerWrap: {
+    marginBottom: 12,
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingRight: 8,
+    paddingLeft: 2,
+    alignSelf: 'flex-start',
+  },
+  backText: { color: '#EDEDF5', fontWeight: '700', fontSize: 14 },
+  title: { color: '#fff', fontSize: 20, fontWeight: '800', marginTop: 8 },
   summaryRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   pill: {
     flex: 1,
