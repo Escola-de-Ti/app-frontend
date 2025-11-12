@@ -1,14 +1,31 @@
-import React, { useState } from 'react';
+// === src/components/ImageUploader.tsx ===
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 
-interface ImageUploaderProps {
+export interface ImageUploaderProps {
   onChange: (uris: string[]) => void;
+  /** Máximo de imagens permitidas (default: 4) */
+  maxImages?: number;
+  /** URIs iniciais para pré-visualização (ex.: avatar salvo no back) */
+  initialUris?: string[];
+  /** Texto do rótulo acima do componente (default: `Imagens (máx. X)`) */
+  label?: string;
 }
 
-export default function ImageUploader({ onChange }: ImageUploaderProps) {
-  const [images, setImages] = useState<string[]>([]);
+export default function ImageUploader({
+  onChange,
+  maxImages = 4,
+  initialUris = [],
+  label,
+}: ImageUploaderProps) {
+  const [images, setImages] = useState<string[]>(initialUris);
+
+  // se o pai mudar initialUris (ex.: ao carregar o perfil), sincroniza
+  useEffect(() => {
+    setImages(initialUris);
+  }, [initialUris]);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -17,22 +34,23 @@ export default function ImageUploader({ onChange }: ImageUploaderProps) {
       return;
     }
 
-    if (images.length >= 4) {
-      Alert.alert('Limite atingido', 'Você pode adicionar no máximo 4 imagens.');
+    if (images.length >= maxImages) {
+      Alert.alert('Limite atingido', `Você pode adicionar no máximo ${maxImages} imagem(ns).`);
       return;
     }
 
+    const selectionLimit = Math.max(1, maxImages - images.length);
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-
-      allowsMultipleSelection: true,
-      selectionLimit: 4 - images.length,
+      allowsMultipleSelection: selectionLimit > 1,
+      selectionLimit,
       quality: 0.7,
     });
 
     if (!result.canceled) {
       const selectedUris = result.assets.map((asset) => asset.uri);
-      const newImages = [...images, ...selectedUris].slice(0, 4);
+      const newImages = [...images, ...selectedUris].slice(0, maxImages);
       setImages(newImages);
       onChange(newImages);
     }
@@ -44,9 +62,11 @@ export default function ImageUploader({ onChange }: ImageUploaderProps) {
     onChange(filtered);
   };
 
+  const finalLabel = label ?? `Imagens (máx. ${maxImages})`;
+
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Imagens (máx. 4)</Text>
+      <Text style={styles.label}>{finalLabel}</Text>
 
       <TouchableOpacity style={styles.uploadBox} onPress={pickImage} activeOpacity={0.8}>
         <Feather name="upload" size={32} color="#999" />
@@ -54,22 +74,18 @@ export default function ImageUploader({ onChange }: ImageUploaderProps) {
       </TouchableOpacity>
 
       <View style={styles.previewContainer}>
-        {images.map((uri) =>
-          React.createElement(
-            View,
-            { key: uri, style: styles.previewWrapper },
-            <>
-              <Image source={{ uri }} style={styles.preview} />
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={() => removeImage(uri)}
-                activeOpacity={0.8}
-              >
-                <Feather name="x" size={14} color="#fff" />
-              </TouchableOpacity>
-            </>
-          )
-        )}
+        {images.map((uri) => (
+          <View key={uri} style={styles.previewWrapper}>
+            <Image source={{ uri }} style={styles.preview} />
+            <TouchableOpacity
+              style={styles.removeButton}
+              onPress={() => removeImage(uri)}
+              activeOpacity={0.8}
+            >
+              <Feather name="x" size={14} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ))}
       </View>
     </View>
   );
