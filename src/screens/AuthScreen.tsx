@@ -1,3 +1,4 @@
+// src/screens/AuthScreen.tsx
 import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
@@ -19,6 +20,7 @@ import Logo from '../components/LogoWhitName';
 import AppInput from '../components/AppInput';
 import { useAuth } from '../hooks/useAuth';
 import { getErrorMessage } from '../lib/errors';
+import type { TipoUsuario } from '../types';
 
 export default function AuthScreen() {
   const { login, register, isLoading } = useAuth();
@@ -35,6 +37,7 @@ export default function AuthScreen() {
   const [telefone, setTelefone] = useState('');
   const [senhaReg, setSenhaReg] = useState('');
   const [confirmSenha, setConfirmSenha] = useState('');
+  const [tipoUsuario, setTipoUsuario] = useState<TipoUsuario | null>(null);
 
   // anim
   const [isRegister, setIsRegister] = useState(false);
@@ -43,7 +46,7 @@ export default function AuthScreen() {
 
   useEffect(() => {
     Animated.timing(cardHeight, {
-      toValue: isRegister ? 720 : 460,
+      toValue: isRegister ? 820 : 460,
       duration: 400,
       easing: Easing.out(Easing.exp),
       useNativeDriver: false,
@@ -65,7 +68,6 @@ export default function AuthScreen() {
   const opacityRegister = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
   // ====== AÇÕES ======
-
   const handleLogin = async () => {
     if (!emailLogin.trim() || !senhaLogin.trim()) {
       Toast.show({
@@ -77,8 +79,7 @@ export default function AuthScreen() {
     }
     try {
       await login(emailLogin.trim(), senhaLogin);
-      // ✅ logou: navega para FeedScreen
-      navigation.reset({ index: 0, routes: [{ name: 'TransactionHistoryScreen' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'FeedScreen' }] });
     } catch (e: any) {
       Toast.show({
         type: 'error',
@@ -111,6 +112,15 @@ export default function AuthScreen() {
       });
       return;
     }
+    if (!tipoUsuario) {
+      Toast.show({
+        type: 'error',
+        text1: 'Selecione o tipo de conta',
+        text2: 'Escolha ALUNO ou INSTRUTOR.',
+      });
+      return;
+    }
+
     try {
       await register({
         nome: nome.trim(),
@@ -118,26 +128,25 @@ export default function AuthScreen() {
         senha: senhaReg,
         cpf: cpf.replace(/\D/g, ''),
         telefone: telefone.trim() || undefined,
+        tipoUsuario,
       });
 
-      // ✅ cadastro OK: mostra toast e só então volta pro "Entrar"
       Toast.show({
         type: 'success',
         text1: 'Conta criada com sucesso!',
         text2: 'Agora faça seu login.',
-        // ao fechar o toast (auto-hide), troca pra aba Entrar
         onHide: () => {
           if (isRegister) toggleForm();
         },
       });
 
-      // limpa o form de cadastro
       setNome('');
       setCpf('');
       setEmailReg('');
       setTelefone('');
       setSenhaReg('');
       setConfirmSenha('');
+      setTipoUsuario(null);
     } catch (e: any) {
       Toast.show({
         type: 'error',
@@ -343,6 +352,39 @@ export default function AuthScreen() {
                 value={confirmSenha}
                 onChangeText={setConfirmSenha}
               />
+
+              {/* Tipo de Conta (exclusivo) */}
+              <Text style={[styles.label, { marginTop: 12 }]}>
+                Tipo de conta <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.radioRow}>
+                <TouchableOpacity
+                  style={styles.radioItem}
+                  onPress={() => setTipoUsuario('ALUNO')}
+                  activeOpacity={0.8}
+                >
+                  <Feather
+                    name={tipoUsuario === 'ALUNO' ? 'check-square' : 'square'}
+                    size={20}
+                    color={tipoUsuario === 'ALUNO' ? '#00FFA3' : '#888'}
+                  />
+                  <Text style={styles.radioText}>Aluno</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.radioItem}
+                  onPress={() => setTipoUsuario('INSTRUTOR')}
+                  activeOpacity={0.8}
+                >
+                  <Feather
+                    name={tipoUsuario === 'INSTRUTOR' ? 'check-square' : 'square'}
+                    size={20}
+                    color={tipoUsuario === 'INSTRUTOR' ? '#00FFA3' : '#888'}
+                  />
+                  <Text style={styles.radioText}>Instrutor</Text>
+                </TouchableOpacity>
+              </View>
+
               <TouchableOpacity
                 style={{ marginTop: 10 }}
                 onPress={handleRegister}
@@ -410,6 +452,7 @@ const styles = StyleSheet.create({
   },
   tabTextInactive: { color: '#ccc', fontWeight: '500' },
   tabTextActive: { color: '#fff', fontWeight: '600' },
+
   formWrapper: { width: '100%', minHeight: 460 },
   form: { position: 'absolute', width: '100%', top: 0 },
   label: { color: '#fff', fontSize: 14, marginBottom: 0, marginTop: 10 },
@@ -439,4 +482,18 @@ const styles = StyleSheet.create({
   backToLogin: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
   backText: { color: '#ccc', fontSize: 14 },
   backLink: { color: '#00FFA3', fontSize: 14, fontWeight: '600' },
+
+  radioRow: { flexDirection: 'row', gap: 14, marginTop: 8 },
+  radioItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#15151A',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2A2A33',
+  },
+  radioText: { color: '#EDEDF5', fontWeight: '700' },
 });

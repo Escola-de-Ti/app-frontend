@@ -231,14 +231,14 @@ export default function EditProfileScreen() {
             returnKeyType="next"
           />
 
-          <Text style={styles.label}>CPF</Text>
+          {/* <Text style={styles.label}>CPF</Text>
           <AppInput
             value={cpf}
             onChangeText={setCpf}
             placeholder="Somente números"
             keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
             maxLength={14}
-          />
+          /> */}
 
           <Text style={styles.label}>Telefone</Text>
           <AppInput
@@ -254,7 +254,7 @@ export default function EditProfileScreen() {
             onChangeText={setBiografia}
             placeholder="Sua biografia"
             multiline
-            style={{ height: 180, textAlignVertical: 'top' }}
+            style={{ height: 150, textAlignVertical: 'top' }}
             returnKeyType="done"
           />
 

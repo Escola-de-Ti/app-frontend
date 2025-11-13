@@ -1,8 +1,7 @@
+// src/services/auth.ts
 import { api } from '../api/client';
 import { setTokens, clearTokens } from '../lib/secure';
-
-export type AuthTokens = { accessToken: string; refreshToken: string | null };
-export type LoginRequest = { email: string; senha: string };
+import type { AuthTokens, LoginRequest, TipoUsuario, RegisterRequest } from '../types';
 
 function pickAccessToken(data: any, headers?: any) {
   return (
@@ -14,9 +13,7 @@ function pickAccessToken(data: any, headers?: any) {
     null
   );
 }
-function pickRefreshToken(data: any) {
-  return data?.refresh_token ?? data?.refreshToken ?? null;
-}
+const pickRefreshToken = (d: any) => d?.refresh_token ?? d?.refreshToken ?? null;
 
 export async function login(payload: LoginRequest): Promise<AuthTokens> {
   const resp = await api.post('/api/usuarios/login', payload);
@@ -25,22 +22,12 @@ export async function login(payload: LoginRequest): Promise<AuthTokens> {
   const accessToken = pickAccessToken(data, headers);
   const refreshToken = pickRefreshToken(data);
 
-  if (!accessToken) {
-    console.log('[LOGIN] resp sem token. data=', data, 'headers=', headers);
-    throw new Error('Resposta de login sem tokens');
-  }
+  if (!accessToken) throw new Error('Resposta de login sem tokens');
   await setTokens(accessToken, refreshToken ?? '');
   return { accessToken, refreshToken };
 }
 
-export async function register(payload: {
-  nome: string;
-  email: string;
-  senha: string;
-  cpf?: string;
-  telefone?: string;
-  telefone2?: string;
-}) {
+export async function register(payload: RegisterRequest & { tipoUsuario: TipoUsuario }) {
   const body = {
     email: payload.email,
     cpf: payload.cpf ?? '',
@@ -50,7 +37,7 @@ export async function register(payload: {
     biografia: '',
     senha: payload.senha,
     imageBase64: null,
-    tipoUsuario: 'ALUNO', // enum do back
+    tipoUsuario: payload.tipoUsuario,
   };
   await api.post('/api/usuarios', body);
 }

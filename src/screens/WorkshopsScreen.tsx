@@ -26,6 +26,9 @@ import { getAccessToken } from '../lib/secure';
 import { getUserIdFromJwt, getEmailFromJwt } from '../lib/jwt';
 import { getUsuarioIdByEmail } from '../services/user';
 
+// ⬇️ novo: input de filtro específico de workshops
+import FilterInputWorkshop from '../components/filters/FilterInputWorkshop';
+
 type Mode = 'Disponíveis' | 'Meus Workshops' | 'Inscritos';
 
 function ModeDropdown({ value, onChange }: { value: Mode; onChange: (v: Mode) => void }) {
@@ -74,6 +77,10 @@ export default function WorkshopsScreen() {
   const [available, setAvailable] = useState<Workshop[]>([]);
   const [mine, setMine] = useState<Workshop[]>([]);
   const [enrolled, setEnrolled] = useState<Workshop[]>([]);
+
+  // ⬇️ novo: termo de busca
+  const [q, setQ] = useState('');
+  const [searching, setSearching] = useState(false);
 
   // 🔑 resolve instrutorId: useAuth → token(userId) → token(email) → API
   const resolveUserId = useCallback(async (): Promise<number | null> => {
@@ -124,8 +131,9 @@ export default function WorkshopsScreen() {
       }
 
       // 2) exclui workshops em que eu sou o instrutor
-      if (myId) {
-        inscritos = inscritos.filter((w) => Number(w.instrutorId) !== Number(myId));
+      const myIdNum = myId != null ? Number(myId) : null;
+      if (myIdNum != null) {
+        inscritos = inscritos.filter((w) => Number(w.instrutorId) !== myIdNum);
       }
 
       // 3) remove duplicatas por id
@@ -141,22 +149,56 @@ export default function WorkshopsScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      load(); // chama sua função que já busca listOpen/listAll
-      return () => {}; // cleanup opcional
+      load();
+      return () => {};
     }, [load])
   );
+
+  // 🔎 filtro client-side mínimo
+  const matches = useCallback((w: Workshop, term: string) => {
+    if (!term) return true;
+    const t = term.toLowerCase();
+    const campos = [
+      w.titulo,
+      (w as any).instrutorNome,
+      (w.descricao as any)?.tema,
+      (w.descricao as any)?.descricao,
+    ]
+      .filter(Boolean)
+      .map(String)
+      .join(' ')
+      .toLowerCase();
+    return campos.includes(t);
+  }, []);
+
+  const filteredAvailable = useMemo(
+    () => available.filter((w) => matches(w, q)),
+    [available, q, matches]
+  );
+  const filteredMine = useMemo(() => mine.filter((w) => matches(w, q)), [mine, q, matches]);
+  const filteredEnrolled = useMemo(
+    () => enrolled.filter((w) => matches(w, q)),
+    [enrolled, q, matches]
+  );
+
+  const onSearch = useCallback(async (term: string) => {
+    // Mantemos local: apenas setamos q. Se futuramente tiver endpoint, plugamos aqui.
+    setSearching(true);
+    try {
+      setQ(term);
+      // se quiser debounce/await de rede, fica aqui
+    } finally {
+      setSearching(false);
+    }
+  }, []);
 
   // Handlers — plugue seus endpoints quando tiver (inscrever/cancelar)
   const onInscrever = async (id: number) => {
     Alert.alert('Inscrição', `Ação de inscrição simulada para o workshop #${id}`);
-    // TODO: await inscreverNoWorkshop(id)
-    // await load();
   };
 
   const onCancelar = async (id: number) => {
     Alert.alert('Inscrição', `Cancelamento de inscrição simulado para o workshop #${id}`);
-    // TODO: await cancelarInscricao(id)
-    // await load();
   };
 
   const onEditar = (id: number) => {
@@ -171,7 +213,7 @@ export default function WorkshopsScreen() {
     if (mode === 'Disponíveis') {
       return (
         <AvailableWorkshops
-          data={available}
+          data={filteredAvailable}
           loading={loading}
           onRefresh={load}
           onEnroll={onInscrever}
@@ -181,15 +223,15 @@ export default function WorkshopsScreen() {
     if (mode === 'Inscritos') {
       return (
         <EnrolledWorkshops
-          data={enrolled}
+          data={filteredEnrolled}
           loading={loading}
           onRefresh={load}
           onCancel={onCancelar}
         />
       );
     }
-    return <MyWorkshops data={mine} loading={loading} onRefresh={load} onEdit={onEditar} />;
-  }, [mode, available, enrolled, mine, loading, load]);
+    return <MyWorkshops data={filteredMine} loading={loading} onRefresh={load} onEdit={onEditar} />;
+  }, [mode, filteredAvailable, filteredEnrolled, filteredMine, loading, load]);
 
   return (
     <AppLayout initialActivePage="Workshops" backgroundColor="rgb(17, 17, 17)">
@@ -215,11 +257,23 @@ export default function WorkshopsScreen() {
 
           <View style={styles.headerRow}>
             <ModeDropdown value={mode} onChange={setMode} />
-            <TouchableOpacity style={styles.filterBtn} activeOpacity={0.8}>
+
+            {/* ⬇️ novo input de filtro */}
+            <View style={{ flex: 1 }}>
+              <FilterInputWorkshop
+                value={q}
+                onChangeText={setQ}
+                loading={searching}
+                onSearch={onSearch}
+                placeholder="Buscar workshops, temas, instrutor…"
+              />
+            </View>
+
+            {/* <TouchableOpacity style={styles.filterBtn} activeOpacity={0.8}>
               <LinearGradient colors={['#7C73FF', '#8D7CFF']} style={styles.filterBtnInner}>
                 <Feather name="sliders" size={16} color="#0B0B0E" />
               </LinearGradient>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
 
@@ -263,7 +317,6 @@ const styles = StyleSheet.create({
   },
 
   filterBtn: {
-    marginLeft: 'auto',
     borderRadius: 5,
     overflow: 'hidden',
   },

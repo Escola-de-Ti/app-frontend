@@ -4,6 +4,7 @@ import { login as apiLogin, register as apiRegister, logout as apiLogout } from 
 import { getEmailFromJwt, getUserIdFromJwt } from '../lib/jwt';
 import { setTokens, getAccessToken, clearTokens } from '../lib/secure';
 import { getUsuarioIdByEmail } from '../services/user';
+import type { TipoUsuario } from '../types';
 
 type RegisterPayload = {
   nome: string;
@@ -11,12 +12,13 @@ type RegisterPayload = {
   senha: string;
   cpf?: string;
   telefone?: string;
-  telefone2?: string; // se não usar, pode remover
+  telefone2?: string;
+  tipoUsuario: TipoUsuario;
 };
 
 type AuthContextType = {
   isAuthenticated: boolean;
-  userId: string | null; // id numérico em string
+  userId: string | null;
   isLoading: boolean;
   login(email: string, senha: string): Promise<void>;
   register(payload: RegisterPayload): Promise<void>;

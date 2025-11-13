@@ -1,3 +1,4 @@
+// src/components/AppInput.tsx
 import React from 'react';
 import { TextInput, StyleSheet, TextInputProps } from 'react-native';
 
@@ -13,7 +14,6 @@ export default function AppInput(props: TextInputProps) {
 
 const styles = StyleSheet.create({
   input: {
-    flex: 1,
     backgroundColor: '#121212',
     borderColor: '#333',
     borderWidth: 1,

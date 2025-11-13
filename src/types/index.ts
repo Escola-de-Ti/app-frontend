@@ -9,7 +9,7 @@ export type StatusWorkshop = 'ABERTO' | 'EM_ANDAMENTO' | 'CONCLUIDO';
 // ======== Auth / Tokens ========
 export interface AuthTokens {
   accessToken: string;
-  refreshToken: string;
+  refreshToken: string | null;
 }
 
 export interface JwtTokenDTO {
@@ -34,18 +34,19 @@ export interface LoginRequest {
   senha: string;
 }
 
+export type TipoUsuario = 'ALUNO' | 'INSTRUTOR' | 'ADMIN' | string;
 export interface RegisterRequest {
   nome: string;
   sobrenome?: string;
   email: string;
   cpf?: string;
   telefone?: string;
+  telefone2?: string;
   senha: string;
-  tipoUsuario?: string;
+  tipoUsuario?: TipoUsuario;
 }
 
 // ======== Perfil (edição alinhada ao back) ========
-export type TipoUsuario = 'ALUNO' | 'INSTRUTOR' | 'ADMIN' | string;
 
 export interface TagNameDTO {
   name: string;

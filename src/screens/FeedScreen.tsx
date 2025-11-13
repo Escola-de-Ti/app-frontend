@@ -18,6 +18,9 @@ import { getFeed, upvotePost } from '../services/posts';
 import type { UpvoteResponse } from '../services/posts';
 import { getVotedSet, markVoted, unmarkVoted } from '../services/votes';
 
+// ✅ usar o input de filtro do feed
+import InputFilterFeed from '../components/filters/InputFilterFeed';
+
 type Cursor = { lastPostId?: number | null; lastScore?: number | null } | null;
 
 export default function FeedScreen() {
@@ -25,6 +28,11 @@ export default function FeedScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+
+  // ✅ estado/refs para busca
+  const [q, setQ] = useState('');
+  const [searching, setSearching] = useState(false);
+  const queryRef = useRef<string>(''); // termo usado nas requisições
 
   const cursorRef = useRef<Cursor>(null);
   const didInitRef = useRef(false);
@@ -98,7 +106,8 @@ export default function FeedScreen() {
             }
           : {};
 
-      const dto = await getFeed({ pageSize: 20, ...params });
+      // ✅ inclui o termo de busca atual
+      const dto = await getFeed({ pageSize: 20, q: queryRef.current, ...params } as any);
 
       cursorRef.current = {
         lastPostId: (dto as any)?.lastPostId ?? null,
@@ -190,15 +199,38 @@ export default function FeedScreen() {
   const keyExtractor = useCallback((item: PostFeedModel) => String(item.id), []);
   const ItemSeparator = useCallback(() => <View style={{ height: 14 }} />, []);
 
+  // ✅ header com filtro embutido
   const header = useMemo(
     () => (
       <View style={styles.header}>
         <StatusBar barStyle="light-content" />
         <Text style={styles.h1}>Feed</Text>
         <Text style={styles.subtitle}>Explore conteúdos da comunidade</Text>
+
+        <View style={{ marginTop: 10 }}>
+          <InputFilterFeed
+            value={q}
+            onChangeText={setQ}
+            loading={searching}
+            onSearch={async (query: string) => {
+              const normalized = query.trim();
+              if (normalized === queryRef.current && initialLoadedRef.current) return;
+              queryRef.current = normalized;
+              setSearching(true);
+              try {
+                cursorRef.current = null;
+                initialLoadedRef.current = false;
+                await fetchFeed({ reset: true });
+              } finally {
+                setSearching(false);
+              }
+            }}
+            placeholder="Buscar posts e usuários…"
+          />
+        </View>
       </View>
     ),
-    []
+    [q, searching, fetchFeed]
   );
 
   const renderItem = useCallback(
