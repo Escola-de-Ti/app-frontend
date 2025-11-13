@@ -282,6 +282,21 @@ export interface CommentDTO {
   repliesCount?: number | null;
 }
 
+export type CommentVoteResponse = {
+  userVoted: boolean;
+  totalUpVotes?: number;
+};
+
+export type CommentModel = {
+  id: ID;
+  user?: string;
+  author?: UserRef | null;
+  content: string;
+  upvotes: number;
+  userUpvoted?: boolean;
+  replies?: CommentModel[];
+};
+
 export type Comment = CommentDTO;
 
 // ======== Ranking ======== //

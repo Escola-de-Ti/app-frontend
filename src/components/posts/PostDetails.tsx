@@ -1,4 +1,3 @@
-// src/components/posts/PostDetails.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -10,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { CommentItem } from '../CommentItem';
+import { CommentItem, CommentModel, ID } from '../CommentItem';
 import {
   getPostDetails,
   createComment,
@@ -18,28 +17,6 @@ import {
   upvotePost,
   getCommentReplies,
 } from '../../services/posts';
-
-type ID = string | number;
-
-type ComentarioDTO = {
-  id: number;
-  postId: number;
-  usuarioId?: number;
-  usuarioNome: string;
-  texto: string;
-  totalUpVotes: number;
-  totalSuperVotes?: number;
-  comentarioPaiId: number | null;
-  dataCriacao: string;
-};
-
-type Comment = {
-  id: ID;
-  user: string;
-  content: string;
-  upvotes: number;
-  replies?: Comment[];
-};
 
 type PostDetailsProps = {
   postId: number;
@@ -53,127 +30,71 @@ function formatDate(iso: string) {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
   const pad = (n: number) => `${n}`.padStart(2, '0');
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(
+    d.getMinutes()
+  )}`;
 }
 
-/* ===== Helpers de normalização ===== */
-type RawComment = any;
-
-function pickFirstArray(...candidates: any[]): any[] {
-  for (const c of candidates) {
-    if (Array.isArray(c)) return c;
-    if (c && Array.isArray(c.items)) return c.items;
-    if (c && Array.isArray(c.content)) return c.content;
-    if (c && Array.isArray(c.data)) return c.data;
-  }
-  return [];
-}
-
-function normalizeOne(raw: RawComment, parentOverride?: number | null): ComentarioDTO {
-  const id = Number(
-    raw.id ?? raw.comentarioId ?? raw.commentId ?? raw._id ?? raw.codigo ?? Date.now()
-  );
-  const postId = Number(raw.postId ?? raw.post ?? raw.post_id ?? 0);
-  const usuarioNome =
-    raw.usuarioNome ?? raw.autorNome ?? raw.userName ?? raw.authorName ?? raw.user ?? 'Usuário';
-  const texto = raw.texto ?? raw.conteudo ?? raw.content ?? raw.body ?? '';
-  const totalUpVotes = Number(raw.totalUpVotes ?? raw.upvotes ?? raw.votes ?? 0);
-  const comentarioPaiIdRaw =
-    parentOverride ??
-    raw.comentarioPaiId ??
-    raw.parentId ??
-    raw.comentarioPai ??
-    raw.parent ??
-    null;
-
-  const comentarioPaiId =
-    comentarioPaiIdRaw === null || comentarioPaiIdRaw === undefined
-      ? null
-      : Number(comentarioPaiIdRaw);
-
-  const dataCriacao =
-    raw.dataCriacao ?? raw.createdAt ?? raw.criadoEm ?? raw.created_at ?? new Date().toISOString();
-
-  return {
-    id,
-    postId,
-    usuarioNome: String(usuarioNome),
-    texto: String(texto ?? ''),
-    totalUpVotes,
-    totalSuperVotes: Number(raw.totalSuperVotes ?? 0),
-    comentarioPaiId,
-    dataCriacao: String(dataCriacao),
-  };
-}
-
-function flattenComments(rawList: RawComment[], parentId: number | null = null): ComentarioDTO[] {
-  const out: ComentarioDTO[] = [];
-  for (const raw of rawList) {
-    const norm = normalizeOne(raw, parentId);
-    out.push(norm);
-
-    const kids = pickFirstArray(raw.replies, raw.children, raw.filhos, raw.comentarios);
-    if (kids.length) {
-      out.push(...flattenComments(kids, norm.id));
-    }
-  }
-  return out;
-}
-
-function buildCommentTree(detailsItems: any[]): Comment[] {
-  const baseRaw = pickFirstArray(
-    detailsItems,
-    (detailsItems as any)?.comentarios,
-    (detailsItems as any)?.comments,
-    (detailsItems as any)?.listaComentarios,
-    (detailsItems as any)?.comentariosDoPost
-  );
-
-  const normalizedFlat: ComentarioDTO[] = flattenComments(baseRaw);
-
-  const nodeById = new Map<number, Comment & { _pid: number | null }>();
-  for (const c of normalizedFlat) {
-    nodeById.set(c.id, {
-      id: String(c.id),
-      user: c.usuarioNome,
-      content: c.texto,
-      upvotes: Number(c.totalUpVotes ?? 0),
-      replies: [],
-      _pid:
-        c.comentarioPaiId === null || c.comentarioPaiId === undefined
-          ? null
-          : Number(c.comentarioPaiId),
-    });
-  }
-
-  const roots: (Comment & { _pid: number | null })[] = [];
-  for (const node of nodeById.values()) {
-    const pid = node._pid;
-    if (pid !== null && pid !== undefined && nodeById.has(pid)) {
-      nodeById.get(pid)!.replies!.push(node);
-    } else {
-      roots.push(node);
-    }
-  }
-
-  const strip = (n: Comment & { _pid?: number | null }): Comment => {
-    const { _pid, replies = [], ...rest } = n as any;
-    return { ...rest, replies: replies.map(strip) };
-  };
-
-  return roots.map(strip);
-}
-
-function countComments(list: Comment[]): number {
+function countComments(list: CommentModel[]): number {
   let total = 0;
-  const walk = (arr: Comment[]) => {
+  const walk = (arr: CommentModel[]) => {
     for (const c of arr) {
       total += 1;
-      if (c.replies?.length) walk(c.replies);
+      if (Array.isArray(c.replies) && c.replies.length) walk(c.replies);
     }
   };
   walk(list);
   return total;
+}
+
+function mergeReplies(current: CommentModel[] = [], incoming: CommentModel[] = []): CommentModel[] {
+  const byId = new Map<string, CommentModel>();
+  for (const c of current) byId.set(String(c.id), c);
+
+  for (const inc of incoming) {
+    const key = String(inc.id);
+    if (byId.has(key)) {
+      const prev = byId.get(key)!;
+      byId.set(key, {
+        ...prev,
+        ...inc,
+        replies: mergeReplies(prev.replies || [], inc.replies || []),
+        repliesCount:
+          typeof prev.repliesCount === 'number' || typeof inc.repliesCount === 'number'
+            ? Math.max(Number(prev.repliesCount || 0), Number(inc.repliesCount || 0))
+            : (prev.repliesCount ?? inc.repliesCount),
+        canLoadMore: (prev.canLoadMore ?? false) || (inc.canLoadMore ?? false),
+      });
+    } else {
+      byId.set(key, inc);
+    }
+  }
+  return Array.from(byId.values());
+}
+
+function normalizeComment(raw: any): CommentModel {
+  const repliesArray =
+    raw.replies || raw.children || raw.comentarios || raw.comentariosDoComentario || [];
+
+  const replies = Array.isArray(repliesArray) ? repliesArray.map(normalizeComment) : [];
+
+  const repliesCount =
+    typeof raw.repliesCount === 'number'
+      ? raw.repliesCount
+      : Array.isArray(repliesArray)
+        ? repliesArray.length
+        : undefined;
+
+  return {
+    id: String(raw.id ?? raw.comentarioId ?? raw._id ?? `${Date.now()}-${Math.random()}`),
+    user: String(raw.usuarioNome ?? raw.autorNome ?? raw.userName ?? 'Usuário'),
+    content: String(raw.texto ?? raw.conteudo ?? raw.body ?? ''),
+    upvotes: Number(raw.totalUpVotes ?? raw.upvotes ?? 0),
+    replies,
+    repliesCount,
+    // assumimos que pode haver mais (o botão "ver mais" decide de acordo com contagem)
+    canLoadMore: true,
+  };
 }
 
 export function PostDetails({
@@ -189,25 +110,21 @@ export function PostDetails({
   const [postCreatedAt, setPostCreatedAt] = useState('');
   const [postUpvoted, setPostUpvoted] = useState<boolean>(!!initiallyUpvoted);
   const [postUpvotes, setPostUpvotes] = useState<number>(Number(initiallyUpvotes ?? 0));
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<CommentModel[]>([]);
   const [hasMoreComments, setHasMoreComments] = useState(false);
 
   const [newComment, setNewComment] = useState('');
   const inputRef = useRef<TextInput>(null);
 
-  // 🔒 trava de concorrência para upvote (evita spam)
-  const upvoteLockRef = useRef(false);
-  const [upvoteLoading, setUpvoteLoading] = useState(false);
-
-  // guardar a ref mais recente do callback pra evitar loop
-  type MetaFn = (meta: { comments?: number; upvotes?: number; userUpvoted?: boolean }) => void;
-  const metaRef = useRef<MetaFn | null>(null);
+  // ==== refs para estabilidade/guards
+  const metaRef = useRef<PostDetailsProps['onMetaChange']>(onMetaChange);
   useEffect(() => {
-    metaRef.current = onMetaChange ?? null;
+    metaRef.current = onMetaChange;
   }, [onMetaChange]);
 
-  // evita recarga duplicada
-  const lastLoadedPostIdRef = useRef<number | null>(null);
+  const currentPostIdRef = useRef<number | null>(null);
+  const firstLevelHydratedRef = useRef<boolean>(false);
+  const inflightRepliesRef = useRef<Set<string>>(new Set()); // track por commentId
 
   useEffect(() => {
     if (focusComment && inputRef.current) {
@@ -216,14 +133,13 @@ export function PostDetails({
     }
   }, [focusComment]);
 
+  // Carrega detalhes do post. ***Depende somente de postId***
   useEffect(() => {
     let mounted = true;
 
-    // impede reentradas se o mesmo postId já estiver carregado
-    if (lastLoadedPostIdRef.current === postId) {
-      return () => {};
-    }
-    lastLoadedPostIdRef.current = postId;
+    currentPostIdRef.current = postId;
+    firstLevelHydratedRef.current = false; // reset ao trocar de post
+    inflightRepliesRef.current.clear(); // limpa in-flight por segurança
 
     (async () => {
       try {
@@ -244,50 +160,85 @@ export function PostDetails({
           setPostUpvoted(Boolean((data as any).usuarioJaVotou));
         }
 
-        const candidate =
+        const base =
           (data as any)?.comentarios ??
           (data as any)?.comments ??
           (data as any)?.listaComentarios ??
           (data as any)?.comentariosDoPost ??
           [];
 
-        const tree = buildCommentTree(candidate);
-        setComments(tree);
+        const roots = Array.isArray(base) ? base.map(normalizeComment) : [];
+        setComments(roots);
 
-        // Hidratar respostas de 1º nível
-        try {
-          const hydrated = await Promise.all(
-            tree.map(async (root) => {
-              try {
-                const repliesDto = await getCommentReplies(Number(root.id), 50);
-                if (!Array.isArray(repliesDto) || repliesDto.length === 0) return root;
-                const replies = repliesDto.map((r) => ({
-                  id: String(r.id),
-                  user: r.usuarioNome,
-                  content: r.texto,
-                  upvotes: Number(r.totalUpVotes ?? 0),
-                  replies: [],
-                }));
-                return { ...root, replies };
-              } catch {
-                return root;
-              }
-            })
-          );
-          if (mounted) setComments(hydrated);
-        } catch (e) {
-          console.log('[PostDetails] falha ao hidratar respostas', (e as any)?.message);
-        }
-
-        // meta (usa ref para não entrar em loop)
+        // Notifica meta (sem re-disparar efeito)
         metaRef.current?.({
-          comments: countComments(tree),
+          comments: countComments(roots),
           upvotes: apiUpvotes,
           userUpvoted:
             typeof (data as any).usuarioJaVotou === 'boolean'
               ? Boolean((data as any).usuarioJaVotou)
               : undefined,
         });
+
+        // --- Hidrata 1º nível apenas uma vez por postId ---
+        if (!firstLevelHydratedRef.current) {
+          // marca ANTES de iniciar para evitar corrida
+          firstLevelHydratedRef.current = true;
+
+          try {
+            const hydrated = await Promise.all(
+              roots.map(async (root) => {
+                // se já veio com replies do back, não hidrata esse id
+                if (Array.isArray(root.replies) && root.replies.length > 0) {
+                  return root;
+                }
+
+                const key = String(root.id);
+                if (inflightRepliesRef.current.has(key)) return root;
+                inflightRepliesRef.current.add(key);
+
+                try {
+                  const repliesDto = await getCommentReplies(Number(root.id), 50);
+                  if (!mounted || currentPostIdRef.current !== postId) return root;
+
+                  if (!Array.isArray(repliesDto) || repliesDto.length === 0) {
+                    return { ...root, canLoadMore: false };
+                  }
+
+                  const mapped = repliesDto.map((r) => ({
+                    id: String(r.id),
+                    user: String(r.usuarioNome ?? 'Usuário'),
+                    content: String(r.texto ?? ''),
+                    upvotes: Number(r.totalUpVotes ?? 0),
+                    replies: [],
+                    repliesCount: (r as any)?.repliesCount ?? undefined,
+                    canLoadMore: true,
+                  })) as CommentModel[];
+
+                  return {
+                    ...root,
+                    replies: mergeReplies(root.replies || [], mapped),
+                    repliesCount:
+                      typeof root.repliesCount === 'number'
+                        ? Math.max(root.repliesCount, mapped.length)
+                        : Math.max(root.replies?.length || 0, mapped.length),
+                    canLoadMore: true,
+                  };
+                } catch {
+                  return root;
+                } finally {
+                  inflightRepliesRef.current.delete(key);
+                }
+              })
+            );
+
+            if (mounted && currentPostIdRef.current === postId) {
+              setComments(hydrated);
+            }
+          } catch (e) {
+            console.log('[PostDetails] falha ao hidratar 1º nível', (e as any)?.message);
+          }
+        }
       } catch (e: any) {
         console.log('[PostDetails] erro ao carregar', e?.message);
         Alert.alert('Erro', 'Não foi possível carregar os detalhes do post.');
@@ -297,8 +248,7 @@ export function PostDetails({
     return () => {
       mounted = false;
     };
-    // *** dependência SOMENTE em postId para evitar loop por ref de função recriada
-  }, [postId]);
+  }, [postId]); // <<< só postId (onMetaChange está em ref)
 
   const totalComments = useMemo(() => countComments(comments), [comments]);
 
@@ -311,14 +261,9 @@ export function PostDetails({
   }, [postUpvotes, postUpvoted]);
 
   const handlePostToggleUpvote = async () => {
-    if (upvoteLockRef.current) return;
-    upvoteLockRef.current = true;
-    setUpvoteLoading(true);
-
     const prevVoted = postUpvoted;
     const next = !prevVoted;
 
-    // otimista
     setPostUpvoted(next);
     setPostUpvotes((prev) => Math.max(0, prev + (next ? 1 : -1)));
 
@@ -335,13 +280,9 @@ export function PostDetails({
         setPostUpvotes(resp.totalUpVotes);
       }
     } catch {
-      // rollback
       setPostUpvoted(prevVoted);
       setPostUpvotes((prev) => Math.max(0, prev + (prevVoted ? 1 : -1)));
       Alert.alert('Erro', 'Não foi possível registrar seu voto no post.');
-    } finally {
-      setUpvoteLoading(false);
-      upvoteLockRef.current = false;
     }
   };
 
@@ -349,12 +290,13 @@ export function PostDetails({
     const texto = newComment.trim();
     if (!texto) return;
 
-    const optimistic: Comment = {
+    const optimistic: CommentModel = {
       id: `temp-${Date.now()}`,
       user: 'Você',
       content: texto,
       upvotes: 0,
       replies: [],
+      canLoadMore: false,
     };
     setComments((prev) => [optimistic, ...prev]);
     setNewComment('');
@@ -363,12 +305,14 @@ export function PostDetails({
       const created = await createComment({ postId, texto, comentarioPaiId: null });
       setComments((prev) => {
         const withoutTemp = prev.filter((c) => c.id !== optimistic.id);
-        const mapped: Comment = {
+        const mapped: CommentModel = {
           id: String(created.id),
           user: created.usuarioNome,
           content: created.texto,
           upvotes: Number(created.totalUpVotes ?? 0),
           replies: [],
+          repliesCount: 0,
+          canLoadMore: false,
         };
         return [mapped, ...withoutTemp];
       });
@@ -384,26 +328,29 @@ export function PostDetails({
     if (!texto) return;
 
     const tempId = `temp-r-${Date.now()}`;
-    const tempReply: Comment = {
+    const tempReply: CommentModel = {
       id: tempId,
       user: 'Você',
       content: texto,
       upvotes: 0,
       replies: [],
+      repliesCount: 0,
+      canLoadMore: false,
     };
 
-    const addTemp = (list: Comment[]): Comment[] =>
-      list.map((c) =>
-        String(c.id) === String(parentId)
-          ? { ...c, replies: [...(c.replies || []), tempReply] }
-          : { ...c, replies: c.replies ? addTemp(c.replies) : [] }
-      );
+    const addTemp = (list: CommentModel[]): CommentModel[] =>
+      list.map((c) => {
+        if (String(c.id) === String(parentId)) {
+          return { ...c, replies: [...(c.replies || []), tempReply] };
+        }
+        return { ...c, replies: c.replies ? addTemp(c.replies) : [] };
+      });
     setComments((prev) => addTemp(prev));
 
     try {
       const saved = await createComment({ postId, texto, comentarioPaiId: Number(parentId) });
 
-      const replaceTemp = (list: Comment[]): Comment[] =>
+      const replaceTemp = (list: CommentModel[]): CommentModel[] =>
         list.map((c) => {
           if (String(c.id) === String(parentId)) {
             const newReplies = (c.replies || []).map((r) =>
@@ -414,31 +361,79 @@ export function PostDetails({
                     content: saved.texto,
                     upvotes: Number(saved.totalUpVotes ?? 0),
                     replies: [],
+                    repliesCount: 0,
+                    canLoadMore: false,
                   }
                 : r
             );
-            return { ...c, replies: newReplies };
+            return {
+              ...c,
+              replies: newReplies,
+              repliesCount: c.repliesCount ?? newReplies.length,
+            };
           }
           return { ...c, replies: c.replies ? replaceTemp(c.replies) : [] };
         });
 
       setComments((prev) => replaceTemp(prev));
     } catch {
-      const removeTemp = (list: Comment[]): Comment[] =>
+      const removeTemp = (list: CommentModel[]): CommentModel[] =>
         list.map((c) => {
-          const children = c.replies || [];
-          const filtered = children.filter((r) => String(r.id) !== String(tempId));
-          return {
-            ...c,
-            replies: filtered.map((r) => ({
-              ...r,
-              replies: r.replies?.length ? removeTemp(r.replies) : r.replies,
-            })),
-          };
+          if (String(c.id) === String(parentId)) {
+            const filtered = (c.replies || []).filter((r) => String(r.id) !== String(tempId));
+            return { ...c, replies: filtered };
+          }
+          return { ...c, replies: c.replies ? removeTemp(c.replies) : [] };
         });
 
       setComments((prev) => removeTemp(prev));
       Alert.alert('Erro', 'Não foi possível enviar a resposta.');
+    }
+  };
+
+  const handleLoadMoreReplies = async (parentId: ID) => {
+    const key = String(parentId);
+    if (inflightRepliesRef.current.has(key)) return; // já carregando
+    inflightRepliesRef.current.add(key);
+    try {
+      const repliesDto = await getCommentReplies(Number(parentId), 50);
+      const mapped: CommentModel[] = Array.isArray(repliesDto)
+        ? repliesDto.map((r) => ({
+            id: String(r.id),
+            user: String(r.usuarioNome ?? 'Usuário'),
+            content: String(r.texto ?? ''),
+            upvotes: Number(r.totalUpVotes ?? 0),
+            replies: [],
+            repliesCount: (r as any)?.repliesCount ?? undefined,
+            canLoadMore: true,
+          }))
+        : [];
+
+      const mergeIntoTree = (list: CommentModel[]): CommentModel[] =>
+        list.map((c) => {
+          if (String(c.id) === key) {
+            if (mapped.length === 0) {
+              return { ...c, canLoadMore: false };
+            }
+            const mergedReplies = mergeReplies(c.replies || [], mapped);
+            return {
+              ...c,
+              replies: mergedReplies,
+              repliesCount:
+                typeof c.repliesCount === 'number'
+                  ? Math.max(c.repliesCount, mergedReplies.length)
+                  : Math.max(c.replies?.length || 0, mergedReplies.length),
+              canLoadMore: true,
+            };
+          }
+          return { ...c, replies: c.replies ? mergeIntoTree(c.replies) : [] };
+        });
+
+      setComments((prev) => mergeIntoTree(prev));
+    } catch (e) {
+      console.log('[PostDetails] handleLoadMoreReplies error:', (e as any)?.message);
+    } finally {
+      inflightRepliesRef.current.delete(key);
     }
   };
 
@@ -447,7 +442,7 @@ export function PostDetails({
       if (willUpvote) {
         await upvoteComment(Number(commentId));
       } else {
-        // se houver endpoint para desfazer voto, chamar aqui
+        // se houver endpoint para desfazer o voto, chamar aqui
       }
     } catch (e) {
       throw e;
@@ -478,18 +473,8 @@ export function PostDetails({
       <Text style={styles.title}>{postTitle}</Text>
       {!!postDescription && <Text style={styles.description}>{postDescription}</Text>}
 
-      <TouchableOpacity
-        onPress={handlePostToggleUpvote}
-        activeOpacity={upvoteLoading ? 1 : 0.8}
-        disabled={upvoteLoading}
-      >
-        <View
-          style={[
-            styles.upvoteContainer,
-            postUpvoted && styles.upvoteActive,
-            upvoteLoading && { opacity: 0.6 },
-          ]}
-        >
+      <TouchableOpacity onPress={handlePostToggleUpvote} activeOpacity={0.8}>
+        <View style={[styles.upvoteContainer, postUpvoted && styles.upvoteActive]}>
           <Feather name="arrow-up" size={16} color={postUpvoted ? '#003d2b' : '#fff'} />
           <Text style={[styles.upvoteText, postUpvoted && styles.upvoteTextActive]}>
             {postUpvotes}
@@ -527,6 +512,7 @@ export function PostDetails({
             depth={0}
             onReply={handleReply}
             onUpvote={handleCommentUpvote}
+            onLoadMoreReplies={handleLoadMoreReplies}
           />
         ))}
       </View>
@@ -593,5 +579,3 @@ const styles = StyleSheet.create({
   commentInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 8, minHeight: 50 },
   sendButton: { marginLeft: 10, backgroundColor: '#5b2eff', padding: 8, borderRadius: 8 },
 });
-
-export default PostDetails;

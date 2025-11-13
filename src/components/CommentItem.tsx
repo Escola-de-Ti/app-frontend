@@ -1,9 +1,8 @@
-// src/components/CommentItem.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
-type ID = string | number;
+export type ID = string | number;
 
 type UserRef = {
   id?: ID;
@@ -20,6 +19,10 @@ export type CommentModel = {
   content: string;
   upvotes: number;
   replies?: CommentModel[];
+  repliesCount?: number | null;
+  canLoadMore?: boolean;
+  /** opcional: se você já tiver esse booleano no payload do back */
+  userUpvoted?: boolean;
 };
 
 type CommentProps = {
@@ -28,32 +31,82 @@ type CommentProps = {
   maxDepth?: number;
   onReply: (parentId: ID, replyText: string) => void;
   onUpvote?: (commentId: ID, willUpvote: boolean) => Promise<void> | void;
+  onLoadMoreReplies?: (commentId: ID) => Promise<void> | void;
+  /** novo: permite o pai informar o estado inicial do voto */
+  initiallyUpvoted?: boolean;
 };
 
-export function CommentItem({ comment, depth = 0, maxDepth = 3, onReply, onUpvote }: CommentProps) {
-  const [upvoted, setUpvoted] = useState(false);
+export function CommentItem({
+  comment,
+  depth = 0,
+  maxDepth = 3,
+  onReply,
+  onUpvote,
+  onLoadMoreReplies,
+  initiallyUpvoted,
+}: CommentProps) {
+  // === AJUSTES DO UPVOTE (início) ===
+  // estado inicial considera: prop inicialmenteUpvoted > comment.userUpvoted > false
+  const [upvoted, setUpvoted] = useState<boolean>(
+    typeof initiallyUpvoted === 'boolean' ? initiallyUpvoted : !!comment.userUpvoted
+  );
   const [upvotes, setUpvotes] = useState<number>(Number(comment.upvotes) || 0);
+
+  // sincroniza quando o pai atualizar (ex.: após resposta do back)
+  useEffect(() => {
+    if (typeof initiallyUpvoted === 'boolean') {
+      setUpvoted(initiallyUpvoted);
+    } else if (typeof comment.userUpvoted === 'boolean') {
+      setUpvoted(!!comment.userUpvoted);
+    }
+  }, [initiallyUpvoted, comment.userUpvoted, comment.id]);
+
+  // se o pai atualizar a contagem (ex.: correção do backend)
+  useEffect(() => {
+    if (typeof comment.upvotes === 'number') {
+      setUpvotes(Number(comment.upvotes) || 0);
+    }
+  }, [comment.upvotes, comment.id]);
+
+  const handleUpvote = async () => {
+    const willUpvote = !upvoted;
+
+    // otimista
+    setUpvoted(willUpvote);
+    setUpvotes((prev) => (willUpvote ? prev + 1 : Math.max(0, prev - 1)));
+
+    try {
+      await onUpvote?.(comment.id, willUpvote);
+      // OBS: se o pai corrigir via props (userUpvoted/upvotes),
+      // os useEffects acima vão sincronizar automaticamente.
+    } catch {
+      // reverte
+      setUpvoted((prev) => !prev);
+      setUpvotes((prev) => (!willUpvote ? prev + 1 : Math.max(0, prev - 1)));
+      Alert.alert('Erro', 'Não foi possível registrar seu voto neste comentário.');
+    }
+  };
+  // === AJUSTES DO UPVOTE (fim) ===
+
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [expanded, setExpanded] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const displayUser = useMemo(() => {
     return comment.user || comment.author?.name || comment.author?.nome || 'Usuário';
   }, [comment.user, comment.author?.name, comment.author?.nome]);
 
   const canNest = depth < (maxDepth ?? 3);
+  const replies = Array.isArray(comment.replies) ? comment.replies : [];
+  const knownCount = typeof comment.repliesCount === 'number' ? comment.repliesCount : undefined;
 
-  const handleUpvote = async () => {
-    const willUpvote = !upvoted;
-    setUpvoted(willUpvote);
-    setUpvotes((prev) => (willUpvote ? prev + 1 : Math.max(0, prev - 1)));
-    try {
-      await onUpvote?.(comment.id, willUpvote);
-    } catch {
-      setUpvoted((prev) => !prev);
-      setUpvotes((prev) => (!willUpvote ? prev + 1 : Math.max(0, prev - 1)));
-      Alert.alert('Erro', 'Não foi possível registrar seu voto neste comentário.');
-    }
-  };
+  const showSeeMore =
+    canNest &&
+    !loadingMore &&
+    ((knownCount !== undefined && knownCount > replies.length) ||
+      (!expanded && replies.length > 0) ||
+      comment.canLoadMore === true);
 
   const handleSendReply = () => {
     const txt = replyText.trim();
@@ -61,6 +114,18 @@ export function CommentItem({ comment, depth = 0, maxDepth = 3, onReply, onUpvot
     onReply(comment.id, txt);
     setReplyText('');
     setShowReplyInput(false);
+    setExpanded(true);
+  };
+
+  const handleSeeMore = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      await onLoadMoreReplies?.(comment.id);
+      setExpanded(true);
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   const borderColor = depth > 0 ? '#F08E90' : '#5b2eff';
@@ -99,6 +164,16 @@ export function CommentItem({ comment, depth = 0, maxDepth = 3, onReply, onUpvot
             <Text style={styles.replyText}>Responder</Text>
           </TouchableOpacity>
         )}
+
+        {showSeeMore && (
+          <TouchableOpacity
+            onPress={handleSeeMore}
+            accessibilityRole="button"
+            disabled={loadingMore}
+          >
+            <Text style={styles.seeMoreText}>{loadingMore ? 'Carregando…' : 'Ver mais'}</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {canNest && showReplyInput && (
@@ -122,9 +197,9 @@ export function CommentItem({ comment, depth = 0, maxDepth = 3, onReply, onUpvot
         </View>
       )}
 
-      {canNest && Array.isArray(comment.replies) && comment.replies.length > 0 && (
+      {canNest && expanded && replies.length > 0 && (
         <View>
-          {comment.replies.map((reply) => (
+          {replies.map((reply) => (
             <CommentItem
               key={String(reply.id)}
               comment={reply}
@@ -132,6 +207,9 @@ export function CommentItem({ comment, depth = 0, maxDepth = 3, onReply, onUpvot
               maxDepth={maxDepth}
               onReply={onReply}
               onUpvote={onUpvote}
+              onLoadMoreReplies={onLoadMoreReplies}
+              // passa o estado inicial do filho (se vier do back)
+              initiallyUpvoted={reply.userUpvoted}
             />
           ))}
         </View>
@@ -176,6 +254,7 @@ const styles = StyleSheet.create({
   commentStatText: { color: '#ccc', fontSize: 12 },
   commentUpvoteTextActive: { color: '#003d2b', fontWeight: '600' },
   replyText: { color: '#82caff', fontSize: 12 },
+  seeMoreText: { color: '#b3b3ff', fontSize: 12, fontWeight: '600' },
   replyInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
