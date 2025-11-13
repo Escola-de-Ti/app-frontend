@@ -123,6 +123,7 @@ export type FeedParams = {
   pageSize?: number;
   lastPostId?: number | null;
   lastScore?: number | null;
+  q?: string;
   // filtros opcionais:
   // tagIds?: number[];
   // tagOperador?: 'E' | 'OU';
@@ -130,21 +131,30 @@ export type FeedParams = {
   // dataFim?: string;    // yyyy-MM-dd
 };
 
-export async function getFeed(params: FeedParams = {}): Promise<GetFeedResponseDTO> {
-  try {
-    const { data } = await api.get<GetFeedResponseDTO>(`${POSTS_ENDPOINT}/feed`, {
-      params: { pageSize: 20, ...params },
-    });
+let FEED_SEQ = 0;
 
-    return {
-      posts: Array.isArray((data as any)?.posts) ? (data as any).posts : [],
-      hasMore: Boolean((data as any)?.hasMore),
-      lastPostId: (data as any)?.lastPostId ?? null,
-      lastScore: (data as any)?.lastScore ?? null,
-    };
-  } catch (err: any) {
-    throw new Error(extractErrorMessage(err));
-  }
+export async function getFeed(params: FeedParams = {}): Promise<GetFeedResponseDTO> {
+  const seq = ++FEED_SEQ; // id da chamada p/ rastrear
+  const finalParams = { pageSize: 20, ...params };
+
+  console.log('[FEED][API][REQ]', { seq, finalParams });
+
+  const { data } = await api.get<GetFeedResponseDTO>('/api/posts/feed', { params: finalParams });
+
+  const count = Array.isArray((data as any)?.posts) ? (data as any).posts.length : 0;
+  console.log('[FEED][API][RESP]', {
+    seq,
+    count,
+    lastPostId: (data as any)?.lastPostId,
+    lastScore: (data as any)?.lastScore,
+  });
+
+  return {
+    posts: Array.isArray((data as any)?.posts) ? (data as any).posts : [],
+    hasMore: Boolean((data as any)?.hasMore),
+    lastPostId: (data as any)?.lastPostId ?? null,
+    lastScore: (data as any)?.lastScore ?? null,
+  };
 }
 
 /** GET /api/posts/{id}/detalhes */

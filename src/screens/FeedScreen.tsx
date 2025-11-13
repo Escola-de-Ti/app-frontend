@@ -8,9 +8,11 @@ import {
   FlatList,
   RefreshControl,
   ListRenderItemInfo,
+  Animated,
+  LayoutChangeEvent,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import AppLayout from '../components/AppLayout';
+import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 
 import PostCard from '../components/posts/PostCard';
 import type { PostFeedModel, PostFeedDTO } from '../types';
@@ -18,10 +20,12 @@ import { getFeed, upvotePost } from '../services/posts';
 import type { UpvoteResponse } from '../services/posts';
 import { getVotedSet, markVoted, unmarkVoted } from '../services/votes';
 
-// ✅ usar o input de filtro do feed
 import InputFilterFeed from '../components/filters/InputFilterFeed';
 
 type Cursor = { lastPostId?: number | null; lastScore?: number | null } | null;
+
+const PAGE_SIZE = 20;
+const PREFETCH_DISTANCE_PX = 320;
 
 export default function FeedScreen() {
   const [data, setData] = useState<PostFeedModel[]>([]);
@@ -29,14 +33,19 @@ export default function FeedScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
-  // ✅ estado/refs para busca
   const [q, setQ] = useState('');
   const [searching, setSearching] = useState(false);
-  const queryRef = useRef<string>(''); // termo usado nas requisições
+  const queryRef = useRef<string>('');
 
   const cursorRef = useRef<Cursor>(null);
   const didInitRef = useRef(false);
   const initialLoadedRef = useRef(false);
+
+  const inFlightRef = useRef(false);
+  const layoutScrollY = useRef(new Animated.Value(0)).current;
+
+  const viewportHRef = useRef(0);
+  const contentHRef = useRef(0);
 
   const votedSetRef = useRef<Set<number>>(new Set());
 
@@ -95,8 +104,12 @@ export default function FeedScreen() {
     return base;
   }, []);
 
+  // ===== load =====
   const fetchFeed = useCallback(
     async (opts?: { reset?: boolean }) => {
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
+
       const isReset = !!opts?.reset;
       const params =
         !isReset && cursorRef.current?.lastPostId != null && cursorRef.current?.lastScore != null
@@ -106,19 +119,34 @@ export default function FeedScreen() {
             }
           : {};
 
-      // ✅ inclui o termo de busca atual
-      const dto = await getFeed({ pageSize: 20, q: queryRef.current, ...params } as any);
+      try {
+        const dto = await getFeed({ pageSize: PAGE_SIZE, q: queryRef.current, ...params } as any);
 
-      cursorRef.current = {
-        lastPostId: (dto as any)?.lastPostId ?? null,
-        lastScore: (dto as any)?.lastScore ?? null,
-      };
-      setHasMore(Boolean((dto as any)?.hasMore));
+        const rawPosts = Array.isArray((dto as any)?.posts) ? (dto as any).posts : [];
+        const mapped = rawPosts.map(mapPost);
 
-      const mapped = (dto.posts ?? []).map(mapPost);
-      setData((prev) => (isReset ? mapped : mergeById(prev, mapped)));
+        let nextLastPostId = (dto as any)?.lastPostId ?? null;
+        const nextLastScore = (dto as any)?.lastScore ?? null;
+        if ((nextLastPostId == null || Number.isNaN(Number(nextLastPostId))) && mapped.length > 0) {
+          const last = mapped[mapped.length - 1];
+          const idNum = Number(last.id);
+          if (Number.isFinite(idNum)) nextLastPostId = idNum;
+        }
+        cursorRef.current = { lastPostId: nextLastPostId, lastScore: nextLastScore };
 
-      if (isReset) initialLoadedRef.current = true;
+        const serverHasMore = (dto as any)?.hasMore;
+        const finalHasMore =
+          typeof serverHasMore === 'boolean' ? serverHasMore : mapped.length === PAGE_SIZE;
+        setHasMore(finalHasMore);
+
+        setData((prev) => (isReset ? mapped : mergeById(prev, mapped)));
+
+        if (isReset) {
+          initialLoadedRef.current = true;
+        }
+      } finally {
+        inFlightRef.current = false;
+      }
     },
     [mapPost, mergeById]
   );
@@ -140,15 +168,18 @@ export default function FeedScreen() {
     try {
       cursorRef.current = null;
       initialLoadedRef.current = false;
+      setHasMore(true);
       await fetchFeed({ reset: true });
     } finally {
       setRefreshing(false);
     }
   }, [fetchFeed]);
 
-  const onEndReached = useCallback(async () => {
+  const tryLoadMore = useCallback(async () => {
     if (!initialLoadedRef.current) return;
-    if (loadingMore || !hasMore) return;
+    if (!hasMore) return;
+    if (loadingMore || inFlightRef.current) return;
+
     setLoadingMore(true);
     try {
       await fetchFeed();
@@ -157,6 +188,58 @@ export default function FeedScreen() {
     }
   }, [fetchFeed, hasMore, loadingMore]);
 
+  const maybePrefillScreen = useCallback(async () => {
+    const vh = viewportHRef.current;
+    const ch = contentHRef.current;
+    if (!vh || !ch) return;
+
+    let attempts = 0;
+    while (ch < vh - 1 && hasMore && attempts < 2) {
+      await tryLoadMore();
+      attempts++;
+    }
+  }, [hasMore, tryLoadMore]);
+
+  // ===== eventos do FlatList =====
+
+  const onEndReached = useCallback(async () => {
+    await tryLoadMore();
+  }, [tryLoadMore]);
+
+  const onListScroll = Animated.event([{ nativeEvent: { contentOffset: { y: layoutScrollY } } }], {
+    useNativeDriver: true,
+    listener: (e: any) => {
+      const y = e?.nativeEvent?.contentOffset?.y ?? 0;
+      const h = e?.nativeEvent?.layoutMeasurement?.height ?? 0;
+      const ch = e?.nativeEvent?.contentSize?.height ?? 0;
+
+      viewportHRef.current = h;
+      contentHRef.current = ch;
+
+      const dist = ch - (y + h);
+      if (dist < PREFETCH_DISTANCE_PX) {
+        tryLoadMore();
+      }
+    },
+  });
+
+  const onListLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      viewportHRef.current = e.nativeEvent.layout.height;
+      maybePrefillScreen();
+    },
+    [maybePrefillScreen]
+  );
+
+  const onContentSizeChange = useCallback(
+    (w: number, h: number) => {
+      contentHRef.current = h;
+      maybePrefillScreen();
+    },
+    [maybePrefillScreen]
+  );
+
+  // ===== votação =====
   const handleUpvote = useCallback(
     async (postId: number, willUpvote: boolean): Promise<UpvoteResponse | void> => {
       try {
@@ -199,7 +282,6 @@ export default function FeedScreen() {
   const keyExtractor = useCallback((item: PostFeedModel) => String(item.id), []);
   const ItemSeparator = useCallback(() => <View style={{ height: 14 }} />, []);
 
-  // ✅ header com filtro embutido
   const header = useMemo(
     () => (
       <View style={styles.header}>
@@ -220,6 +302,7 @@ export default function FeedScreen() {
               try {
                 cursorRef.current = null;
                 initialLoadedRef.current = false;
+                setHasMore(true);
                 await fetchFeed({ reset: true });
               } finally {
                 setSearching(false);
@@ -233,28 +316,32 @@ export default function FeedScreen() {
     [q, searching, fetchFeed]
   );
 
-  const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<PostFeedModel>) => (
-      <PostCard
-        post={item}
-        initiallyUpvoted={!!item.usuarioJaVotou}
-        commentCount={Number(item.totalComentarios ?? 0)}
-        onUpvote={handleUpvote}
-      />
-    ),
-    [handleUpvote]
-  );
-
   return (
-    <AppLayout initialActivePage="Feed" backgroundColor="rgb(17, 17, 17)">
+    <AppLayout
+      initialActivePage="Feed"
+      backgroundColor="rgb(17, 17, 17)"
+      wrapWithScroll={false}
+      externalScrollY={layoutScrollY}
+    >
       <FlatList
         style={styles.container}
-        contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 110, paddingTop: 8 }}
+        contentContainerStyle={{
+          paddingHorizontal: 14,
+          paddingTop: HEADER_OFFSET + 8,
+          paddingBottom: FOOTER_OFFSET,
+        }}
         data={data}
         keyExtractor={keyExtractor}
         ListHeaderComponent={header}
         ItemSeparatorComponent={ItemSeparator}
-        renderItem={renderItem}
+        renderItem={({ item }: ListRenderItemInfo<PostFeedModel>) => (
+          <PostCard
+            post={item}
+            initiallyUpvoted={!!item.usuarioJaVotou}
+            commentCount={Number(item.totalComentarios ?? 0)}
+            onUpvote={handleUpvote}
+          />
+        )}
         refreshControl={
           <RefreshControl
             tintColor="#7C73FF"
@@ -263,9 +350,16 @@ export default function FeedScreen() {
             onRefresh={onRefresh}
           />
         }
-        onEndReachedThreshold={0.4}
+        onEndReachedThreshold={0.2}
         onEndReached={onEndReached}
-        initialNumToRender={8}
+        initialNumToRender={PAGE_SIZE}
+        removeClippedSubviews
+        keyboardShouldPersistTaps="handled"
+        windowSize={7}
+        onScroll={onListScroll}
+        scrollEventThrottle={16}
+        onLayout={onListLayout}
+        onContentSizeChange={onContentSizeChange}
         ListFooterComponent={
           loadingMore ? (
             <View style={{ paddingVertical: 18, alignItems: 'center' }}>
