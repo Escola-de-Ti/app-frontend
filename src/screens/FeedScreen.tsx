@@ -18,7 +18,6 @@ import PostCard from '../components/posts/PostCard';
 import type { PostFeedModel, PostFeedDTO } from '../types';
 import { getFeed, upvotePost } from '../services/posts';
 import type { UpvoteResponse } from '../services/posts';
-import { getVotedSet, markVoted, unmarkVoted } from '../services/votes';
 
 import InputFilterFeed from '../components/filters/InputFilterFeed';
 
@@ -26,6 +25,18 @@ type Cursor = { lastPostId?: number | null; lastScore?: number | null } | null;
 
 const PAGE_SIZE = 20;
 const PREFETCH_DISTANCE_PX = 320;
+
+// helpers
+const toBool = (v: any): boolean => {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v === 1;
+  if (typeof v === 'string') return v.toLowerCase() === 'true' || v === '1';
+  return false;
+};
+const toNum = (v: any): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 export default function FeedScreen() {
   const [data, setData] = useState<PostFeedModel[]>([]);
@@ -47,21 +58,6 @@ export default function FeedScreen() {
   const viewportHRef = useRef(0);
   const contentHRef = useRef(0);
 
-  const votedSetRef = useRef<Set<number>>(new Set());
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const s = await getVotedSet();
-        if (mounted) votedSetRef.current = s;
-      } catch {}
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
   const mergeById = useCallback((prev: PostFeedModel[], next: PostFeedModel[]) => {
     const map = new Map<string | number, PostFeedModel>();
     for (const p of prev) map.set(p.id, p);
@@ -73,35 +69,32 @@ export default function FeedScreen() {
   }, []);
 
   const mapPost = useCallback((p: PostFeedDTO): PostFeedModel => {
-    const idNum = Number(p.id);
-    const usuarioIdNum = Number(p.usuarioId);
-    const totalComentarios = Number(
+    const idNum = Number((p as any).id);
+    const usuarioIdNum = Number((p as any).usuarioId);
+    const totalComentarios = toNum(
       (p as any).totalComentarios ?? (p as any).comentariosCount ?? (p as any).comments ?? 0
     );
 
-    const base: PostFeedModel = {
-      id: Number.isFinite(idNum) ? idNum : (p.id as any),
-      usuarioId: Number.isFinite(usuarioIdNum) ? usuarioIdNum : (p.usuarioId as any),
-      nomeUsuario: p.nomeUsuario,
-      titulo: p.titulo,
-      descricao: p.descricao ?? '',
-      totalUpVotes: Number(p.totalUpVotes ?? 0),
+    const voted = (p as any).votado ?? (p as any).usuarioJaVotou ?? (p as any).userVoted ?? false;
+
+    return {
+      id: Number.isFinite(idNum) ? idNum : ((p as any).id as any),
+      usuarioId: Number.isFinite(usuarioIdNum) ? usuarioIdNum : ((p as any).usuarioId as any),
+      nomeUsuario: (p as any).nomeUsuario,
+      titulo: (p as any).titulo,
+      descricao: (p as any).descricao ?? '',
+      totalUpVotes: toNum((p as any).totalUpVotes ?? 0),
       totalComentarios,
-      usuarioJaVotou: Boolean((p as any).usuarioJaVotou ?? (p as any).userVoted ?? false),
+      usuarioJaVotou: toBool(voted),
       tags:
-        p.tags?.map((t: any) => ({
+        (p as any).tags?.map((t: any) => ({
           id: typeof t.id === 'string' ? t.id : Number(t.id),
           nome: t.nome ?? t.name ?? '',
         })) ?? [],
-      dataCriacao: String(p.dataCriacao),
-      relevanceScore: p.relevanceScore ?? undefined,
-      tagsEmComum: p.tagsEmComum ?? undefined,
+      dataCriacao: String((p as any).dataCriacao),
+      relevanceScore: (p as any).relevanceScore ?? undefined,
+      tagsEmComum: (p as any).tagsEmComum ?? undefined,
     };
-
-    if (typeof base.id === 'number' && votedSetRef.current.has(base.id)) {
-      base.usuarioJaVotou = true;
-    }
-    return base;
   }, []);
 
   // ===== load =====
@@ -239,34 +232,34 @@ export default function FeedScreen() {
     [maybePrefillScreen]
   );
 
-  // ===== votação =====
+  // ===== votação (usa campo 'votado' do back) =====
   const handleUpvote = useCallback(
     async (postId: number, willUpvote: boolean): Promise<UpvoteResponse | void> => {
       try {
         const resp = await upvotePost(postId);
-        const final = typeof resp?.userVoted === 'boolean' ? resp.userVoted : willUpvote;
 
-        if (final) {
-          await markVoted(Number(postId));
-          votedSetRef.current.add(Number(postId));
-        } else {
-          await unmarkVoted(Number(postId));
-          votedSetRef.current.delete(Number(postId));
-        }
+        const serverVoted = toBool((resp as any)?.userVoted ?? (resp as any)?.votado);
+        const final = serverVoted ?? willUpvote;
+        const serverCount = (resp as any)?.totalUpVotes;
+        const nextCountNumber =
+          serverCount !== undefined && serverCount !== null ? toNum(serverCount) : undefined;
 
         setData((prev) =>
           prev.map((p) => {
             if (Number(p.id) !== Number(postId)) return p;
             const prevVoted = !!p.usuarioJaVotou;
-            let nextCount =
-              typeof resp?.totalUpVotes === 'number'
-                ? resp.totalUpVotes
-                : (p.totalUpVotes ?? 0) + (final === prevVoted ? 0 : final ? 1 : -1);
-            if (!Number.isFinite(nextCount)) nextCount = p.totalUpVotes ?? 0;
+
+            let nextCount = p.totalUpVotes ?? 0;
+            if (typeof nextCountNumber === 'number') {
+              nextCount = nextCountNumber; // confia no backend se veio
+            } else if (final !== prevVoted) {
+              nextCount = Math.max(0, (p.totalUpVotes ?? 0) + (final ? 1 : -1));
+            }
+
             return {
               ...p,
               usuarioJaVotou: final,
-              totalUpVotes: Math.max(0, nextCount),
+              totalUpVotes: nextCount,
             };
           })
         );

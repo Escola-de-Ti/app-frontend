@@ -38,9 +38,10 @@ export type PostDetalhesDTO = {
   hasMoreComentarios: boolean;
 };
 
-// Algumas APIs podem devolver esse campo opcionalmente
+// Algumas APIs podem devolver esses campos opcionalmente
 export type PostDetalhesResponse = PostDetalhesDTO & {
   usuarioJaVotou?: boolean;
+  votado?: boolean; // aceitamos também este alias vindo do back
 };
 
 // ===== Helpers =====
@@ -80,6 +81,18 @@ function buildBody(payload: CreatePostPayload): Record<string, unknown> {
   Object.keys(body).forEach((k) => body[k] === undefined && delete body[k]);
   return body;
 }
+
+const toBool = (v: any): boolean => {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v === 1;
+  if (typeof v === 'string') return v.toLowerCase() === 'true' || v === '1';
+  return false;
+};
+
+const toNum = (v: any): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 /** Extrai mensagem amigável de erros Spring/Problem+JSON/strings. */
 function extractErrorMessage(err: any): string {
@@ -168,16 +181,15 @@ export async function getPostDetails(
     });
 
     // Normaliza campos sensíveis a undefined
-    const totalUpVotes =
-      typeof (data as any)?.totalUpVotes === 'number' ? (data as any).totalUpVotes : 0;
+    const totalUpVotes = toNum((data as any)?.totalUpVotes);
+
+    // Alguns backs mandam 'votado' em vez de 'usuarioJaVotou'
+    const voted = (data as any)?.usuarioJaVotou ?? (data as any)?.votado;
 
     return {
       ...data,
       totalUpVotes,
-      usuarioJaVotou:
-        typeof (data as any)?.usuarioJaVotou === 'boolean'
-          ? (data as any).usuarioJaVotou
-          : undefined,
+      usuarioJaVotou: typeof voted === 'boolean' ? voted : undefined,
       comentarios: Array.isArray((data as any)?.comentarios) ? (data as any).comentarios : [],
       hasMoreComentarios: Boolean((data as any)?.hasMoreComentarios),
     };
@@ -254,14 +266,18 @@ export async function upvotePost(postId: number): Promise<UpvoteResponse> {
   try {
     const { data } = await api.post(`${VOTES_ENDPOINT}/post/${postId}`);
 
-    // Normaliza possíveis chaves do back
+    // Normaliza possíveis chaves do back:
+    // userVoted / usuarioJaVotou / jaVotou / votado
     const userVotedRaw =
-      (data as any)?.userVoted ?? (data as any)?.usuarioJaVotou ?? (data as any)?.jaVotou;
+      (data as any)?.userVoted ??
+      (data as any)?.usuarioJaVotou ??
+      (data as any)?.jaVotou ??
+      (data as any)?.votado;
 
     const totalRaw = (data as any)?.totalUpVotes ?? (data as any)?.upvotes ?? (data as any)?.total;
 
     return {
-      userVoted: Boolean(userVotedRaw ?? true), // se o endpoint não mandar, assume votado
+      userVoted: typeof userVotedRaw === 'boolean' ? userVotedRaw : false,
       totalUpVotes: typeof totalRaw === 'number' ? totalRaw : undefined,
     };
   } catch (err: any) {

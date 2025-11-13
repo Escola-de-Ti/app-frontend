@@ -195,6 +195,10 @@ export function PostDetails({
   const [newComment, setNewComment] = useState('');
   const inputRef = useRef<TextInput>(null);
 
+  // 🔒 trava de concorrência para upvote (evita spam)
+  const upvoteLockRef = useRef(false);
+  const [upvoteLoading, setUpvoteLoading] = useState(false);
+
   // guardar a ref mais recente do callback pra evitar loop
   type MetaFn = (meta: { comments?: number; upvotes?: number; userUpvoted?: boolean }) => void;
   const metaRef = useRef<MetaFn | null>(null);
@@ -307,9 +311,14 @@ export function PostDetails({
   }, [postUpvotes, postUpvoted]);
 
   const handlePostToggleUpvote = async () => {
+    if (upvoteLockRef.current) return;
+    upvoteLockRef.current = true;
+    setUpvoteLoading(true);
+
     const prevVoted = postUpvoted;
     const next = !prevVoted;
 
+    // otimista
     setPostUpvoted(next);
     setPostUpvotes((prev) => Math.max(0, prev + (next ? 1 : -1)));
 
@@ -326,9 +335,13 @@ export function PostDetails({
         setPostUpvotes(resp.totalUpVotes);
       }
     } catch {
+      // rollback
       setPostUpvoted(prevVoted);
       setPostUpvotes((prev) => Math.max(0, prev + (prevVoted ? 1 : -1)));
       Alert.alert('Erro', 'Não foi possível registrar seu voto no post.');
+    } finally {
+      setUpvoteLoading(false);
+      upvoteLockRef.current = false;
     }
   };
 
@@ -465,8 +478,18 @@ export function PostDetails({
       <Text style={styles.title}>{postTitle}</Text>
       {!!postDescription && <Text style={styles.description}>{postDescription}</Text>}
 
-      <TouchableOpacity onPress={handlePostToggleUpvote} activeOpacity={0.8}>
-        <View style={[styles.upvoteContainer, postUpvoted && styles.upvoteActive]}>
+      <TouchableOpacity
+        onPress={handlePostToggleUpvote}
+        activeOpacity={upvoteLoading ? 1 : 0.8}
+        disabled={upvoteLoading}
+      >
+        <View
+          style={[
+            styles.upvoteContainer,
+            postUpvoted && styles.upvoteActive,
+            upvoteLoading && { opacity: 0.6 },
+          ]}
+        >
           <Feather name="arrow-up" size={16} color={postUpvoted ? '#003d2b' : '#fff'} />
           <Text style={[styles.upvoteText, postUpvoted && styles.upvoteTextActive]}>
             {postUpvotes}
@@ -570,3 +593,5 @@ const styles = StyleSheet.create({
   commentInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 8, minHeight: 50 },
   sendButton: { marginLeft: 10, backgroundColor: '#5b2eff', padding: 8, borderRadius: 8 },
 });
+
+export default PostDetails;

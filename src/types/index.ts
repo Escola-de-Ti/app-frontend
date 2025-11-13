@@ -1,5 +1,4 @@
 // src/types/index.ts
-
 export type ID = string | number;
 
 export type OrdenacaoTipo = 'MAIS_RECENTES' | 'MAIS_ANTIGOS' | 'MAIS_POPULARES';
@@ -47,7 +46,6 @@ export interface RegisterRequest {
 }
 
 // ======== Perfil (edição alinhada ao back) ========
-
 export interface TagNameDTO {
   name: string;
 }
@@ -134,7 +132,7 @@ export interface WorkshopDTO {
   dataCriacao: string;
   dataInicio: string;
   dataTermino: string;
-  descricao?: DescricaoWorkshopDTO;
+  descricao: DescricaoWorkshopDTO;
 }
 
 export interface Workshop extends Omit<WorkshopDTO, 'dataCriacao' | 'dataInicio' | 'dataTermino'> {
@@ -231,6 +229,7 @@ export interface PostFeedDTO {
   totalComentarios?: number | string | null;
   userVoted?: boolean | null;
   usuarioJaVotou?: boolean | null;
+  votado?: boolean | null; // <- aceitamos este alias também
   tags?: PostFeedTagDTO[] | null;
   dataCriacao: string;
   relevanceScore?: number | null;

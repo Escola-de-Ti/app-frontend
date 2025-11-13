@@ -72,6 +72,7 @@ export function PostCard({
     const prevVoted = hasUpvoted;
     const next = !prevVoted;
 
+    // otimista
     setHasUpvoted(next);
     setUpvotes((prev) => Math.max(0, prev + (next ? 1 : -1)));
 
@@ -79,22 +80,28 @@ export function PostCard({
       const result = await onUpvote?.(Number(post.id), next);
       const resp = result as UpvoteResponse | void;
 
+      // pode vir userVoted OU votado
       const finalUserVoted =
-        resp && typeof resp === 'object' && typeof resp.userVoted === 'boolean'
-          ? resp.userVoted
+        resp &&
+        typeof resp === 'object' &&
+        ('userVoted' in (resp as any) || 'votado' in (resp as any))
+          ? typeof (resp as any).userVoted !== 'undefined'
+            ? Boolean((resp as any).userVoted)
+            : Boolean((resp as any).votado)
           : next;
 
       if (finalUserVoted !== next) {
+        // corrige delta otimista se o back discordar
         setUpvotes((prev) => Math.max(0, prev + (finalUserVoted ? 1 : -1)));
       }
       setHasUpvoted(finalUserVoted);
 
-      if (resp && typeof resp.totalUpVotes === 'number') {
-        setUpvotes(resp.totalUpVotes);
+      if (resp && typeof (resp as any).totalUpVotes === 'number') {
+        setUpvotes((resp as any).totalUpVotes);
       }
     } catch {
+      // desfaz otimista
       setHasUpvoted(prevVoted);
-      // desfaz o delta otimista anterior
       setUpvotes((prev) => Math.max(0, prev + (prevVoted ? 1 : -1)));
       Alert.alert('Erro', 'Não foi possível registrar seu voto.');
     }
@@ -294,9 +301,10 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 4,
     paddingHorizontal: 10,
+    borderRadius: 20,
   },
   upvoteText: { color: '#ccc', fontSize: 13 },
-  upvoteActive: { backgroundColor: '#6ef7c3', borderRadius: 20 },
+  upvoteActive: { backgroundColor: '#6ef7c3' },
   upvoteTextActive: { color: '#003d2b', fontWeight: '600' },
   commentContainer: {
     flexDirection: 'row',
