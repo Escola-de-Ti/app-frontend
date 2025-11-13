@@ -8,8 +8,8 @@ type Page = 'Feed' | 'Workshops' | 'Ranking' | 'Perfil';
 
 type Props = {
   translateY: Animated.AnimatedInterpolation<number>;
-  activePage: Page | null; // 👈 agora pode ser null
-  onChangePage: (p: Page | null) => void; // 👈 aceita null
+  activePage: Page | null;
+  onChangePage: (p: Page | null) => void;
 };
 
 const ROUTES = {
@@ -25,12 +25,12 @@ export default function Footer({ translateY, activePage, onChangePage }: Props) 
 
   const goCreatePost = () => {
     navigation.navigate(ROUTES.CREATE_POST);
-    onChangePage(null); // 👈 ao clicar no +, nenhuma aba fica ativa (nada verdinho)
+    onChangePage(null);
   };
 
   const goWorkshops = () => {
     navigation.navigate(ROUTES.CREATE_WORKSHOP);
-    onChangePage('Workshops'); // 👈 workshops fica verdinho
+    onChangePage('Workshops');
   };
 
   const goFeed = () => {
@@ -67,7 +67,6 @@ export default function Footer({ translateY, activePage, onChangePage }: Props) 
 
   return (
     <Animated.View style={[styles.wrap, { transform: [{ translateY }] }]}>
-      {/* esquerda */}
       <Item isActive={activePage === 'Feed'} icon="home" label="Feed" onPress={goFeed} />
       <Item
         isActive={activePage === 'Workshops'}
@@ -76,7 +75,6 @@ export default function Footer({ translateY, activePage, onChangePage }: Props) 
         onPress={goWorkshops}
       />
 
-      {/* botão central + → CreatePost (não deixa nenhuma aba ativa) */}
       <TouchableOpacity
         style={styles.plusWrap}
         onPress={goCreatePost}
@@ -92,7 +90,6 @@ export default function Footer({ translateY, activePage, onChangePage }: Props) 
         </LinearGradient>
       </TouchableOpacity>
 
-      {/* direita */}
       <Item isActive={activePage === 'Ranking'} icon="award" label="Ranking" onPress={goRanking} />
       <Item isActive={activePage === 'Perfil'} icon="user" label="Perfil" onPress={goProfile} />
     </Animated.View>
@@ -100,15 +97,15 @@ export default function Footer({ translateY, activePage, onChangePage }: Props) 
 }
 
 const styles = StyleSheet.create({
+  // 🔥 sem background aqui! Quem pinta é o AppLayout
   wrap: {
-    backgroundColor: '#0E0E0E',
-    borderTopColor: '#222',
-    borderTopWidth: 1,
+    borderTopColor: '#656565',
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 64,
     paddingHorizontal: 12,
     justifyContent: 'space-between',
+    backgroundColor: 'transparent',
   },
   item: { alignItems: 'center', gap: 4, paddingVertical: 8, flex: 1 },
   label: { color: '#aaa', fontSize: 12, fontWeight: '600' },

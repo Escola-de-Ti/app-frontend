@@ -1,21 +1,23 @@
+// src/components/Header.tsx
 import React from 'react';
 import { View, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Logo from './Logo';
 
+export const HEADER_HEIGHT = 50; // use se quiser alinhar paddings em telas
+
 export default function Header() {
   return (
     <View
       style={{
-        height: 50,
-        backgroundColor: '#111',
+        height: HEADER_HEIGHT, // altura fixa real
+        backgroundColor: '#111111', // igual ao background do app
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#222',
-        paddingBottom: 10,
       }}
     >
       <Logo />
