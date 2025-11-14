@@ -12,6 +12,7 @@ import {
   LayoutChangeEvent,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 
 import PostCard from '../components/posts/PostCard';
@@ -58,6 +59,9 @@ export default function FeedScreen() {
   const viewportHRef = useRef(0);
   const contentHRef = useRef(0);
 
+  // controla refresh ao voltar do PostDetails
+  const didFirstFocusRef = useRef(false);
+
   const mergeById = useCallback((prev: PostFeedModel[], next: PostFeedModel[]) => {
     const map = new Map<string | number, PostFeedModel>();
     for (const p of prev) map.set(p.id, p);
@@ -75,7 +79,7 @@ export default function FeedScreen() {
       (p as any).totalComentarios ?? (p as any).comentariosCount ?? (p as any).comments ?? 0
     );
 
-    // 👇 prioriza jaVotou vindo do back
+    // prioriza jaVotou vindo do back
     const voted =
       (p as any).jaVotou ??
       (p as any).votado ??
@@ -174,6 +178,17 @@ export default function FeedScreen() {
     }
   }, [fetchFeed]);
 
+  // reload quando a tela volta a ficar focada (ex.: fechar PostDetails)
+  useFocusEffect(
+    useCallback(() => {
+      if (didFirstFocusRef.current) {
+        onRefresh();
+      } else {
+        didFirstFocusRef.current = true;
+      }
+    }, [onRefresh])
+  );
+
   const tryLoadMore = useCallback(async () => {
     if (!initialLoadedRef.current) return;
     if (!hasMore) return;
@@ -244,7 +259,7 @@ export default function FeedScreen() {
       try {
         const resp = await upvotePost(postId);
 
-        // 👇 prioriza jaVotou também aqui
+        // prioriza jaVotou também aqui
         const serverVoted = toBool(
           (resp as any)?.jaVotou ?? (resp as any)?.userVoted ?? (resp as any)?.votado
         );

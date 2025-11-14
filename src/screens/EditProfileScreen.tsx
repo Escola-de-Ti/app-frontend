@@ -1,3 +1,4 @@
+// src/screens/EditProfileScreen.tsx
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View,
@@ -22,8 +23,11 @@ import ImageUploader from '../components/ImageUploader';
 import Toast from 'react-native-toast-message';
 
 import { getUserById, updateMyProfile } from '../services/profile';
-import type { UpdateUserRequest, MyProfile } from '../types';
+import type { UpdateUserRequest, MyProfile, TagNameDTO } from '../types';
 import { useAuth } from '../hooks/useAuth';
+
+// ⬇️ novo: gerenciador visual de tags
+import TagManager from '../components/TagManager';
 
 const COLOR_PRESETS = ['#b14cb3', '#2edba7', '#4562f0', '#a65bf7', '#d36d6d', '#00FFA3', '#7C73FF'];
 
@@ -46,6 +50,17 @@ function parseUserIdLocal(v: unknown): number | null {
   return n > 0 ? n : null;
 }
 
+// ⬇️ normalização/limpeza de tags (dedup + upper por consistência)
+const normalizeTags = (arr: string[]) =>
+  Array.from(
+    new Set(
+      (arr ?? [])
+        .map((t) => (t ?? '').trim())
+        .filter(Boolean)
+        .map((t) => t.toUpperCase())
+    )
+  );
+
 export default function EditProfileScreen() {
   const navigation = useNavigation<any>();
   const { userId: authUserId } = useAuth();
@@ -61,6 +76,9 @@ export default function EditProfileScreen() {
   const [telefone, setTelefone] = useState('');
   const [email, setEmail] = useState(''); // editável
   const [cpf, setCpf] = useState(''); // editável
+
+  // ⬇️ novo: estado local de tags (string[])
+  const [tags, setTags] = useState<string[]>([]);
 
   // UI only
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
@@ -97,6 +115,13 @@ export default function EditProfileScreen() {
           ? me.bannerOpacity
           : 0.2
       );
+
+      // ⬇️ carrega tags do perfil -> string[]
+      const initialTagNames =
+        Array.isArray(me.tags) && me.tags.length
+          ? me.tags.map((t) => t?.name).filter((n): n is string => !!n && !!n.trim())
+          : [];
+      setTags(initialTagNames);
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || 'Falha ao carregar perfil.';
       Toast.show({ type: 'error', text1: 'Erro ao carregar', text2: msg });
@@ -130,6 +155,10 @@ export default function EditProfileScreen() {
     try {
       setSaving(true);
 
+      // monta tags pro payload (TagNameDTO[])
+      const normalized = normalizeTags(tags);
+      const payloadTags: TagNameDTO[] = normalized.map((name) => ({ name }));
+
       // Monta payload conforme teu PUT /api/usuarios/user aceita
       const payload: UpdateUserRequest = {
         email: email.trim(),
@@ -140,11 +169,19 @@ export default function EditProfileScreen() {
         biografia: biografia.trim() || undefined,
         // senha: undefined, // só enviar se for alterar
         tipoUsuario: profile?.tipoUsuario, // preserva se existir
-        tags: profile?.tags ?? [],
+        tags: payloadTags, // ⬅️ aqui vão as tags
       };
 
       const updated = await updateMyProfile(payload);
       setProfile(updated);
+
+      // atualiza estado local com o que voltou (mantendo normalização)
+      const updatedTagNames =
+        Array.isArray(updated.tags) && updated.tags.length
+          ? updated.tags.map((t) => t?.name).filter((n): n is string => !!n && !!n.trim())
+          : [];
+      setTags(updatedTagNames);
+
       Toast.show({ type: 'success', text1: 'Perfil atualizado!' });
       // se quiser voltar após salvar:
       // navigation.goBack();
@@ -164,7 +201,7 @@ export default function EditProfileScreen() {
     biografia,
     profile?.telefone2,
     profile?.tipoUsuario,
-    profile?.tags,
+    tags,
   ]);
 
   if (loading) {
@@ -257,6 +294,14 @@ export default function EditProfileScreen() {
             style={{ height: 150, textAlignVertical: 'top' }}
             returnKeyType="done"
           />
+
+          {/* ⬇️ NOVA SEÇÃO: Tags de interesse/habilidade */}
+          <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Tags</Text>
+          <Text style={{ color: '#9aa', marginBottom: 6, fontSize: 12 }}>
+            Adicione áreas de interesse/skills. Ex.: JAVA, REACT, FLUTTER…
+          </Text>
+
+          <TagManager tags={tags} onChange={setTags} maxTags={12} maxLength={18} />
 
           <View style={styles.footer}>
             <TouchableOpacity
