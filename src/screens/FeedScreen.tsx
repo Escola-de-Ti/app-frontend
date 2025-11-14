@@ -75,7 +75,13 @@ export default function FeedScreen() {
       (p as any).totalComentarios ?? (p as any).comentariosCount ?? (p as any).comments ?? 0
     );
 
-    const voted = (p as any).votado ?? (p as any).usuarioJaVotou ?? (p as any).userVoted ?? false;
+    // 👇 prioriza jaVotou vindo do back
+    const voted =
+      (p as any).jaVotou ??
+      (p as any).votado ??
+      (p as any).usuarioJaVotou ??
+      (p as any).userVoted ??
+      false;
 
     return {
       id: Number.isFinite(idNum) ? idNum : ((p as any).id as any),
@@ -232,14 +238,18 @@ export default function FeedScreen() {
     [maybePrefillScreen]
   );
 
-  // ===== votação (usa campo 'votado' do back) =====
+  // ===== votação (usa campo 'jaVotou'/'votado' do back) =====
   const handleUpvote = useCallback(
     async (postId: number, willUpvote: boolean): Promise<UpvoteResponse | void> => {
       try {
         const resp = await upvotePost(postId);
 
-        const serverVoted = toBool((resp as any)?.userVoted ?? (resp as any)?.votado);
+        // 👇 prioriza jaVotou também aqui
+        const serverVoted = toBool(
+          (resp as any)?.jaVotou ?? (resp as any)?.userVoted ?? (resp as any)?.votado
+        );
         const final = serverVoted ?? willUpvote;
+
         const serverCount = (resp as any)?.totalUpVotes;
         const nextCountNumber =
           serverCount !== undefined && serverCount !== null ? toNum(serverCount) : undefined;

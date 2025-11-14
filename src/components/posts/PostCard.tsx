@@ -198,17 +198,11 @@ export function PostCard({
               </TouchableOpacity>
 
               <TouchableOpacity onPress={handleCommentPress} activeOpacity={0.8}>
-                <View
-                  style={[styles.commentContainer, hasCommented && styles.commentContainerActive]}
-                >
-                  <Feather
-                    name="message-circle"
-                    size={16}
-                    color={hasCommented ? '#ffeaff' : '#fff'}
-                  />
-                  <Text style={[styles.commentText, hasCommented && styles.commentTextActive]}>
+                <View style={[styles.commentContainer]}>
+                  <Feather name="message-circle" size={16} color={'#fff'} />
+                  {/* <Text style={[styles.commentText, hasCommented && styles.commentTextActive]}>
                     {comments}
-                  </Text>
+                  </Text> */}
                 </View>
               </TouchableOpacity>
             </View>
@@ -314,9 +308,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  commentContainerActive: { backgroundColor: '#4a334d' },
+  // commentContainerActive: { backgroundColor: '#4a334d' },
   commentText: { color: '#ccc', fontSize: 13 },
-  commentTextActive: { color: '#ffeaff', fontWeight: '600' },
+  // commentTextActive: { color: '#ffeaff', fontWeight: '600' },
   modal: { justifyContent: 'flex-end', margin: 0 },
   modalContent: {
     height: '95%',

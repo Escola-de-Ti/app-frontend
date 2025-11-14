@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
@@ -36,6 +36,13 @@ type CommentProps = {
   initiallyUpvoted?: boolean;
 };
 
+const toBool = (v: any): boolean => {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v === 1;
+  if (typeof v === 'string') return v.trim().toLowerCase() === 'true' || v === '1';
+  return false;
+};
+
 export function CommentItem({
   comment,
   depth = 0,
@@ -46,18 +53,19 @@ export function CommentItem({
   initiallyUpvoted,
 }: CommentProps) {
   // === AJUSTES DO UPVOTE (início) ===
-  // estado inicial considera: prop inicialmenteUpvoted > comment.userUpvoted > false
+  // estado inicial considera: prop initiallyUpvoted > comment.userUpvoted > false
   const [upvoted, setUpvoted] = useState<boolean>(
-    typeof initiallyUpvoted === 'boolean' ? initiallyUpvoted : !!comment.userUpvoted
+    typeof initiallyUpvoted === 'boolean' ? initiallyUpvoted : toBool(comment.userUpvoted)
   );
   const [upvotes, setUpvotes] = useState<number>(Number(comment.upvotes) || 0);
+  const votingRef = useRef(false); // evita double-tap/disparos concorrentes
 
   // sincroniza quando o pai atualizar (ex.: após resposta do back)
   useEffect(() => {
     if (typeof initiallyUpvoted === 'boolean') {
       setUpvoted(initiallyUpvoted);
-    } else if (typeof comment.userUpvoted === 'boolean') {
-      setUpvoted(!!comment.userUpvoted);
+    } else if (typeof comment.userUpvoted !== 'undefined') {
+      setUpvoted(toBool(comment.userUpvoted));
     }
   }, [initiallyUpvoted, comment.userUpvoted, comment.id]);
 
@@ -69,6 +77,9 @@ export function CommentItem({
   }, [comment.upvotes, comment.id]);
 
   const handleUpvote = async () => {
+    if (votingRef.current) return; // trava enquanto a chamada anterior não termina
+    votingRef.current = true;
+
     const willUpvote = !upvoted;
 
     // otimista
@@ -80,10 +91,12 @@ export function CommentItem({
       // OBS: se o pai corrigir via props (userUpvoted/upvotes),
       // os useEffects acima vão sincronizar automaticamente.
     } catch {
-      // reverte
+      // rollback
       setUpvoted((prev) => !prev);
       setUpvotes((prev) => (!willUpvote ? prev + 1 : Math.max(0, prev - 1)));
       Alert.alert('Erro', 'Não foi possível registrar seu voto neste comentário.');
+    } finally {
+      votingRef.current = false;
     }
   };
   // === AJUSTES DO UPVOTE (fim) ===
@@ -141,7 +154,12 @@ export function CommentItem({
         </View>
       </View>
 
-      <View style={[styles.commentBox, { borderLeftColor: borderColor }]}>
+      <View
+        style={[
+          styles.commentBox,
+          { borderLeftColor: borderColor, paddingTop: 10, paddingBottom: 10 },
+        ]}
+      >
         <Text style={styles.commentText}>{comment.content}</Text>
       </View>
 
@@ -209,7 +227,7 @@ export function CommentItem({
               onUpvote={onUpvote}
               onLoadMoreReplies={onLoadMoreReplies}
               // passa o estado inicial do filho (se vier do back)
-              initiallyUpvoted={reply.userUpvoted}
+              initiallyUpvoted={toBool(reply.userUpvoted)}
             />
           ))}
         </View>
