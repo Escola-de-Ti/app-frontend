@@ -4,7 +4,7 @@ import { View, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Logo from './Logo';
 
-export const HEADER_HEIGHT = 50; // use se quiser alinhar paddings em telas
+export const HEADER_HEIGHT = 56; // use se quiser alinhar paddings em telas
 
 export default function Header() {
   return (
