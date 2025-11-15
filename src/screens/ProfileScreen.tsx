@@ -18,7 +18,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import AppLayout from '../components/AppLayout';
 import Tag from '../components/Tag';
 import type { MyProfile } from '../types';
-import { getUserById } from '../services/profile';
+import { getMyProfile, getUserById, getUserDetails } from '../services/profile';
 import { getUserIdFromJwt } from '../lib/jwt';
 import { useAuth } from '../hooks/useAuth';
 
@@ -65,7 +65,6 @@ export default function ProfileScreen() {
   const route = useRoute<any>();
   const { userId: userIdFromAuth, logout } = useAuth();
 
-  // Definição do ID a buscar:
   // 1) se veio via rota (perfil de outro usuário), usa ele
   // 2) senão, tenta do contexto do useAuth()
   // 3) fallback: extrai do JWT
@@ -79,7 +78,7 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Fundo editável (visual)
+  // Fundo editável (só front)
   const [colorA, setColorA] = useState<string>(TOKENS.gradientA);
   const [colorB, setColorB] = useState<string>(TOKENS.gradientB);
   const [opacityPct, setOpacityPct] = useState<number>(100);
@@ -93,6 +92,13 @@ export default function ProfileScreen() {
   const previewA = withOpacity(draftA, Math.max(0, Math.min(100, Number(draftPct) || 0)) / 100);
   const previewB = withOpacity(draftB, Math.max(0, Math.min(100, Number(draftPct) || 0)) / 100);
 
+  // avatar: aceita tanto avatarUrl (front) quanto imagemUrl (back)
+  const avatarUrl = useMemo(() => {
+    if (!profile) return null;
+    const anyP: any = profile;
+    return anyP.avatarUrl ?? anyP.imagemUrl ?? null;
+  }, [profile]);
+
   const initials = useMemo(() => {
     const parts = (profile?.nome || '').trim().split(/\s+/).slice(0, 2);
     return parts.map((p) => p[0]?.toUpperCase?.() || '').join('');
@@ -104,6 +110,7 @@ export default function ProfileScreen() {
     setDraftPct(String(opacityPct));
     setEditBgOpen(true);
   };
+
   const applyBg = () => {
     const finalA = normalizeHex(draftA, colorA);
     const finalB = normalizeHex(draftB, colorB);
@@ -120,11 +127,44 @@ export default function ProfileScreen() {
       setLoading(false);
       return;
     }
+
     setLoading(true);
     setError(null);
+
     try {
-      const data = await getUserById(fetchId);
-      setProfile(data);
+      if (isMe) {
+        // MEU PERFIL -> /usuarios/user + /usuarios/detalhes/{id}
+        const base = await getMyProfile(); // /usuarios/user
+
+        let details: any | null = null;
+        if ((base as any)?.id != null) {
+          details = await getUserDetails((base as any).id); // /usuarios/detalhes/id
+        }
+
+        // 🔥 base primeiro, depois details: detalhes (incl. tags bonitinhas) sobrescrevem o básico
+        const merged: any = {
+          ...(base || {}),
+          ...(details || {}),
+        };
+
+        merged.avatarUrl = merged.avatarUrl ?? merged.imagemUrl ?? null;
+
+        setProfile(merged as MyProfile);
+      } else {
+        // PERFIL DE OUTRO USUÁRIO -> /usuarios/{id} + /usuarios/detalhes/{id}
+        const base = await getUserById(fetchId); // /usuarios/{id}
+        const details = await getUserDetails(fetchId); // /usuarios/detalhes/{id}
+
+        // mesma lógica: base primeiro, details por cima
+        const merged: any = {
+          ...(base || {}),
+          ...(details || {}),
+        };
+
+        merged.avatarUrl = merged.avatarUrl ?? merged.imagemUrl ?? null;
+
+        setProfile(merged as MyProfile);
+      }
     } catch (e: any) {
       const msg =
         e?.response?.data?.message ||
@@ -135,7 +175,7 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [fetchId]);
+  }, [fetchId, isMe]);
 
   useEffect(() => {
     load();
@@ -150,7 +190,9 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     try {
       await logout();
-    } catch {}
+    } catch {
+      // quiet
+    }
   };
 
   if (loading) {
@@ -199,6 +241,33 @@ export default function ProfileScreen() {
     );
   }
 
+  const anyProfile: any = profile;
+  const email = anyProfile.email ?? 'email não informado';
+  const tipoUsuario = anyProfile.tipoUsuario ?? 'Usuário';
+
+  // ====== STATS DO PERFIL (detalhes) ======
+  const nivel = Number(anyProfile.nivel ?? 1) || 1;
+  const xp = Number(anyProfile.xp ?? anyProfile.qntdXp ?? 0) || 0;
+  const tokens = Number(anyProfile.tokens ?? anyProfile.qntdToken ?? 0) || 0;
+  const qtdPosts = Number(anyProfile.qtdPosts ?? 0) || 0;
+  const qtdComentarios = Number(anyProfile.qtdComentarios ?? 0) || 0;
+  const qtdUpVotes = Number(anyProfile.qtdUpVotes ?? 0) || 0;
+  const qtdSuperVotes = Number(anyProfile.qtdSuperVotes ?? 0) || 0;
+  const qtdWorkshops = Number(anyProfile.qtdWorkshops ?? 0) || 0;
+  const totalVotes = qtdUpVotes + qtdSuperVotes;
+
+  // ====== TAGS (abaixo da Bio) ======
+  const tagsArray: string[] =
+    Array.isArray(anyProfile.tags) && anyProfile.tags.length > 0
+      ? anyProfile.tags
+          .map((t: any) => {
+            if (typeof t === 'string') return t;
+            if (typeof t === 'number') return String(t); // fallback feio, mas evita sumir
+            return t?.name ?? t?.nome ?? '';
+          })
+          .filter((n: string) => !!n && !!n.trim())
+      : [];
+
   return (
     <AppLayout initialActivePage="Perfil" backgroundColor="rgb(17, 17, 17)">
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
@@ -209,7 +278,6 @@ export default function ProfileScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.cover}
         >
-          {/* Logout (topo direito) */}
           {isMe && (
             <TouchableOpacity
               onPress={handleLogout}
@@ -221,27 +289,29 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Botão de editar cor (topo esquerdo) com borda gradiente */}
-          <LinearGradient
-            colors={['#55F6C9', '#F985CD', '#5468FF', '#8476D9', '#F08E90']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.editFabBorder}
-          >
-            <TouchableOpacity
-              style={styles.editFabInner}
-              onPress={openBgEditor}
-              activeOpacity={0.85}
-              hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+          {/* Botão editar fundo (só pra mim) */}
+          {isMe && (
+            <LinearGradient
+              colors={['#55F6C9', '#F985CD', '#5468FF', '#8476D9', '#F08E90']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.editFabBorder}
             >
-              <Feather name="edit-2" size={16} color="#656565" />
-            </TouchableOpacity>
-          </LinearGradient>
+              <TouchableOpacity
+                style={styles.editFabInner}
+                onPress={openBgEditor}
+                activeOpacity={0.85}
+                hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+              >
+                <Feather name="edit-2" size={16} color="#656565" />
+              </TouchableOpacity>
+            </LinearGradient>
+          )}
 
-          {/* Avatar central */}
+          {/* Avatar */}
           <View style={styles.avatarWrap}>
-            {profile.avatarUrl ? (
-              <Image source={{ uri: profile.avatarUrl }} style={styles.avatar} />
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, styles.avatarFallback]}>
                 <Text style={styles.avatarInitials}>{initials || 'U'}</Text>
@@ -249,24 +319,24 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          {/* Nome + e-mail */}
+          {/* Nome + Email */}
           <View style={styles.identity}>
             <Text style={styles.name}>{profile.nome}</Text>
             <View style={styles.usernamePill}>
               <Feather name="at-sign" size={14} color="#0B0B0E" />
-              <Text style={styles.usernameText}>{profile.email}</Text>
+              <Text style={styles.usernameText}>{email}</Text>
             </View>
           </View>
 
           {/* Badges */}
           <View style={styles.badgesRow}>
-            <View style={styles.badgePill}>
+            {/* <View style={styles.badgePill}>
               <Feather name="bar-chart-2" size={14} color="#0B0B0E" />
               <Text style={styles.badgeText}>Perfil</Text>
-            </View>
+            </View> */}
             <View style={styles.badgePill}>
               <Feather name="award" size={14} color="#0B0B0E" />
-              <Text style={styles.badgeText}>{profile.tipoUsuario}</Text>
+              <Text style={styles.badgeText}>{tipoUsuario}</Text>
             </View>
           </View>
         </LinearGradient>
@@ -283,19 +353,59 @@ export default function ProfileScreen() {
             )}
           </View>
 
+          {/* STATS / TOKENS / NÍVEL / ATIVIDADE */}
+          <View style={styles.statsWrap}>
+            <View style={styles.statPill}>
+              <Text style={styles.statLabel}>Nível</Text>
+              <Text style={styles.statValue}>{nivel}</Text>
+            </View>
+            <View style={styles.statPill}>
+              <Text style={styles.statLabel}>XP</Text>
+              <Text style={styles.statValue}>{xp}</Text>
+            </View>
+            <View style={[styles.statPill, styles.statPillAccent]}>
+              <View style={styles.statTokenRow}>
+                <Feather name="hexagon" size={14} color="#00FFA3" />
+                <Text style={styles.statLabel}>Tokens</Text>
+              </View>
+              <Text style={styles.statValue}>{tokens}</Text>
+            </View>
+          </View>
+
+          <View style={[styles.statsWrap, { marginTop: 8 }]}>
+            <View style={styles.statPillSmall}>
+              <Text style={styles.statLabel}>Posts</Text>
+              <Text style={styles.statValueSmall}>{qtdPosts}</Text>
+            </View>
+            <View style={styles.statPillSmall}>
+              <Text style={styles.statLabel}>Comentários</Text>
+              <Text style={styles.statValueSmall}>{qtdComentarios}</Text>
+            </View>
+            <View style={styles.statPillSmall}>
+              <Text style={styles.statLabel}>Votos recebidos</Text>
+              <Text style={styles.statValueSmall}>{totalVotes}</Text>
+            </View>
+            <View style={styles.statPillSmall}>
+              <Text style={styles.statLabel}>Workshops</Text>
+              <Text style={styles.statValueSmall}>{qtdWorkshops}</Text>
+            </View>
+          </View>
+
+          {/* BIO */}
           {!!profile.biografia && (
-            <View style={{ marginTop: 10 }}>
+            <View style={{ marginTop: 16 }}>
               <Text style={styles.subSectionTitle}>Bio</Text>
               <Text style={styles.bioText}>{profile.biografia}</Text>
             </View>
           )}
 
-          {Array.isArray(profile.tags) && profile.tags.length > 0 && (
-            <View style={{ marginTop: 16 }}>
-              <Text style={styles.subSectionTitle}>Áreas de Interesse</Text>
+          {/* TAGS ABAIXO DA BIO */}
+          {tagsArray.length > 0 && (
+            <View style={{ marginTop: profile.biografia ? 12 : 16 }}>
+              <Text style={styles.subSectionTitle}>Tags</Text>
               <View style={styles.tagsWrap}>
-                {profile.tags.map((t, i) => (
-                  <Tag key={`t-${i}`} name={t?.name ?? ''} type="suggested" />
+                {tagsArray.map((name: string, i: number) => (
+                  <Tag key={`tag-${i}`} name={name} type="suggested" />
                 ))}
               </View>
             </View>
@@ -582,6 +692,59 @@ const styles = StyleSheet.create({
 
   subSectionTitle: { color: TOKENS.txtPrimary, fontWeight: '800', fontSize: 14 },
   bioText: { color: '#D8D8E3', marginTop: 6, lineHeight: 18 },
+
+  // ====== STATS ======
+  statsWrap: {
+    marginTop: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statPill: {
+    flexGrow: 1,
+    minWidth: '30%',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: TOKENS.cardBorder,
+    backgroundColor: '#15151A',
+  },
+  statPillAccent: {
+    borderColor: TOKENS.gradientA,
+    backgroundColor: 'rgba(0,255,163,0.08)',
+  },
+  statLabel: {
+    color: TOKENS.txtMuted,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  statValue: {
+    color: TOKENS.txtPrimary,
+    fontSize: 18,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  statTokenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statPillSmall: {
+    flexBasis: '48%',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#24242C',
+    backgroundColor: '#111116',
+  },
+  statValueSmall: {
+    color: TOKENS.txtPrimary,
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 2,
+  },
 
   tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
 

@@ -34,6 +34,7 @@ export interface LoginRequest {
 }
 
 export type TipoUsuario = 'ALUNO' | 'INSTRUTOR' | 'ADMIN' | string;
+
 export interface RegisterRequest {
   nome: string;
   sobrenome?: string;
@@ -62,26 +63,57 @@ export interface UpdateUserRequest {
   telefone?: string | null;
   telefone2?: string | null;
   biografia?: string | null;
-  senha?: string | null; // só envie se for trocar
-  tipoUsuario?: TipoUsuario; // mantenha se o back permitir mudar
-  tags?: TagNameDTO[]; // ex.: [{ name: "C" }, { name: "JAVA" }]
+  senha?: string | null;
+  tipoUsuario?: TipoUsuario;
+  // antes:
+  // tags?: TagNameDTO[];
+  // agora: IDs das tags
+  tags?: number[];
 }
 
-// Estrutura base do "meu perfil" (ajuste se o GET retornar mais campos)
+/**
+ * Estrutura base do "perfil" combinando:
+ * - /api/usuarios/user         (meu perfil para edição)
+ * - /api/usuarios/detalhes/id  (perfil detalhado)
+ */
 export interface MyProfile {
+  id?: ID;
   email: string;
   nome: string;
+
   cpf?: string | null;
   telefone?: string | null;
   telefone2?: string | null;
   biografia?: string | null;
-  tipoUsuario?: TipoUsuario; // deixado como opcional
-  tags?: TagNameDTO[];
 
-  // campos adicionais opcionais (se houver no back)
-  avatarUrl?: string | null;
+  tipoUsuario?: TipoUsuario;
+  statusUsuario?: string | null;
+
+  /**
+   * /usuarios/user => ["JAVA", "SPRING"]
+   * /usuarios/detalhes/{id} => [{ id, name }]
+   */
+  tags?: (TagNameDTO | string)[];
+
+  // campos de gamificação / estatísticas (detalhes)
+  nivel?: number;
+  xp?: number;
+  tokens?: number;
+  qtdPosts?: number;
+  qtdComentarios?: number;
+  qtdUpVotes?: number;
+  qtdSuperVotes?: number;
+  qtdWorkshops?: number;
+
+  // imagem de perfil
+  idImagemPerfil?: ID | null;
+  imagemUrl?: string | null; // vem em /usuarios/detalhes/{id}
+  avatarUrl?: string | null; // pode ser montado a partir de imagemUrl/id, se quiser
+
+  // preferências visuais (se existirem no back)
   bannerColorHex?: string | null;
   bannerOpacity?: number | null;
+
   sobrenome?: string | null;
 }
 
@@ -396,6 +428,7 @@ export type HistoricoResponse = {
 };
 
 export const isCredito = (qtd: number) => qtd > 0;
+
 export const formatarDataHoraBR = (iso: string) => {
   const d = new Date(iso);
   const data = d.toLocaleDateString('pt-BR');

@@ -10,8 +10,6 @@ import {
   Platform,
   Alert,
   Modal,
-  TextInput,
-  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -19,15 +17,20 @@ import { useNavigation } from '@react-navigation/native';
 
 import AppLayout from '../components/AppLayout';
 import AppInput from '../components/AppInput';
-import ImageUploader from '../components/ImageUploader';
+import ProfileAvatarPicker from '../components/ProfileAvatarPicker';
 import Toast from 'react-native-toast-message';
 
-import { getUserById, updateMyProfile } from '../services/profile';
-import type { UpdateUserRequest, MyProfile, TagNameDTO } from '../types';
-import { useAuth } from '../hooks/useAuth';
+import {
+  getMyProfile,
+  updateMyProfile,
+  uploadUserAvatar,
+  updateUserAvatar,
+} from '../services/profile';
+import type { UpdateUserRequest, MyProfile } from '../types';
 
-// ⬇️ novo: gerenciador visual de tags
+// gerenciador visual de tags
 import TagManager from '../components/TagManager';
+import { createOrGetTagIds } from '../services/tags';
 
 const COLOR_PRESETS = ['#b14cb3', '#2edba7', '#4562f0', '#a65bf7', '#d36d6d', '#00FFA3', '#7C73FF'];
 
@@ -41,16 +44,8 @@ function hexToRgba(hex?: string | null, opacity?: number | null) {
   const b = bigint & 255;
   return `rgba(${r}, ${g}, ${b}, ${o})`;
 }
-// parser local seguro
-function parseUserIdLocal(v: unknown): number | null {
-  if (v == null) return null;
-  const s = String(v).trim();
-  if (!/^\d+$/.test(s)) return null;
-  const n = parseInt(s, 10);
-  return n > 0 ? n : null;
-}
 
-// ⬇️ normalização/limpeza de tags (dedup + upper por consistência)
+// normalização/limpeza de tags (dedup + upper por consistência)
 const normalizeTags = (arr: string[]) =>
   Array.from(
     new Set(
@@ -63,8 +58,6 @@ const normalizeTags = (arr: string[]) =>
 
 export default function EditProfileScreen() {
   const navigation = useNavigation<any>();
-  const { userId: authUserId } = useAuth();
-  const myIdNum = parseUserIdLocal(authUserId);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -77,11 +70,15 @@ export default function EditProfileScreen() {
   const [email, setEmail] = useState(''); // editável
   const [cpf, setCpf] = useState(''); // editável
 
-  // ⬇️ novo: estado local de tags (string[])
+  // estado local de tags (string[])
   const [tags, setTags] = useState<string[]>([]);
 
-  // UI only
+  // avatar
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [avatarImageId, setAvatarImageId] = useState<number | null>(null);
+  const [avatarChanged, setAvatarChanged] = useState(false);
+
+  // banner (apenas UI local)
   const [bannerHex, setBannerHex] = useState<string>('#141417');
   const [bannerOpacity, setBannerOpacity] = useState<number>(0.2);
   const [openBannerModal, setOpenBannerModal] = useState(false);
@@ -92,34 +89,39 @@ export default function EditProfileScreen() {
   );
 
   const load = useCallback(async () => {
-    if (myIdNum === null) {
-      Toast.show({ type: 'error', text1: 'Sem ID do usuário logado.' });
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
-      // preenche a tela com GET /api/usuarios/{id}
-      const me = await getUserById(myIdNum);
+      // pega dados completos do usuário logado (/api/usuarios/user)
+      const me = await getMyProfile();
       setProfile(me);
 
       setNome(me.nome ?? '');
       setBiografia(me.biografia ?? '');
       setTelefone(me.telefone ?? '');
       setEmail(me.email ?? '');
-      setCpf((me.cpf as any as string) ?? ''); // se vier null/undefined, fica vazio
-      setAvatarUri(me.avatarUrl ?? null);
-      setBannerHex(me.bannerColorHex ?? '#141417');
+      setCpf((me as any)?.cpf ?? ''); // se vier null/undefined, fica vazio
+
+      const anyMe: any = me;
+
+      // foto de perfil: tenta urlImagemPerfil > avatarUrl > imagemUrl
+      setAvatarUri(anyMe.urlImagemPerfil ?? anyMe.avatarUrl ?? anyMe.imagemUrl ?? null);
+      setAvatarImageId(anyMe.idImagemPerfil ?? null);
+      setAvatarChanged(false);
+
+      // banner (se algum dia vier do back, já aproveita)
+      setBannerHex(anyMe.bannerColorHex ?? '#141417');
       setBannerOpacity(
-        typeof me.bannerOpacity === 'number' && !Number.isNaN(me.bannerOpacity)
-          ? me.bannerOpacity
+        typeof anyMe.bannerOpacity === 'number' && !Number.isNaN(anyMe.bannerOpacity)
+          ? anyMe.bannerOpacity
           : 0.2
       );
 
-      // ⬇️ carrega tags do perfil -> string[]
+      // tags do perfil -> string[] (aceita string[] ou [{id, name}])
       const initialTagNames =
-        Array.isArray(me.tags) && me.tags.length
-          ? me.tags.map((t) => t?.name).filter((n): n is string => !!n && !!n.trim())
+        Array.isArray(anyMe.tags) && anyMe.tags.length
+          ? anyMe.tags
+              .map((t: any) => (typeof t === 'string' ? t : t?.name))
+              .filter((n: string): n is string => !!n && !!n.trim())
           : [];
       setTags(initialTagNames);
     } catch (e: any) {
@@ -128,7 +130,7 @@ export default function EditProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [myIdNum]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -137,7 +139,8 @@ export default function EditProfileScreen() {
   // validação simples
   const emailOk = /\S+@\S+\.\S+/.test(email.trim());
   const cpfDigits = (cpf || '').replace(/\D/g, '');
-  const cpfOk = cpfDigits.length === 11;
+  // CPF opcional: aceita vazio ou 11 dígitos
+  const cpfOk = cpfDigits.length === 0 || cpfDigits.length === 11;
 
   const canSave = useMemo(
     () => nome.trim().length >= 2 && emailOk && cpfOk && !saving,
@@ -148,37 +151,95 @@ export default function EditProfileScreen() {
     if (!canSave) {
       Alert.alert(
         'Validação',
-        !emailOk ? 'E-mail inválido.' : !cpfOk ? 'CPF deve ter 11 dígitos.' : 'Verifique os campos.'
+        !emailOk
+          ? 'E-mail inválido.'
+          : !cpfOk
+            ? 'CPF deve ter 11 dígitos ou ficar em branco.'
+            : 'Verifique os campos.'
       );
       return;
     }
+
     try {
       setSaving(true);
 
-      // monta tags pro payload (TagNameDTO[])
-      const normalized = normalizeTags(tags);
-      const payloadTags: TagNameDTO[] = normalized.map((name) => ({ name }));
+      const anyProfile: any = profile;
+      const userId = anyProfile?.id as number | undefined;
 
-      // Monta payload conforme teu PUT /api/usuarios/user aceita
-      const payload: UpdateUserRequest = {
+      // ================== AVATAR (UPLOAD / UPDATE) ==================
+      let finalAvatarImageId: number | null = avatarImageId ?? anyProfile?.idImagemPerfil ?? null;
+
+      if (avatarChanged && avatarUri && userId != null) {
+        // se já tinha imagem de perfil -> atualiza
+        if (finalAvatarImageId) {
+          const img = await updateUserAvatar(finalAvatarImageId, avatarUri);
+          finalAvatarImageId = (img as any)?.id ?? finalAvatarImageId;
+        } else {
+          // senão -> faz upload novo
+          const img = await uploadUserAvatar(userId, avatarUri);
+          finalAvatarImageId = (img as any)?.id ?? null;
+        }
+      }
+
+      // ================== TAGS (NOMES -> IDs -> { id }) ==================
+      const normalized = normalizeTags(tags);
+
+      let tagIds: number[] = [];
+      if (normalized.length > 0) {
+        try {
+          tagIds = await createOrGetTagIds(normalized);
+        } catch (e: any) {
+          const msg =
+            e?.response?.data?.message || e?.message || 'Não foi possível resolver as tags.';
+          Toast.show({ type: 'error', text1: 'Erro nas tags', text2: msg });
+          tagIds = [];
+        }
+      }
+
+      // backend espera algo como:
+      // {
+      //   "tags": [
+      //     { "id": 1 },
+      //     { "id": 2 }
+      //   ]
+      // }
+      const tagsPayload = tagIds.length ? tagIds.map((id) => ({ id })) : undefined;
+
+      // ================== PAYLOAD PERFIL ==================
+      const payload: UpdateUserRequest & {
+        // tags?: { id: number }[];
+        idImagemPerfil?: number | null;
+      } = {
         email: email.trim(),
         nome: nome.trim(),
         cpf: cpfDigits || undefined,
         telefone: telefone.trim() || undefined,
-        telefone2: profile?.telefone2 ?? undefined,
+        telefone2: anyProfile?.telefone2 ?? undefined,
         biografia: biografia.trim() || undefined,
         // senha: undefined, // só enviar se for alterar
-        tipoUsuario: profile?.tipoUsuario, // preserva se existir
-        tags: payloadTags, // ⬅️ aqui vão as tags
+        tipoUsuario: anyProfile?.tipoUsuario, // preserva se existir
+        tags: tagIds.length ? tagIds : undefined,
+        idImagemPerfil: finalAvatarImageId ?? undefined,
       };
 
       const updated = await updateMyProfile(payload);
       setProfile(updated);
 
-      // atualiza estado local com o que voltou (mantendo normalização)
+      const anyUpdated: any = updated;
+
+      // avatar / imagem de perfil após update
+      setAvatarImageId(anyUpdated.idImagemPerfil ?? finalAvatarImageId ?? null);
+      setAvatarUri(
+        anyUpdated.urlImagemPerfil ?? anyUpdated.avatarUrl ?? anyUpdated.imagemUrl ?? avatarUri
+      );
+      setAvatarChanged(false);
+
+      // atualiza estado local com o que voltou (string[] ou {id, name}[])
       const updatedTagNames =
-        Array.isArray(updated.tags) && updated.tags.length
-          ? updated.tags.map((t) => t?.name).filter((n): n is string => !!n && !!n.trim())
+        Array.isArray(anyUpdated.tags) && anyUpdated.tags.length
+          ? (anyUpdated.tags as any[])
+              .map((t: any) => (typeof t === 'string' ? t : t?.name))
+              .filter((n: string): n is string => !!n && !!n.trim())
           : [];
       setTags(updatedTagNames);
 
@@ -199,9 +260,13 @@ export default function EditProfileScreen() {
     cpfDigits,
     telefone,
     biografia,
-    profile?.telefone2,
-    profile?.tipoUsuario,
+    profile,
     tags,
+    avatarUri,
+    avatarImageId,
+    avatarChanged,
+    emailOk,
+    cpfOk,
   ]);
 
   if (loading) {
@@ -235,11 +300,14 @@ export default function EditProfileScreen() {
 
         {/* BANNER (UI only) */}
         <View style={[styles.banner, { backgroundColor: bannerColorPreview }]}>
-          <View style={{ marginTop: 0 }}>
-            <ImageUploader
-              onChange={(uris) => setAvatarUri(uris?.[0] ?? null)} // UI only
-              initialUris={avatarUri ? [avatarUri] : []}
-              maxImages={1}
+          <View style={{ marginTop: 0, alignItems: 'center', paddingVertical: 16 }}>
+            <ProfileAvatarPicker
+              uri={avatarUri}
+              onChange={(newUri) => {
+                setAvatarUri(newUri);
+                setAvatarChanged(true);
+              }}
+              size={96}
               label="Foto de perfil"
             />
           </View>
@@ -268,6 +336,7 @@ export default function EditProfileScreen() {
             returnKeyType="next"
           />
 
+          {/* CPF opcional – comentado, mas a validação aceita vazio */}
           {/* <Text style={styles.label}>CPF</Text>
           <AppInput
             value={cpf}
@@ -295,7 +364,7 @@ export default function EditProfileScreen() {
             returnKeyType="done"
           />
 
-          {/* ⬇️ NOVA SEÇÃO: Tags de interesse/habilidade */}
+          {/* Tags de interesse/habilidade */}
           <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Tags</Text>
           <Text style={{ color: '#9aa', marginBottom: 6, fontSize: 12 }}>
             Adicione áreas de interesse/skills. Ex.: JAVA, REACT, FLUTTER…
