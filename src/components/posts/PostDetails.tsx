@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Platform,
   Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -33,6 +34,8 @@ type PostDetailsProps = {
   onMetaChange?: (meta: { comments?: number; upvotes?: number; userUpvoted?: boolean }) => void;
   /** Usado pelo pai (PostCard / Feed) pra fechar o modal antes de navegar pra edição */
   onRequestClose?: () => void;
+  /** Chamado quando o post é excluído com sucesso, para o pai atualizar o feed */
+  onDeleted?: (postId: number) => void;
 };
 
 function formatDate(iso: string) {
@@ -112,6 +115,7 @@ export function PostDetails({
   initiallyUpvotes,
   onMetaChange,
   onRequestClose,
+  onDeleted,
 }: PostDetailsProps) {
   const navigation = useNavigation<any>();
   const { userId } = useAuth();
@@ -530,24 +534,60 @@ export function PostDetails({
   };
 
   const handleDeletePost = () => {
+    // fecha o menu em qualquer plataforma
     setMenuVisible(false);
-    Alert.alert('Excluir post', 'Tem certeza que deseja excluir este post?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deletePost(postId);
-            Alert.alert('Sucesso', 'Post excluído com sucesso.');
-            onRequestClose?.();
-            navigation.goBack?.();
-          } catch (e: any) {
-            Alert.alert('Erro', 'Não foi possível excluir o post.');
+
+    const doDelete = async () => {
+      try {
+        await deletePost(postId);
+
+        // feedback de sucesso
+        if (Platform.OS === 'web') {
+          if (typeof window !== 'undefined') {
+            window.alert('Sucesso\n\nPost excluído com sucesso.');
           }
+        } else {
+          Alert.alert('Sucesso', 'Post excluído com sucesso.');
+        }
+
+        // avisa o pai pra atualizar o feed
+        onDeleted?.(postId);
+
+        // fecha o detalhe: se for modal, o pai fecha; se for screen, volta
+        if (onRequestClose) {
+          onRequestClose();
+        } else {
+          navigation.goBack?.();
+        }
+      } catch (e: any) {
+        if (Platform.OS === 'web') {
+          if (typeof window !== 'undefined') {
+            window.alert('Erro\n\nNão foi possível excluir o post.');
+          }
+        } else {
+          Alert.alert('Erro', 'Não foi possível excluir o post.');
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') {
+        const confirmed = window.confirm('Tem certeza que deseja excluir este post?');
+        if (!confirmed) return;
+      }
+      void doDelete();
+    } else {
+      Alert.alert('Excluir post', 'Tem certeza que deseja excluir este post?', [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: () => {
+            void doDelete();
+          },
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   const handleClose = () => {

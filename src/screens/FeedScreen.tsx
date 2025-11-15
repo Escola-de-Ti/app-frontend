@@ -62,7 +62,6 @@ export default function FeedScreen() {
   const queryRef = useRef<string>('');
 
   const cursorRef = useRef<Cursor>(null);
-  const didInitRef = useRef(false);
   const initialLoadedRef = useRef(false);
 
   const inFlightRef = useRef(false);
@@ -70,9 +69,6 @@ export default function FeedScreen() {
 
   const viewportHRef = useRef(0);
   const contentHRef = useRef(0);
-
-  // controla refresh ao voltar do PostDetails
-  const didFirstFocusRef = useRef(false);
 
   // ===== controle de PostDetails aberto =====
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
@@ -193,18 +189,6 @@ export default function FeedScreen() {
     [mapPost, mergeById]
   );
 
-  useEffect(() => {
-    if (didInitRef.current) return;
-    didInitRef.current = true;
-    (async () => {
-      try {
-        await fetchFeed({ reset: true });
-      } catch (e) {
-        console.log('[FEED] erro:', e);
-      }
-    })();
-  }, [fetchFeed]);
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -217,14 +201,10 @@ export default function FeedScreen() {
     }
   }, [fetchFeed]);
 
-  // reload quando a tela volta a ficar focada (ex.: fechar PostDetails / voltar de edição)
+  // 👉 Toda vez que a tela ganhar foco (navigate pra ela), dá refresh no feed
   useFocusEffect(
     useCallback(() => {
-      if (didFirstFocusRef.current) {
-        onRefresh();
-      } else {
-        didFirstFocusRef.current = true;
-      }
+      onRefresh();
     }, [onRefresh])
   );
 
@@ -428,14 +408,21 @@ export default function FeedScreen() {
         }
       />
 
-      {/* Modal com PostDetails – usado tanto ao clicar no card quanto ao voltar da edição */}
+      {/* Modal com PostDetails */}
       <Modal
         visible={detailsVisible && selectedPostId != null}
         animationType="slide"
         onRequestClose={handleCloseDetails}
       >
         {selectedPostId != null && (
-          <PostDetails postId={selectedPostId} onRequestClose={handleCloseDetails} />
+          <PostDetails
+            postId={selectedPostId}
+            onRequestClose={handleCloseDetails}
+            onDeleted={(deletedId) => {
+              setData((prev) => prev.filter((p) => Number(p.id) !== Number(deletedId)));
+              onRefresh();
+            }}
+          />
         )}
       </Modal>
     </AppLayout>
