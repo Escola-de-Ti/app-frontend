@@ -22,8 +22,10 @@ import ImageUploader from '../components/ImageUploader';
 import TagManager from '../components/TagManager';
 
 import { useAuth } from '../hooks/useAuth';
-import { updatePost, uploadPostImages, updatePostImage } from '../services/posts';
+import { updatePost, uploadPostImages, updatePostImage, deletePostImage } from '../services/posts';
 import { createOrGetTagIds } from '../services/tags';
+
+const MAX_IMAGES = 3;
 
 type EditPostRouteParams = {
   postId: number;
@@ -58,6 +60,8 @@ export default function EditPostScreen() {
 
   // novas imagens selecionadas no app (URIs locais, serão anexadas além das já existentes)
   const [newImages, setNewImages] = useState<string[]>([]);
+  // ids de imagens existentes que o usuário mandou remover no X
+  const [removedImageIds, setRemovedImageIds] = useState<number[]>([]);
 
   // tags já existentes + novas, exibidas como "Adicionadas" no TagManager
   const [tags, setTags] = useState<string[]>(initialTags || []);
@@ -68,6 +72,7 @@ export default function EditPostScreen() {
 
   const { userId } = useAuth(); // só pra validar sessão
 
+  // trocar imagem existente (sobrescreve via /api/imagem/update/{id})
   const handlePickReplacement = async (imageId: number) => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -90,6 +95,24 @@ export default function EditPostScreen() {
     }
   };
 
+  // remover imagem EXISTENTE (vai chamar DELETE no salvar)
+  const handleRemoveExistingImage = (imageId: number) => {
+    setEditableImages((prev) => prev.filter((img) => img.id !== imageId));
+    setRemovedImageIds((prev) => (prev.includes(imageId) ? prev : [...prev, imageId]));
+  };
+
+  // novas imagens (só front; serão anexadas via uploadPostImages)
+  const handleNewImagesChange = (uris: string[]) => {
+    const total = editableImages.length + uris.length;
+    if (total > MAX_IMAGES) {
+      Alert.alert('Limite de imagens', `Você pode ter no máximo ${MAX_IMAGES} imagens por post.`);
+      const allowed = Math.max(0, MAX_IMAGES - editableImages.length);
+      setNewImages(uris.slice(0, allowed));
+    } else {
+      setNewImages(uris);
+    }
+  };
+
   const handleSave = async () => {
     if (!postId) {
       Alert.alert('Erro', 'Não foi possível identificar o post a ser editado.');
@@ -103,6 +126,12 @@ export default function EditPostScreen() {
 
     if (!userId || isNaN(Number(userId))) {
       Alert.alert('Sessão', 'Não consegui identificar seu usuário. Faça login novamente.');
+      return;
+    }
+
+    const totalImagesCount = editableImages.length + newImages.length;
+    if (totalImagesCount > MAX_IMAGES) {
+      Alert.alert('Limite de imagens', `Você pode ter no máximo ${MAX_IMAGES} imagens por post.`);
       return;
     }
 
@@ -122,6 +151,7 @@ export default function EditPostScreen() {
       const updated = await updatePost(Number(postId), payload);
       console.log('[EditPost] post atualizado =>', updated);
 
+      // 🔁 atualizar imagens EXISTENTES que foram trocadas (update)
       const imagesToUpdate = editableImages.filter((img) => img.localUri);
       if (imagesToUpdate.length > 0) {
         for (const img of imagesToUpdate) {
@@ -141,6 +171,26 @@ export default function EditPostScreen() {
         }
       }
 
+      // 🗑 remover imagens que o usuário excluiu (X) — DELETE /api/imagem/delete/{id}
+      if (removedImageIds.length > 0) {
+        for (const imgId of removedImageIds) {
+          try {
+            console.log('[EditPost] deletando imagem', imgId);
+            await deletePostImage(imgId);
+          } catch (imgErr: any) {
+            console.log('[EditPost] ERRO deletePostImage', {
+              id: imgId,
+              message: imgErr?.message,
+            });
+            Alert.alert(
+              'Aviso',
+              'O post foi atualizado, mas ocorreu um erro ao remover uma das imagens.'
+            );
+          }
+        }
+      }
+
+      // 📎 anexar novas imagens
       if (newImages.length > 0) {
         try {
           console.log('[EditPost] enviando novas imagens para o post', postId, newImages);
@@ -212,6 +262,16 @@ export default function EditPostScreen() {
                       style={styles.image}
                       resizeMode="cover"
                     />
+
+                    {/* X pra remover imagem existente */}
+                    <TouchableOpacity
+                      style={styles.removeExistingButton}
+                      onPress={() => handleRemoveExistingImage(img.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.removeExistingButtonText}>×</Text>
+                    </TouchableOpacity>
+
                     {img.localUri && <Text style={styles.imageBadge}>Nova imagem pendente</Text>}
 
                     <TouchableOpacity
@@ -227,7 +287,10 @@ export default function EditPostScreen() {
           )}
 
           {/* ImageUploader para NOVAS imagens que serão anexadas no update */}
-          <ImageUploader onChange={setNewImages} />
+          <ImageUploader
+            onChange={handleNewImagesChange}
+            maxImages={Math.max(0, MAX_IMAGES - editableImages.length)}
+          />
 
           {/* TagManager com as tags já existentes como "Adicionadas" */}
           <TagManager tags={tags} onChange={setTags} />
@@ -307,11 +370,13 @@ const styles = StyleSheet.create({
   headerView: { marginTop: 0 },
   sectionTitle: { color: '#fff', fontWeight: 'bold', fontSize: 18, marginBottom: 16 },
   label: { color: '#ccc', marginTop: 12, marginBottom: 4 },
+
   rewardCardBorder: { borderRadius: 12, padding: 1, marginBottom: 16 },
   rewardCard: { backgroundColor: '#1A1A1A', borderRadius: 12, padding: 12 },
   rewardTitle: { color: '#fff', fontWeight: 'bold', fontSize: 14, marginBottom: 6 },
   rewardItem: { color: '#ccc', fontSize: 13, marginBottom: 2 },
   token: { color: '#00FFA3', fontWeight: 'bold' },
+
   publish: { borderRadius: 10, paddingVertical: 12, paddingHorizontal: 30 },
   submitText: { color: '#000', fontWeight: '700', fontSize: 16, textAlign: 'center' },
 
@@ -328,6 +393,7 @@ const styles = StyleSheet.create({
     padding: 8,
     borderWidth: 1,
     borderColor: '#333',
+    position: 'relative',
   },
   image: { width: '100%', height: 120, borderRadius: 8 },
   imageBadge: {
@@ -348,5 +414,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '500',
+  },
+
+  // X pra remover imagem já anexada
+  removeExistingButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  removeExistingButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    lineHeight: 16,
   },
 });

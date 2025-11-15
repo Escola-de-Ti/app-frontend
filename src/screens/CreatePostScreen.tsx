@@ -1,3 +1,4 @@
+// src/screens/CreatePostScreen.tsx
 import React, { useState } from 'react';
 import {
   ScrollView,
@@ -149,8 +150,8 @@ export default function CreatePostScreen() {
             style={{ height: 150, textAlignVertical: 'top' }}
           />
 
-          {/* ImageUploader devolve string[] de URIs locais */}
-          <ImageUploader onChange={handleImagesChange} />
+          {/* ImageUploader devolve string[] de URIs locais (sem pré-visualização duplicada) */}
+          <ImageUploader onChange={handleImagesChange} maxImages={MAX_IMAGES} />
 
           {/* TagManager devolve string[] com os nomes das tags */}
           <TagManager tags={tags} onChange={setTags} />
@@ -230,11 +231,13 @@ const styles = StyleSheet.create({
   headerView: { marginTop: 0 },
   sectionTitle: { color: '#fff', fontWeight: 'bold', fontSize: 18, marginBottom: 16 },
   label: { color: '#ccc', marginTop: 12, marginBottom: 4 },
+
   rewardCardBorder: { borderRadius: 12, padding: 1, marginBottom: 16 },
   rewardCard: { backgroundColor: '#1A1A1A', borderRadius: 12, padding: 12 },
   rewardTitle: { color: '#fff', fontWeight: 'bold', fontSize: 14, marginBottom: 6 },
   rewardItem: { color: '#ccc', fontSize: 13, marginBottom: 2 },
   token: { color: '#00FFA3', fontWeight: 'bold' },
+
   publish: { borderRadius: 10, paddingVertical: 12, paddingHorizontal: 30 },
   submitText: { color: '#000', fontWeight: '700', fontSize: 16, textAlign: 'center' },
 });
