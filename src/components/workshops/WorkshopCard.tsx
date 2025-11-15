@@ -23,13 +23,24 @@ export default function WorkshopCard({
   const isOnline = !!item.linkMeet;
   const idNum = Number(item.id);
 
-  // 🔗 capa do workshop (primeira imagem)
-  const rawImages = (item as any)?.imagens ?? (item as any)?.urlsImagens ?? [];
+  const anyItem: any = item;
+
+  // 🔗 tenta primeiro array de imagens (imagens / urlsImagens)
+  const rawImages = anyItem?.imagens ?? anyItem?.urlsImagens ?? [];
 
   let coverUrl: string | null = null;
+
   if (Array.isArray(rawImages) && rawImages.length > 0) {
     const first = rawImages[0];
     const candidate = String(first?.urlImagem ?? first?.url ?? '').trim();
+    if (candidate) {
+      coverUrl = candidate;
+    }
+  }
+
+  // 🔁 fallback: usa descricao.urlImagem (modelo atual do back)
+  if (!coverUrl && anyItem?.descricao?.urlImagem) {
+    const candidate = String(anyItem.descricao.urlImagem).trim();
     if (candidate) {
       coverUrl = candidate;
     }
