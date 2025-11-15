@@ -23,7 +23,7 @@ export type ComentarioDTO = {
   totalUpVotes: number;
   totalSuperVotes: number;
   comentarioPaiId: number | null;
-  dataCriacao: string; // ISO
+  dataCriacao: string;
 };
 
 export type PostDetalhesDTO = {
@@ -39,10 +39,9 @@ export type PostDetalhesDTO = {
   hasMoreComentarios: boolean;
 };
 
-// Algumas APIs podem devolver esses campos opcionalmente
 export type PostDetalhesResponse = PostDetalhesDTO & {
   usuarioJaVotou?: boolean;
-  votado?: boolean; // aceitamos também este alias vindo do back
+  votado?: boolean;
 };
 
 // ===== Helpers =====
@@ -76,7 +75,6 @@ function trimOrUndefined(s?: string) {
   return t.length ? t : undefined;
 }
 
-// body para criação (precisa de usuarioId)
 function buildCreateBody(payload: CreatePostPayload): Record<string, unknown> {
   const body: Record<string, unknown> = {
     usuarioId: Number(payload.usuarioId),
@@ -91,10 +89,9 @@ function buildCreateBody(payload: CreatePostPayload): Record<string, unknown> {
   return body;
 }
 
-// body para update (inclui SEMPRE o id do post)
 function buildUpdateBody(postId: number, payload: UpdatePostPayload): Record<string, unknown> {
   const body: Record<string, unknown> = {
-    id: Number(postId), // 👈 manda o id do post no body
+    id: Number(postId),
     usuarioId:
       payload.usuarioId != null && !Number.isNaN(Number(payload.usuarioId))
         ? Number(payload.usuarioId)
@@ -122,7 +119,6 @@ const toNum = (v: any): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-/** Extrai mensagem amigável de erros Spring/Problem+JSON/strings. */
 function extractErrorMessage(err: any): string {
   const data = err?.response?.data;
 
@@ -144,12 +140,6 @@ function extractErrorMessage(err: any): string {
   return err?.message || 'Falha na requisição.';
 }
 
-/**
- * Erro específico para o caso de tentar votar no próprio post/comentário.
- * O back manda mensagens:
- * - "Você não pode votar no próprio post"
- * - "Você não pode votar no próprio comentário"
- */
 export class OwnContentVoteError extends Error {
   constructor(message: string) {
     super(message);
@@ -185,10 +175,7 @@ export async function updatePost(postId: number, payload: UpdatePostPayload) {
   }
 }
 
-/**
- * GET /api/posts/feed
- * paginação via lastPostId/lastScore
- */
+/* GET /api/posts/feed */
 export type FeedParams = {
   pageSize?: number;
   lastPostId?: number | null;
@@ -204,7 +191,7 @@ export type FeedParams = {
 let FEED_SEQ = 0;
 
 export async function getFeed(params: FeedParams = {}): Promise<GetFeedResponseDTO> {
-  const seq = ++FEED_SEQ; // id da chamada p/ rastrear
+  const seq = ++FEED_SEQ;
   const finalParams = { pageSize: 20, ...params };
 
   console.log('[FEED][API][REQ]', { seq, finalParams });
@@ -237,10 +224,8 @@ export async function getPostDetails(
       params: { pageSize },
     });
 
-    // Normaliza campos sensíveis a undefined
     const totalUpVotes = toNum((data as any)?.totalUpVotes);
 
-    // Alguns backs mandam 'votado' em vez de 'usuarioJaVotou'
     const voted = (data as any)?.usuarioJaVotou ?? (data as any)?.votado;
 
     return {
@@ -255,9 +240,7 @@ export async function getPostDetails(
   }
 }
 
-/** POST /api/comentarios
- * Body esperado pelo back: { postId, texto, comentarioPaiId }
- */
+/** POST /api/comentarios */
 export async function createComment(args: {
   postId: number;
   texto: string;
@@ -273,9 +256,9 @@ export async function createComment(args: {
           : null;
 
     const payload = {
-      postId, // obrigatório
-      texto: (args.texto ?? '').trim(), // string limpa
-      comentarioPaiId: parent, // null p/ raiz, número p/ reply
+      postId,
+      texto: (args.texto ?? '').trim(),
+      comentarioPaiId: parent,
     };
 
     const { data } = await api.post<ComentarioDTO>(COMMENTS_ENDPOINT, payload, {
@@ -298,7 +281,6 @@ export async function getCommentReplies(
       params: { pageSize },
     });
 
-    // aceita variações de payload
     if (Array.isArray(data)) return data as ComentarioDTO[];
     if (Array.isArray((data as any)?.comentarios))
       return (data as any).comentarios as ComentarioDTO[];
@@ -310,21 +292,16 @@ export async function getCommentReplies(
   }
 }
 
-/**
- * POST /api/votos/post/{postId}
- * Retorna shape normalizado para a UI decidir (toggle no back ou idempotente).
- */
+/* POST /api/votos/post/{postId} */
 export type UpvoteResponse = {
-  userVoted: boolean; // estado final do voto após a operação
-  totalUpVotes?: number; // contagem final após a operação (se o back fornecer)
+  userVoted: boolean;
+  totalUpVotes?: number;
 };
 
 export async function upvotePost(postId: number): Promise<UpvoteResponse> {
   try {
     const { data } = await api.post(`${VOTES_ENDPOINT}/post/${postId}`);
 
-    // Normaliza possíveis chaves do back:
-    // userVoted / usuarioJaVotou / jaVotou / votado
     const userVotedRaw =
       (data as any)?.userVoted ??
       (data as any)?.usuarioJaVotou ??
@@ -344,12 +321,10 @@ export async function upvotePost(postId: number): Promise<UpvoteResponse> {
     const rawMsg = typeof body === 'string' ? body : body?.message || extractErrorMessage(err);
     const lower = String(rawMsg).toLowerCase();
 
-    // caso específico: back barrou voto no próprio post
     if (lower.includes('você não pode votar no próprio post')) {
       throw new OwnContentVoteError(String(rawMsg));
     }
 
-    // Caso comum: servidor retorna 409/400 dizendo que já estava votado
     if (status === 409 || status === 400) {
       if (lower.includes('já vot') || lower.includes('already')) {
         return { userVoted: true };
@@ -394,13 +369,6 @@ export async function superVoteComment(comentarioId: number) {
   }
 }
 
-/**
- * Upload de imagens de post
- * Usa exatamente o endpoint do back:
- *   POST /api/imagem/upload
- *   body: byte[] da imagem
- *   params: type=POST, id_type={postId}
- */
 async function uriToBytes(uri: string): Promise<ArrayBuffer> {
   const res = await fetch(uri);
   if (!res.ok) {
@@ -435,7 +403,6 @@ export async function uploadPostImages(postId: number, imageUris: string[]): Pro
       uploaded.push(data);
     } catch (err: any) {
       console.log('[uploadPostImages][ERR]', { uri, errMessage: err?.message });
-      // propaga como erro "bonitinho" pro caller
       throw new Error(extractErrorMessage(err));
     }
   }
@@ -449,7 +416,6 @@ export async function updatePostImage(imagemId: number, uri: string): Promise<Im
 
     const { data } = await api.put<Imagem>(`${IMAGEM_ENDPOINT}/update/${imagemId}`, bytes, {
       headers: {
-        // o back do cURL usa image/png, mas application/octet-stream tbm costuma funcionar
         'Content-Type': 'application/octet-stream',
       },
     });
