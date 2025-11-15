@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Image,
-  Switch,
   Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,8 +25,13 @@ import ImageUploader from '../components/ImageUploader';
 
 import type { Workshop } from '../types';
 import { toIsoWithMillis } from '../types';
-import { getWorkshopById, updateWorkshop, uploadWorkshopImages } from '../services/workshops';
-import { updatePostImage } from '../services/posts'; // 🔁 usado para atualizar qualquer imagem via /api/imagem/update/{id}
+import {
+  getWorkshopById,
+  updateWorkshop,
+  uploadWorkshopImages,
+  updateWorkshopImage,
+  deleteWorkshopImage,
+} from '../services/workshops';
 
 const MAX_IMAGES = 10;
 
@@ -50,12 +54,10 @@ export default function EditWorkshopScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
-  // Modalidade
-  const [isOnline, setIsOnline] = useState(false);
+  // Link (apenas link, sem modalidade)
   const [meetingLink, setMeetingLink] = useState('');
-  const [address, setAddress] = useState('');
 
-  // Capacidade / Tokens (UI)
+  // Capacidade / Tokens
   const [capacity, setCapacity] = useState('');
   const [tokens, setTokens] = useState('');
 
@@ -68,6 +70,7 @@ export default function EditWorkshopScreen() {
   // Imagens
   const [editableImages, setEditableImages] = useState<EditableImage[]>([]);
   const [newImages, setNewImages] = useState<string[]>([]);
+  const [removedImageIds, setRemovedImageIds] = useState<number[]>([]); // ids a deletar no back
 
   const titleCount = title.trim().length;
   const descriptionCount = description.trim().length;
@@ -93,27 +96,44 @@ export default function EditWorkshopScreen() {
       try {
         setLoading(true);
         const w: Workshop = await getWorkshopById(id);
+        const anyW: any = w;
 
+        // título / descrição
         setTitle(w.titulo ?? '');
-        const desc = (w as any)?.descricao?.descricao ?? (w as any)?.descricao ?? '';
+        const desc = anyW?.descricao?.descricao ?? anyW?.descricao ?? '';
         setDescription(desc);
 
+        // datas
         setStartAt(w.dataInicio ?? new Date());
-        setEndAt((w as any)?.dataTermino ?? new Date(Date.now() + 2 * 60 * 60 * 1000));
+        setEndAt(anyW?.dataTermino ?? new Date(Date.now() + 2 * 60 * 60 * 1000));
 
-        const link = (w as any)?.linkMeet ?? '';
-        setIsOnline(!!link);
+        // link (se tiver)
+        const link = anyW?.linkMeet ?? '';
         setMeetingLink(link);
-        setAddress((w as any)?.endereco ?? (w as any)?.local ?? '');
 
-        if ((w as any)?.vagasTotais != null) setCapacity(String((w as any).vagasTotais));
-        if ((w as any)?.tokens != null) setTokens(String((w as any).tokens));
+        // capacidade / tokens (tenta campos novos e depois os antigos)
+        if (anyW?.capacidade != null) {
+          setCapacity(String(anyW.capacidade));
+        } else if (anyW?.vagasTotais != null) {
+          setCapacity(String(anyW.vagasTotais));
+        }
+
+        if (anyW?.custo != null) {
+          setTokens(String(anyW.custo));
+        } else if (anyW?.tokens != null) {
+          setTokens(String(anyW.tokens));
+        }
 
         // 🔗 imagens existentes do workshop
-        const rawImages = (w as any)?.urlsImagens ?? (w as any)?.imagens ?? [];
+        // HOJE: vem em descricao.urlImagem + descricao.idImagem (apenas 1)
+        // FUTURO: se virar array urlsImagens/imagens, também tratamos.
+        const rawArray = anyW?.urlsImagens ?? anyW?.imagens;
+        const descObj = anyW?.descricao;
 
-        if (Array.isArray(rawImages)) {
-          const mapped: EditableImage[] = rawImages
+        let mapped: EditableImage[] = [];
+
+        if (Array.isArray(rawArray) && rawArray.length > 0) {
+          mapped = rawArray
             .map((img: any) => {
               const url = String(img?.urlImagem ?? img?.url ?? '').trim();
               const rawId = Number(img?.id ?? img?.imagemId);
@@ -121,11 +141,18 @@ export default function EditWorkshopScreen() {
               return { id: rawId, url };
             })
             .filter(Boolean) as EditableImage[];
-
-          setEditableImages(mapped);
-        } else {
-          setEditableImages([]);
+        } else if (descObj?.urlImagem && descObj?.idImagem != null) {
+          mapped = [
+            {
+              id: Number(descObj.idImagem),
+              url: String(descObj.urlImagem),
+            },
+          ];
         }
+
+        setEditableImages(mapped);
+        setRemovedImageIds([]); // limpamos qualquer estado anterior
+        setNewImages([]);
       } catch (e: any) {
         console.log('[EditWorkshop] load error', e?.message);
         Toast.show({
@@ -144,12 +171,15 @@ export default function EditWorkshopScreen() {
   const canSave = useMemo(() => {
     const _title = title.trim();
     const _desc = description.trim();
+    const _link = meetingLink.trim();
+
     const baseOk = _title.length >= 4 && _desc.length >= 20;
-    const linkOk = isOnline ? meetingLink.trim().length >= 6 : true;
     const timeOk = startAt.getTime() < endAt.getTime();
     const imagesOk = totalImagesCount <= MAX_IMAGES;
+    const linkOk = !_link || _link.length >= 6; // se preencher, exige tamanho mínimo
+
     return baseOk && linkOk && timeOk && imagesOk && !loading;
-  }, [title, description, isOnline, meetingLink, startAt, endAt, totalImagesCount, loading]);
+  }, [title, description, meetingLink, startAt, endAt, totalImagesCount, loading]);
 
   // ===== troca de imagem existente =====
   const handlePickReplacement = async (imageId: number) => {
@@ -171,6 +201,12 @@ export default function EditWorkshopScreen() {
       console.log('[EditWorkshop] erro ao escolher imagem', err);
       Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
     }
+  };
+
+  // 🗑 remover imagem EXISTENTE do workshop
+  const handleRemoveExistingImage = (imageId: number) => {
+    setEditableImages((prev) => prev.filter((img) => img.id !== imageId));
+    setRemovedImageIds((prev) => (prev.includes(imageId) ? prev : [...prev, imageId]));
   };
 
   // ===== imagens novas (limite) =====
@@ -197,6 +233,7 @@ export default function EditWorkshopScreen() {
 
     const _title = title.trim();
     const _desc = description.trim();
+    const _link = meetingLink.trim();
 
     // validações explícitas
     if (_title.length < 4) {
@@ -223,9 +260,9 @@ export default function EditWorkshopScreen() {
       Alert.alert('Imagens demais', `Você pode ter no máximo ${MAX_IMAGES} imagens.`);
       return;
     }
-    if (isOnline && meetingLink.trim().length < 6) {
+    if (_link && _link.length < 6) {
       Toast.show({ type: 'error', text1: 'Link inválido', text2: 'Informe um link válido.' });
-      Alert.alert('Link inválido', 'Informe um link válido para o encontro online.');
+      Alert.alert('Link inválido', 'Informe um link válido.');
       return;
     }
 
@@ -234,13 +271,14 @@ export default function EditWorkshopScreen() {
       Toast.show({ type: 'info', text1: 'Salvando...', text2: 'Atualizando workshop' });
 
       const tema = _title;
-      const payload = {
+      const payload: any = {
         titulo: _title,
-        linkMeet: isOnline ? meetingLink.trim() : undefined,
+        linkMeet: _link || undefined,
         dataInicio: toIsoWithMillis(startAt),
         dataTermino: toIsoWithMillis(endAt),
         descricao: { tema, descricao: _desc },
-        // capacidade / tokens ainda não enviados pro back aqui — só UI
+        capacidade: Number(capacity || 0),
+        custo: Number(tokens || 0),
       };
 
       console.log('[EditWorkshop] UPDATE payload', { id, payload });
@@ -252,15 +290,34 @@ export default function EditWorkshopScreen() {
         for (const img of imagesToUpdate) {
           try {
             console.log('[EditWorkshop] update image', img.id, img.localUri);
-            await updatePostImage(img.id, img.localUri!);
+            await updateWorkshopImage(img.id, img.localUri!);
           } catch (imgErr: any) {
-            console.log('[EditWorkshop] ERRO updatePostImage', {
+            console.log('[EditWorkshop] ERRO updateWorkshopImage', {
               id: img.id,
               message: imgErr?.message,
             });
             Alert.alert(
               'Aviso',
               'O workshop foi atualizado, mas ocorreu um erro ao atualizar uma das imagens.'
+            );
+          }
+        }
+      }
+
+      // 🗑 remover imagens que o usuário excluiu (X)
+      if (removedImageIds.length > 0) {
+        for (const imgId of removedImageIds) {
+          try {
+            console.log('[EditWorkshop] delete image', imgId);
+            await deleteWorkshopImage(imgId);
+          } catch (imgErr: any) {
+            console.log('[EditWorkshop] ERRO deleteWorkshopImage', {
+              id: imgId,
+              message: imgErr?.message,
+            });
+            Alert.alert(
+              'Aviso',
+              'O workshop foi atualizado, mas ocorreu um erro ao remover uma das imagens.'
             );
           }
         }
@@ -304,19 +361,17 @@ export default function EditWorkshopScreen() {
     id,
     title,
     description,
-    isOnline,
     meetingLink,
     startAt,
     endAt,
     totalImagesCount,
     editableImages,
     newImages,
+    removedImageIds,
     navigation,
+    capacity,
+    tokens,
   ]);
-
-  const handleResetNewImages = () => {
-    setNewImages([]);
-  };
 
   return (
     <AppLayout initialActivePage="Workshops" backgroundColor="rgb(17, 17, 17)">
@@ -368,27 +423,14 @@ export default function EditWorkshopScreen() {
               autoCapitalize="sentences"
             />
 
-            {/* Modalidade */}
-            <View style={[styles.inlineHeader, { marginTop: 12 }]}>
-              <Text style={styles.label}>Online</Text>
-              <Switch value={isOnline} onValueChange={setIsOnline} />
-            </View>
-
-            {isOnline ? (
-              <AppInput
-                placeholder="Link da reunião (Zoom/Meet/Teams...)"
-                value={meetingLink}
-                onChangeText={setMeetingLink}
-                autoCapitalize="none"
-              />
-            ) : (
-              <AppInput
-                placeholder="Endereço do local (apenas visual)"
-                value={address}
-                onChangeText={setAddress}
-                autoCapitalize="sentences"
-              />
-            )}
+            {/* Link (apenas input, sem toggle) */}
+            <Text style={styles.label}>Link do encontro (opcional)</Text>
+            <AppInput
+              placeholder="Link da reunião (Zoom/Meet/Teams...)"
+              value={meetingLink}
+              onChangeText={setMeetingLink}
+              autoCapitalize="none"
+            />
 
             {/* Datas e horas */}
             <View style={styles.datetimeRow}>
@@ -429,7 +471,7 @@ export default function EditWorkshopScreen() {
               </View>
             </View>
 
-            {/* Capacidade / Tokens — ainda UI */}
+            {/* Capacidade / Tokens */}
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Capacidade</Text>
@@ -452,14 +494,10 @@ export default function EditWorkshopScreen() {
               </View>
             </View>
 
-            {/* Imagens existentes */}
+            {/* Imagens já existentes do workshop */}
             {editableImages.length > 0 && (
               <View style={{ marginTop: 16 }}>
-                <View style={styles.inlineHeader}>
-                  <Text style={styles.label}>Imagens atuais</Text>
-                  <Text style={styles.hint}>{editableImages.length} anexadas</Text>
-                </View>
-
+                <Text style={styles.label}>Imagens do workshop</Text>
                 <View style={styles.imageList}>
                   {editableImages.map((img) => (
                     <View key={img.id} style={styles.imageItem}>
@@ -468,6 +506,16 @@ export default function EditWorkshopScreen() {
                         style={styles.image}
                         resizeMode="cover"
                       />
+
+                      {/* X para remover imagem existente */}
+                      <TouchableOpacity
+                        style={styles.removeExistingButton}
+                        onPress={() => handleRemoveExistingImage(img.id)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.removeExistingButtonText}>×</Text>
+                      </TouchableOpacity>
+
                       {img.localUri && <Text style={styles.imageBadge}>Nova imagem pendente</Text>}
 
                       <TouchableOpacity
@@ -482,24 +530,18 @@ export default function EditWorkshopScreen() {
               </View>
             )}
 
-            {/* Novas imagens */}
-            <View style={[styles.inlineHeader, { marginTop: 16 }]}>
-              <Text style={styles.label}>Novas imagens</Text>
-              <Text style={styles.hint}>
-                {totalImagesCount}/{MAX_IMAGES}
-              </Text>
-            </View>
-            <ImageUploader onChange={handleNewImagesChange} />
-
-            {!!newImages.length && (
-              <View style={styles.previewGrid}>
-                {newImages.map((uri) => (
-                  <Image key={uri} source={{ uri }} style={styles.preview} />
-                ))}
-                <TouchableOpacity style={styles.clearNewImages} onPress={handleResetNewImages}>
-                  <Text style={styles.clearNewImagesText}>Limpar novas imagens</Text>
-                </TouchableOpacity>
-              </View>
+            {/* ImageUploader para NOVAS imagens do workshop
+                👉 Só aparece quando NÃO tiver nenhuma imagem já anexada */}
+            {editableImages.length === 0 && (
+              <>
+                <View style={[styles.inlineHeader, { marginTop: 16 }]}>
+                  <Text style={styles.label}>Novas imagens</Text>
+                  <Text style={styles.hint}>
+                    {totalImagesCount}/{MAX_IMAGES}
+                  </Text>
+                </View>
+                <ImageUploader onChange={handleNewImagesChange} maxImages={MAX_IMAGES} />
+              </>
             )}
 
             {/* Footer */}
@@ -625,6 +667,7 @@ const styles = StyleSheet.create({
     padding: 8,
     borderWidth: 1,
     borderColor: '#333',
+    position: 'relative',
   },
   image: { width: '100%', height: 120, borderRadius: 8 },
   imageBadge: {
@@ -647,18 +690,25 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  previewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  preview: { width: 80, height: 80, borderRadius: 8, backgroundColor: '#222' },
-  clearNewImages: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#555',
-    alignSelf: 'flex-start',
-    marginTop: 4,
+  // X pra remover imagem já anexada
+  removeExistingButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
-  clearNewImagesText: { color: '#ccc', fontSize: 12 },
+  removeExistingButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    lineHeight: 16,
+  },
 
   tipBorder: { borderRadius: 12, padding: 1, marginBottom: 24 },
   tipCard: { backgroundColor: '#1A1A1A', borderRadius: 12, padding: 12 },

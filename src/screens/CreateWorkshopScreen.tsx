@@ -10,8 +10,6 @@ import {
   Platform,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Image,
-  Switch,
   Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,6 +35,8 @@ import { getAccessToken } from '../lib/secure';
 import { getUserIdFromJwt, getEmailFromJwt } from '../lib/jwt';
 import { getUsuarioIdByEmail } from '../services/user';
 
+const MAX_IMAGES = 10;
+
 type RouteParams = { id?: number };
 
 export default function CreateWorkshopScreen() {
@@ -52,12 +52,10 @@ export default function CreateWorkshopScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
-  // Modalidade
-  const [isOnline, setIsOnline] = useState(false);
+  // Link (apenas link, sem "online/presencial")
   const [meetingLink, setMeetingLink] = useState('');
-  const [address, setAddress] = useState('');
 
-  // Capacidade / Tokens (UI apenas por enquanto)
+  // Capacidade / Tokens
   const [capacity, setCapacity] = useState('');
   const [tokens, setTokens] = useState('');
 
@@ -76,7 +74,9 @@ export default function CreateWorkshopScreen() {
 
   const formatDateTime = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(
+      d.getHours()
+    )}:${pad(d.getMinutes())}`;
   };
 
   // carregar dados no modo edição
@@ -91,14 +91,11 @@ export default function CreateWorkshopScreen() {
         setDescription(desc);
         setStartAt(w.dataInicio ?? new Date());
         setEndAt((w as any).dataTermino ?? new Date(Date.now() + 2 * 60 * 60 * 1000));
+        setCapacity(String((w as any)?.capacidade ?? (w as any)?.vagasTotais ?? ''));
+        setTokens(String((w as any)?.custo ?? (w as any)?.tokens ?? ''));
 
         const link = (w as any).linkMeet ?? '';
-        setIsOnline(!!link);
         setMeetingLink(link);
-        setAddress('');
-
-        if ((w as any)?.vagasTotais != null) setCapacity(String((w as any).vagasTotais));
-        if ((w as any)?.tokens != null) setTokens(String((w as any).tokens));
       } catch (e: any) {
         Toast.show({ type: 'error', text1: 'Falha ao carregar', text2: e?.message ?? '' });
         navigation.goBack();
@@ -113,10 +110,10 @@ export default function CreateWorkshopScreen() {
     const _title = title.trim();
     const _desc = description.trim();
     const baseOk = _title.length >= 4 && _desc.length >= 20;
-    const linkOk = isOnline ? meetingLink.trim().length >= 6 : true;
     const timeOk = startAt.getTime() < endAt.getTime();
-    return baseOk && linkOk && timeOk && !loading;
-  }, [title, description, isOnline, meetingLink, startAt, endAt, images, loading]);
+    const imagesOk = images.length <= MAX_IMAGES;
+    return baseOk && timeOk && imagesOk && !loading;
+  }, [title, description, startAt, endAt, images, loading]);
 
   // 🔑 Resolve instrutorId na ordem: useAuth → token(userId) → token(email)→ API
   const resolveInstructorId = async (): Promise<number | null> => {
@@ -145,6 +142,7 @@ export default function CreateWorkshopScreen() {
 
     const _title = title.trim();
     const _desc = description.trim();
+    const _link = meetingLink.trim();
 
     // validações
     if (_title.length < 4) {
@@ -162,14 +160,19 @@ export default function CreateWorkshopScreen() {
       Alert.alert('Horário inválido', 'A data/hora de início deve ser antes do término.');
       return;
     }
-    if (images.length > 10) {
-      Toast.show({ type: 'error', text1: 'Imagens demais', text2: 'Máx. 10 imagens.' });
-      Alert.alert('Imagens demais', 'Envie no máximo 10 imagens.');
+    if (images.length > MAX_IMAGES) {
+      Toast.show({
+        type: 'error',
+        text1: 'Imagens demais',
+        text2: `Máx. ${MAX_IMAGES} imagens.`,
+      });
+      Alert.alert('Imagens demais', `Envie no máximo ${MAX_IMAGES} imagens.`);
       return;
     }
-    if (isOnline && meetingLink.trim().length < 6) {
+    // se quiser manter uma validação mínima pro link quando preenchido:
+    if (_link && _link.length < 6) {
       Toast.show({ type: 'error', text1: 'Link inválido', text2: 'Informe um link válido.' });
-      Alert.alert('Link inválido', 'Informe um link válido para o encontro online.');
+      Alert.alert('Link inválido', 'Informe um link válido.');
       return;
     }
 
@@ -181,10 +184,12 @@ export default function CreateWorkshopScreen() {
       if (isEdit) {
         const payload = {
           titulo: _title,
-          linkMeet: isOnline ? meetingLink.trim() : undefined,
+          linkMeet: _link || undefined,
           dataInicio: toIsoWithMillis(startAt), // ✅ 2025-11-10T18:30:00.000Z
           dataTermino: toIsoWithMillis(endAt), // ✅ idem
           descricao: { tema, descricao: _desc },
+          capacidade: Number(capacity),
+          custo: Number(tokens),
         };
 
         console.log('[Workshop][UPDATE][REQ]', { id, payload });
@@ -224,11 +229,13 @@ export default function CreateWorkshopScreen() {
 
         const basePayload: any = {
           titulo: _title,
-          linkMeet: isOnline ? meetingLink.trim() : undefined,
+          linkMeet: _link || undefined,
           dataInicio: toUtcNoMillis(startAt), // ✅ "yyyy-MM-dd'T'HH:mm:ss" (SEM Z)
           dataTermino: toUtcNoMillis(endAt), // ✅ idem
           descricao: { tema, descricao: _desc },
-          instrutorId, // ✅ obrigatório no back
+          instrutorId,
+          capacidade: Number(capacity),
+          custo: Number(tokens),
         };
 
         console.log('[Workshop][CREATE][REQ]', basePayload);
@@ -276,14 +283,24 @@ export default function CreateWorkshopScreen() {
     } finally {
       setLoading(false);
     }
-  }, [isEdit, id, title, description, isOnline, meetingLink, startAt, endAt, navigation, images]);
+  }, [
+    isEdit,
+    id,
+    title,
+    description,
+    meetingLink,
+    startAt,
+    endAt,
+    navigation,
+    images,
+    tokens,
+    capacity,
+  ]);
 
   const handleClear = useCallback(() => {
     setTitle('');
     setDescription('');
-    setIsOnline(false);
     setMeetingLink('');
-    setAddress('');
     setImages([]);
     setCapacity('');
     setTokens('');
@@ -342,27 +359,14 @@ export default function CreateWorkshopScreen() {
               autoCapitalize="sentences"
             />
 
-            {/* Modalidade */}
-            <View style={[styles.inlineHeader, { marginTop: 12 }]}>
-              <Text style={styles.label}>Online</Text>
-              <Switch value={isOnline} onValueChange={setIsOnline} />
-            </View>
-
-            {isOnline ? (
-              <AppInput
-                placeholder="Link da reunião (Zoom/Meet/Teams...)"
-                value={meetingLink}
-                onChangeText={setMeetingLink}
-                autoCapitalize="none"
-              />
-            ) : (
-              <AppInput
-                placeholder="Endereço do local (apenas visual)"
-                value={address}
-                onChangeText={setAddress}
-                autoCapitalize="sentences"
-              />
-            )}
+            {/* Link (apenas um input, sem toggle de modalidade) */}
+            <Text style={styles.label}>Link do encontro (opcional)</Text>
+            <AppInput
+              placeholder="Link da reunião (Zoom/Meet/Teams...)"
+              value={meetingLink}
+              onChangeText={setMeetingLink}
+              autoCapitalize="none"
+            />
 
             {/* Datas e horas */}
             <View style={styles.datetimeRow}>
@@ -403,7 +407,7 @@ export default function CreateWorkshopScreen() {
               </View>
             </View>
 
-            {/* Capacidade / Tokens — UI (não enviados ainda) */}
+            {/* Capacidade / Tokens */}
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Capacidade</Text>
@@ -429,17 +433,17 @@ export default function CreateWorkshopScreen() {
             {/* Imagens */}
             <View style={styles.inlineHeader}>
               <Text style={styles.label}>Imagens</Text>
-              <Text style={styles.hint}>{images.length}/10</Text>
+              <Text style={styles.hint}>
+                {images.length}/{MAX_IMAGES}
+              </Text>
             </View>
-            <ImageUploader onChange={setImages} />
-
-            {!!images.length && (
-              <View style={styles.previewGrid}>
-                {images.map((uri) => (
-                  <Image key={uri} source={{ uri }} style={styles.preview} />
-                ))}
-              </View>
-            )}
+            <ImageUploader
+              onChange={setImages}
+              maxImages={MAX_IMAGES}
+              label={`Imagens (máx. ${MAX_IMAGES})`}
+            />
+            {/* 👆 removemos o preview manual pra não duplicar,
+                o próprio ImageUploader já mostra as imagens */}
 
             {/* Footer */}
             <View style={styles.footer}>
@@ -534,8 +538,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnText: { color: '#fff', fontWeight: '600' },
-  previewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  preview: { width: 80, height: 80, borderRadius: 8, backgroundColor: '#222' },
   row: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 8 },
   datetimeRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 8 },
   dtBtn: {

@@ -67,7 +67,7 @@ export async function createWorkshop(payload: WorkshopCreateDTO): Promise<Worksh
 }
 
 export async function updateWorkshop(id: number, payload: WorkshopUpdateDTO): Promise<Workshop> {
-  const { data } = await api.put<WorkshopDTO>(`/api/workshops/${id}`, payload);
+  const { data } = await api.patch<WorkshopDTO>(`/api/workshops/${id}`, payload);
   return mapWorkshopDTO(data);
 }
 
@@ -78,9 +78,7 @@ export async function deleteWorkshop(id: number): Promise<void> {
 // ========== IMAGENS DE WORKSHOP ==========
 
 /**
- * @param workshopId
- * @param imageUris
- * @returns
+ * Faz upload de uma ou mais imagens para um workshop.
  */
 export async function uploadWorkshopImages(
   workshopId: number,
@@ -119,8 +117,7 @@ export async function uploadWorkshopImages(
 }
 
 /**
- * @param imagemId
- * @param uri
+ * Atualiza uma imagem existente de workshop.
  */
 export async function updateWorkshopImage(imagemId: number, uri: string): Promise<Imagem> {
   try {
@@ -135,6 +132,19 @@ export async function updateWorkshopImage(imagemId: number, uri: string): Promis
     return data;
   } catch (err: any) {
     console.log('[updateWorkshopImage][ERR]', { imagemId, errMessage: err?.message });
+    throw new Error(extractErrorMessage(err));
+  }
+}
+
+/**
+ * Remove definitivamente uma imagem (usada em workshop) pelo id.
+ * DELETE /api/imagem/delete/{id}
+ */
+export async function deleteWorkshopImage(imagemId: number): Promise<void> {
+  try {
+    await api.delete(`${IMAGEM_ENDPOINT}/delete/${imagemId}`);
+  } catch (err: any) {
+    console.log('[deleteWorkshopImage][ERR]', { imagemId, errMessage: err?.message });
     throw new Error(extractErrorMessage(err));
   }
 }

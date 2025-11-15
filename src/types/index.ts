@@ -143,6 +143,8 @@ export interface WorkshopDTO {
   dataInicio: string;
   dataTermino: string;
   descricao: DescricaoWorkshopDTO;
+  custo: number;
+  capacidade: number;
 }
 
 export interface Workshop extends Omit<WorkshopDTO, 'dataCriacao' | 'dataInicio' | 'dataTermino'> {
@@ -158,6 +160,8 @@ export interface WorkshopCreateDTO {
   dataInicio: string;
   dataTermino: string;
   descricao: DescricaoWorkshopDTO;
+  custo: number;
+  capacidade: number;
 }
 
 export type WorkshopUpdateDTO = Partial<{
@@ -167,6 +171,8 @@ export type WorkshopUpdateDTO = Partial<{
   dataTermino: string;
   descricao: DescricaoWorkshopDTO;
   status: StatusWorkshop;
+  custo: number;
+  capacidade: number;
 }>;
 
 // ======== Utils de data ========
@@ -198,6 +204,8 @@ export const toWorkshopCreateDTO = (w: {
   descricao?: string;
   tema?: string;
   linkMeet?: string;
+  custo: number;
+  capacidade: number;
 }): WorkshopCreateDTO => ({
   titulo: w.titulo.trim(),
   instrutorId: w.instrutorId,
@@ -208,6 +216,8 @@ export const toWorkshopCreateDTO = (w: {
     tema: (w.tema ?? w.titulo).trim(),
     descricao: w.descricao?.trim() || undefined,
   },
+  custo: w.custo || 0,
+  capacidade: w.capacidade || 0,
 });
 
 export const formatWorkshopDateRange = (w: Workshop) => {
