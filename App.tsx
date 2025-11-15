@@ -18,6 +18,7 @@ import RankingScreen from './src/screens/RankingScreen';
 import TransactionHistoryScreen from 'src/screens/TransactionHistoryScreen';
 import EditProfileScreen from 'src/screens/EditProfileScreen';
 import EditPostScreen from 'src/screens/EditPostScreen';
+import EditWorkshopScreen from 'src/screens/EditWorkshopScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -44,6 +45,7 @@ function Router() {
             <Stack.Screen name="TransactionHistoryScreen" component={TransactionHistoryScreen} />
             <Stack.Screen name="EditProfileScreen" component={EditProfileScreen} />
             <Stack.Screen name="EditPostScreen" component={EditPostScreen} />
+            <Stack.Screen name="EditWorkshopScreen" component={EditWorkshopScreen} />
           </>
         ) : (
           // Telas públicas

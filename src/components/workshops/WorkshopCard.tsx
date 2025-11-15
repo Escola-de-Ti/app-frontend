@@ -1,6 +1,6 @@
 // === src/components/workshops/WorkshopCard.tsx ===
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Workshop } from '../../types';
 import { formatWorkshopDateRange } from '../../types';
@@ -23,65 +23,86 @@ export default function WorkshopCard({
   const isOnline = !!item.linkMeet;
   const idNum = Number(item.id);
 
+  // 🔗 capa do workshop (primeira imagem)
+  const rawImages = (item as any)?.imagens ?? (item as any)?.urlsImagens ?? [];
+
+  let coverUrl: string | null = null;
+  if (Array.isArray(rawImages) && rawImages.length > 0) {
+    const first = rawImages[0];
+    const candidate = String(first?.urlImagem ?? first?.url ?? '').trim();
+    if (candidate) {
+      coverUrl = candidate;
+    }
+  }
+
   return (
     <View style={s.card}>
-      <Text style={s.title} numberOfLines={2}>
-        {item.titulo}
-      </Text>
-
-      {/* Tema (se houver) */}
-      {item.descricao?.tema ? (
-        <Text style={s.subTitle} numberOfLines={1}>
-          {item.descricao.tema}
-        </Text>
-      ) : null}
-
-      {/* Instrutor */}
-      {!!item.instrutorNome && (
-        <Text style={s.meta} numberOfLines={1}>
-          Instrutor: {item.instrutorNome}
-        </Text>
-      )}
-
-      {/* Descrição curta */}
-      {!!item.descricao?.descricao && (
-        <Text style={s.desc} numberOfLines={3}>
-          {item.descricao.descricao}
-        </Text>
-      )}
-
-      {/* Badges */}
-      <View style={s.badgesRow}>
-        <Badge>
-          {item.status === 'ABERTO'
-            ? 'Aberto'
-            : item.status === 'EM_ANDAMENTO'
-              ? 'Em andamento'
-              : 'Concluído'}
-        </Badge>
-        <Badge>{isOnline ? 'Online' : 'Presencial'}</Badge>
-      </View>
-
-      {/* Quando */}
-      <Text style={s.when}>{formatWorkshopDateRange(item)}</Text>
-
-      {(onPrimary || onSecondary) && (
-        <View style={s.actions}>
-          {onPrimary ? (
-            <GradientButton
-              onPress={() => onPrimary(idNum)}
-              label={primaryLabel ?? 'Ver detalhes'}
-            />
-          ) : null}
-
-          {onSecondary ? (
-            <OutlineButton
-              onPress={() => onSecondary(idNum)}
-              label={secondaryLabel ?? 'Cancelar'}
-            />
-          ) : null}
+      {/* Capa / banner do workshop */}
+      {coverUrl && (
+        <View style={s.coverWrapper}>
+          <Image source={{ uri: coverUrl }} style={s.cover} resizeMode="cover" />
         </View>
       )}
+
+      <View style={s.body}>
+        <Text style={s.title} numberOfLines={2}>
+          {item.titulo}
+        </Text>
+
+        {/* Tema (se houver) */}
+        {item.descricao?.tema ? (
+          <Text style={s.subTitle} numberOfLines={1}>
+            {item.descricao.tema}
+          </Text>
+        ) : null}
+
+        {/* Instrutor */}
+        {!!item.instrutorNome && (
+          <Text style={s.meta} numberOfLines={1}>
+            Instrutor: {item.instrutorNome}
+          </Text>
+        )}
+
+        {/* Descrição curta */}
+        {!!item.descricao?.descricao && (
+          <Text style={s.desc} numberOfLines={3}>
+            {item.descricao.descricao}
+          </Text>
+        )}
+
+        {/* Badges */}
+        <View style={s.badgesRow}>
+          <Badge>
+            {item.status === 'ABERTO'
+              ? 'Aberto'
+              : item.status === 'EM_ANDAMENTO'
+                ? 'Em andamento'
+                : 'Concluído'}
+          </Badge>
+          <Badge>{isOnline ? 'Online' : 'Presencial'}</Badge>
+        </View>
+
+        {/* Quando */}
+        <Text style={s.when}>{formatWorkshopDateRange(item)}</Text>
+
+        {(onPrimary || onSecondary) && (
+          <View style={s.actions}>
+            {onPrimary ? (
+              <GradientButton
+                onPress={() => onPrimary(idNum)}
+                label={primaryLabel ?? 'Ver detalhes'}
+              />
+            ) : null}
+
+            {onSecondary ? (
+              <OutlineButton
+                onPress={() => onSecondary(idNum)}
+                label={secondaryLabel ?? 'Cancelar'}
+              />
+            ) : null}
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -123,8 +144,20 @@ const s = StyleSheet.create({
     borderColor: '#222',
     borderWidth: 1,
     borderRadius: 16,
-    padding: 16,
     marginBottom: 16,
+    overflow: 'hidden', // pra imagem respeitar o borderRadius
+  },
+  coverWrapper: {
+    width: '100%',
+    height: 140,
+    backgroundColor: '#111',
+  },
+  cover: {
+    width: '100%',
+    height: '100%',
+  },
+  body: {
+    padding: 16,
   },
   title: { color: '#fff', fontSize: 18, fontWeight: '600' },
   subTitle: { color: '#bdbdbd', marginTop: 4 },
