@@ -696,15 +696,6 @@ export function PostDetails({
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity
-              onPress={handleClose}
-              activeOpacity={0.7}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={styles.closeButton}
-            >
-              <Feather name="x" size={20} color="#ccc" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
               style={styles.userInfo}
               activeOpacity={0.8}
               onPress={handleProfilePress}

@@ -1,4 +1,3 @@
-// src/types/index.ts
 export type ID = string | number;
 
 export type OrdenacaoTipo = 'MAIS_RECENTES' | 'MAIS_ANTIGOS' | 'MAIS_POPULARES';
@@ -353,6 +352,7 @@ export type Comment = CommentDTO;
 
 // ======== Ranking ======== //
 export interface RankingApiItem {
+  id: number; // 👈 vem do back (id do usuário)
   posicao: number;
   nome: string;
   qntdXp: number;
@@ -370,6 +370,7 @@ export interface RankingApiResponse {
 }
 
 export interface RankingUser {
+  id: number; // 👈 usado pra navegar pro ProfileScreen
   posicao: number;
   nome: string;
   xp: number;
@@ -393,6 +394,7 @@ export function mapRankingApiToModel(resp: RankingApiResponse): {
   me: MyRankingStats;
 } {
   const users: RankingUser[] = (resp?.rankingList ?? []).map((u) => ({
+    id: Number(u.id),
     posicao: u.posicao,
     nome: u.nome,
     xp: u.qntdXp,

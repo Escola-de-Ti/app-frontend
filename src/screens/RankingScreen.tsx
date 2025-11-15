@@ -8,8 +8,11 @@ import {
   StatusBar,
   ActivityIndicator,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+
 import AppLayout from '../components/AppLayout';
 import { getRankingModel } from '../services/ranking';
 import type { RankingUser } from '../types';
@@ -102,7 +105,7 @@ export default function RankingScreen() {
         ) : (
           <FlatList
             data={data}
-            keyExtractor={(u) => `${u.posicao}-${u.nome}`}
+            keyExtractor={(u) => `${u.posicao}-${u.id}-${u.nome}`}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
             }
@@ -121,42 +124,57 @@ export default function RankingScreen() {
 }
 
 function RankingCard({ user }: { user: RankingUser }) {
+  const navigation = useNavigation<any>();
+
   const topThree = user.posicao <= 3;
   const color = user.cor || '#6b7280';
   const bg = topThree ? hexWithAlpha(color, 0.13) : '#141417';
 
-  return (
-    <View
-      style={[
-        s.card,
-        {
-          borderLeftWidth: 4,
-          borderLeftColor: color,
-          backgroundColor: bg,
-        },
-      ]}
-    >
-      <View style={s.cardRow}>
-        <View style={s.leftCol}>
-          <View style={s.headerRow}>
-            {topThree && <FontAwesome5 name="trophy" size={16} color={color} />}
-            <Text style={s.position}>#{user.posicao}</Text>
-            <Text style={s.name} numberOfLines={1}>
-              {user.nome}
-            </Text>
-          </View>
+  const handleProfilePress = () => {
+    const userId = Number(user.id);
+    if (!Number.isFinite(userId)) return;
 
-          <View style={s.badgesRow}>
-            <View style={s.badge}>
-              <Text style={[s.badgeText, { color: '#82caff' }]}>Nvl. {user.nivel}</Text>
+    navigation.navigate('ProfileScreen', { userId });
+  };
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={handleProfilePress}
+      style={{ borderRadius: 10, overflow: 'hidden' }}
+    >
+      <View
+        style={[
+          s.card,
+          {
+            borderLeftWidth: 4,
+            borderLeftColor: color,
+            backgroundColor: bg,
+          },
+        ]}
+      >
+        <View style={s.cardRow}>
+          <View style={s.leftCol}>
+            <View style={s.headerRow}>
+              {topThree && <FontAwesome5 name="trophy" size={16} color={color} />}
+              <Text style={s.position}>#{user.posicao}</Text>
+              <Text style={s.name} numberOfLines={1}>
+                {user.nome}
+              </Text>
             </View>
-            <View style={s.badge}>
-              <Text style={[s.badgeText, { color: '#ffd580' }]}>{user.xp} XP</Text>
+
+            <View style={s.badgesRow}>
+              <View style={s.badge}>
+                <Text style={[s.badgeText, { color: '#82caff' }]}>Nvl. {user.nivel}</Text>
+              </View>
+              <View style={s.badge}>
+                <Text style={[s.badgeText, { color: '#ffd580' }]}>{user.xp} XP</Text>
+              </View>
             </View>
           </View>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -170,7 +188,6 @@ function hexWithAlpha(hex: string, alpha: number) {
 }
 
 const s = StyleSheet.create({
-  // container: { flex: 1, backgroundColor: 'rgb(11, 11, 11)', padding: 16 },
   container: { flex: 1, padding: 16 },
   header: { marginBottom: 12 },
   title: { color: '#fff', fontSize: 24, fontWeight: '700' },
