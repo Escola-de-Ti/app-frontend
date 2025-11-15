@@ -427,6 +427,16 @@ export async function updatePostImage(imagemId: number, uri: string): Promise<Im
   }
 }
 
+/** DELETE /api/imagem/delete/{id} - deletar imagem de post */
+export async function deletePostImage(imagemId: number): Promise<void> {
+  try {
+    await api.delete(`${IMAGEM_ENDPOINT}/delete/${imagemId}`);
+  } catch (err: any) {
+    console.log('[deletePostImage][ERR]', { imagemId, errMessage: err?.message });
+    throw new Error(extractErrorMessage(err));
+  }
+}
+
 /** DELETE /api/posts/{id} */
 export async function deletePost(postId: number) {
   try {
