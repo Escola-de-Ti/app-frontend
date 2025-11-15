@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 
 import AppLayout from '../components/AppLayout';
 import AppInput from '../components/AppInput';
@@ -16,9 +17,10 @@ import ImageUploader from '../components/ImageUploader';
 import TagManager from '../components/TagManager';
 
 import { useAuth } from '../hooks/useAuth';
-// ⬇️ removido: import { uploadImages } from '../services/storage';
-import { createPost } from '../services/posts';
+import { createPost, uploadPostImages } from '../services/posts';
 import { createOrGetTagIds } from '../services/tags';
+
+const MAX_IMAGES = 3;
 
 export default function CreatePostScreen() {
   // imagens: URIs locais vindas do ImageUploader
@@ -30,8 +32,31 @@ export default function CreatePostScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const { userId } = useAuth(); // necessário pro campo usuarioId (number)
+  const navigation = useNavigation<any>();
+
+  // controla o limite de imagens e mostra o "toast" (Alert) de erro
+  const handleImagesChange = (uris: string[]) => {
+    if (uris.length > MAX_IMAGES) {
+      Alert.alert(
+        'Limite de imagens',
+        `Você pode anexar no máximo ${MAX_IMAGES} imagens por post.`
+      );
+      setImages(uris.slice(0, MAX_IMAGES));
+    } else {
+      setImages(uris);
+    }
+  };
 
   const handlePublish = async () => {
+    // garantia extra, caso algo escape
+    if (images.length > MAX_IMAGES) {
+      Alert.alert(
+        'Limite de imagens',
+        `Você pode anexar no máximo ${MAX_IMAGES} imagens por post.`
+      );
+      return;
+    }
+
     // ✅ só título é obrigatório para a API
     if (!title.trim()) {
       Alert.alert('Campos obrigatórios', 'Preencha o título antes de publicar.');
@@ -44,8 +69,6 @@ export default function CreatePostScreen() {
 
     setSubmitting(true);
     try {
-      // (upload de imagens opcional permanece igual...)
-
       console.log('[CreatePost] resolvendo tags…', tags);
       const tagIds = await createOrGetTagIds(tags);
       console.log('[CreatePost] tagIds resolvidos =', tagIds);
@@ -59,13 +82,32 @@ export default function CreatePostScreen() {
       };
       console.log('[CreatePost] payload =>', payload);
 
-      await createPost(payload);
+      const created = await createPost(payload);
+
+      // 🔗 se tiver imagens selecionadas, tenta anexar ao post recém-criado
+      if (images.length > 0) {
+        try {
+          console.log('[CreatePost] enviando imagens para o post', created?.id, images);
+          await uploadPostImages(Number(created.id), images);
+        } catch (imgErr) {
+          console.log('[CreatePost] ERRO upload imagens', imgErr);
+          Alert.alert(
+            'Aviso',
+            'O post foi criado, mas ocorreu um erro ao enviar as imagens. Você pode tentar adicionar novamente.'
+          );
+        }
+      }
 
       Alert.alert('Sucesso', 'Post criado com sucesso!');
+
+      // limpa formulário
       setTitle('');
       setContent('');
       setTags([]);
       setImages([]);
+
+      // redireciona para o feed
+      navigation.navigate('FeedScreen'); // ajuste o nome da rota se for diferente
     } catch (err: any) {
       console.log('[CreatePost] ERRO', {
         message: err?.message,
@@ -108,7 +150,7 @@ export default function CreatePostScreen() {
           />
 
           {/* ImageUploader devolve string[] de URIs locais */}
-          <ImageUploader onChange={setImages} />
+          <ImageUploader onChange={handleImagesChange} />
 
           {/* TagManager devolve string[] com os nomes das tags */}
           <TagManager tags={tags} onChange={setTags} />

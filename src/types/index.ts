@@ -86,10 +86,18 @@ export interface MyProfile {
 }
 
 // ======== Mídia / Tag ========
+/**
+ * Imagem ligada a POST, alinhada ao ImagemPostDTO do back.
+ */
 export interface Imagem {
+  /** ID da relação imagem-post */
   id: ID;
-  url: string;
-  key?: string;
+  /** ID da imagem em si (campo imagemId no back) */
+  imagemId: ID;
+  /** URL final exposta pelo back (urlImagem) */
+  urlImagem: string;
+  /** ordem da imagem no post */
+  ordemImagem?: number | null;
 }
 
 export type Tag = {
@@ -106,6 +114,7 @@ export interface PostItem {
   createdAt?: string;
   updatedAt?: string;
   tags?: Tag[];
+  /** lista de imagens do post (ImagemPostDTO) */
   imagens?: Imagem[];
 }
 
@@ -113,6 +122,7 @@ export interface CreatePostDTO {
   titulo: string;
   conteudo: string;
   tagIds?: ID[];
+  /** IDs de imagens já criadas/associadas no back, se usado nesse fluxo */
   imagemIds?: ID[];
 }
 

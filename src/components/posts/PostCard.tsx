@@ -1,5 +1,5 @@
 // src/components/posts/PostCard.tsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import RNModal from 'react-native-modal';
@@ -7,6 +7,7 @@ import { PostDetails } from './PostDetails';
 
 import type { PostFeedModel } from '../../types';
 import type { UpvoteResponse } from '../../services/posts';
+import { OwnContentVoteError } from '../../services/posts';
 
 type PostCardProps = {
   post: PostFeedModel;
@@ -26,7 +27,9 @@ function formatDate(iso: string) {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
   const pad = (n: number) => `${n}`.padStart(2, '0');
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(
+    d.getMinutes()
+  )}`;
 }
 
 export function PostCard({
@@ -50,6 +53,8 @@ export function PostCard({
     Number(typeof commentCount === 'number' ? commentCount : (post.totalComentarios ?? 0))
   );
 
+  const votingRef = useRef(false); // evita double-tap/disparos concorrentes
+
   useEffect(() => {
     setHasUpvoted(typeof initiallyUpvoted === 'boolean' ? initiallyUpvoted : !!post.usuarioJaVotou);
     setUpvotes(Number(post.totalUpVotes ?? 0));
@@ -69,41 +74,30 @@ export function PostCard({
   const createdAt = useMemo(() => formatDate(post.dataCriacao), [post.dataCriacao]);
 
   const handleUpvote = async () => {
-    const prevVoted = hasUpvoted;
-    const next = !prevVoted;
+    if (votingRef.current) return; // trava enquanto a chamada anterior não termina
+    votingRef.current = true;
+
+    const willUpvote = !hasUpvoted;
 
     // otimista
-    setHasUpvoted(next);
-    setUpvotes((prev) => Math.max(0, prev + (next ? 1 : -1)));
+    setHasUpvoted(willUpvote);
+    setUpvotes((prev) => (willUpvote ? prev + 1 : Math.max(0, prev - 1)));
 
     try {
-      const result = await onUpvote?.(Number(post.id), next);
-      const resp = result as UpvoteResponse | void;
+      await onUpvote?.(Number(post.id), willUpvote);
+      // se o pai corrigir via props (metaChange), os useEffect lá em cima sincronizam
+    } catch (e: any) {
+      // rollback TOTAL: botão e contador voltam pro estado anterior
+      setHasUpvoted((prev) => !prev);
+      setUpvotes((prev) => (!willUpvote ? prev + 1 : Math.max(0, prev - 1)));
 
-      // pode vir userVoted OU votado
-      const finalUserVoted =
-        resp &&
-        typeof resp === 'object' &&
-        ('userVoted' in (resp as any) || 'votado' in (resp as any))
-          ? typeof (resp as any).userVoted !== 'undefined'
-            ? Boolean((resp as any).userVoted)
-            : Boolean((resp as any).votado)
-          : next;
-
-      if (finalUserVoted !== next) {
-        // corrige delta otimista se o back discordar
-        setUpvotes((prev) => Math.max(0, prev + (finalUserVoted ? 1 : -1)));
+      if (e instanceof OwnContentVoteError) {
+        Alert.alert('Ops', e.message);
+      } else {
+        Alert.alert('Erro', 'Não foi possível registrar seu voto neste post.');
       }
-      setHasUpvoted(finalUserVoted);
-
-      if (resp && typeof (resp as any).totalUpVotes === 'number') {
-        setUpvotes((resp as any).totalUpVotes);
-      }
-    } catch {
-      // desfaz otimista
-      setHasUpvoted(prevVoted);
-      setUpvotes((prev) => Math.max(0, prev + (prevVoted ? 1 : -1)));
-      Alert.alert('Erro', 'Não foi possível registrar seu voto.');
+    } finally {
+      votingRef.current = false;
     }
   };
 
@@ -228,12 +222,14 @@ export function PostCard({
             <View style={styles.swipeIndicator} />
             <Text style={styles.modalTitle}>Comentários</Text>
           </View>
+
           <PostDetails
             postId={Number(post.id)}
             focusComment={focusComment}
             initiallyUpvoted={hasUpvoted}
             initiallyUpvotes={upvotes}
             onMetaChange={handleMetaChange}
+            onRequestClose={closeModal} // <<< ESSENCIAL
           />
         </View>
       </RNModal>

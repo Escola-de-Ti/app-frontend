@@ -10,12 +10,17 @@ import {
   ListRenderItemInfo,
   Animated,
   LayoutChangeEvent,
+  TouchableOpacity,
+  Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+
 import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 
 import PostCard from '../components/posts/PostCard';
+import PostDetails from '../components/posts/PostDetails';
+
 import type { PostFeedModel, PostFeedDTO } from '../types';
 import { getFeed, upvotePost } from '../services/posts';
 import type { UpvoteResponse } from '../services/posts';
@@ -23,6 +28,9 @@ import type { UpvoteResponse } from '../services/posts';
 import InputFilterFeed from '../components/filters/InputFilterFeed';
 
 type Cursor = { lastPostId?: number | null; lastScore?: number | null } | null;
+type FeedRouteParams = {
+  openPostId?: number;
+};
 
 const PAGE_SIZE = 20;
 const PREFETCH_DISTANCE_PX = 320;
@@ -40,6 +48,10 @@ const toNum = (v: any): number => {
 };
 
 export default function FeedScreen() {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const params: FeedRouteParams = route.params || {};
+
   const [data, setData] = useState<PostFeedModel[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -61,6 +73,33 @@ export default function FeedScreen() {
 
   // controla refresh ao voltar do PostDetails
   const didFirstFocusRef = useRef(false);
+
+  // ===== controle de PostDetails aberto =====
+  const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
+  const [detailsVisible, setDetailsVisible] = useState(false);
+
+  const handleOpenPost = useCallback((postId: number) => {
+    setSelectedPostId(postId);
+    setDetailsVisible(true);
+  }, []);
+
+  const handleCloseDetails = useCallback(() => {
+    setDetailsVisible(false);
+    setSelectedPostId(null);
+  }, []);
+
+  // quando vier de edição com navigation.navigate('Feed', { openPostId })
+  useEffect(() => {
+    if (params?.openPostId != null) {
+      const id = Number(params.openPostId);
+      if (Number.isFinite(id)) {
+        setSelectedPostId(id);
+        setDetailsVisible(true);
+      }
+      // limpa o param pra não reabrir em outras navegações
+      navigation.setParams?.({ openPostId: undefined });
+    }
+  }, [params?.openPostId, navigation]);
 
   const mergeById = useCallback((prev: PostFeedModel[], next: PostFeedModel[]) => {
     const map = new Map<string | number, PostFeedModel>();
@@ -178,7 +217,7 @@ export default function FeedScreen() {
     }
   }, [fetchFeed]);
 
-  // reload quando a tela volta a ficar focada (ex.: fechar PostDetails)
+  // reload quando a tela volta a ficar focada (ex.: fechar PostDetails / voltar de edição)
   useFocusEffect(
     useCallback(() => {
       if (didFirstFocusRef.current) {
@@ -353,12 +392,14 @@ export default function FeedScreen() {
         ListHeaderComponent={header}
         ItemSeparatorComponent={ItemSeparator}
         renderItem={({ item }: ListRenderItemInfo<PostFeedModel>) => (
-          <PostCard
-            post={item}
-            initiallyUpvoted={!!item.usuarioJaVotou}
-            commentCount={Number(item.totalComentarios ?? 0)}
-            onUpvote={handleUpvote}
-          />
+          <TouchableOpacity activeOpacity={0.9} onPress={() => handleOpenPost(Number(item.id))}>
+            <PostCard
+              post={item}
+              initiallyUpvoted={!!item.usuarioJaVotou}
+              commentCount={Number(item.totalComentarios ?? 0)}
+              onUpvote={handleUpvote}
+            />
+          </TouchableOpacity>
         )}
         refreshControl={
           <RefreshControl
@@ -386,6 +427,17 @@ export default function FeedScreen() {
           ) : null
         }
       />
+
+      {/* Modal com PostDetails – usado tanto ao clicar no card quanto ao voltar da edição */}
+      <Modal
+        visible={detailsVisible && selectedPostId != null}
+        animationType="slide"
+        onRequestClose={handleCloseDetails}
+      >
+        {selectedPostId != null && (
+          <PostDetails postId={selectedPostId} onRequestClose={handleCloseDetails} />
+        )}
+      </Modal>
     </AppLayout>
   );
 }

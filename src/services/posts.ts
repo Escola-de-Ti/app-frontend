@@ -1,11 +1,12 @@
 // src/services/posts.ts
 import { api } from '../api/client';
-import type { GetFeedResponseDTO } from '../types';
+import type { GetFeedResponseDTO, Imagem } from '../types';
 
 // ===== Endpoints =====
 const POSTS_ENDPOINT = '/api/posts';
 const COMMENTS_ENDPOINT = '/api/comentarios';
 const VOTES_ENDPOINT = '/api/votos';
+const IMAGEM_ENDPOINT = '/api/imagem';
 
 // ===== Re-export dos tipos de FEED (vem de src/types) =====
 export type { PostFeedDTO, GetFeedResponseDTO } from '../types';
@@ -52,6 +53,13 @@ export type CreatePostPayload = {
   tagIds?: number[];
 };
 
+export type UpdatePostPayload = {
+  usuarioId?: number;
+  titulo?: string;
+  descricao?: string;
+  tagIds?: number[];
+};
+
 function uniqFiniteNumbers(input?: number[]) {
   if (!Array.isArray(input)) return [];
   const out = new Set<number>();
@@ -68,9 +76,29 @@ function trimOrUndefined(s?: string) {
   return t.length ? t : undefined;
 }
 
-function buildBody(payload: CreatePostPayload): Record<string, unknown> {
+// body para criação (precisa de usuarioId)
+function buildCreateBody(payload: CreatePostPayload): Record<string, unknown> {
   const body: Record<string, unknown> = {
     usuarioId: Number(payload.usuarioId),
+    titulo: trimOrUndefined(payload.titulo),
+    descricao: trimOrUndefined(payload.descricao),
+  };
+
+  const tagIds = uniqFiniteNumbers(payload.tagIds);
+  if (tagIds.length) body.tagIds = tagIds;
+
+  Object.keys(body).forEach((k) => body[k] === undefined && delete body[k]);
+  return body;
+}
+
+// body para update (inclui SEMPRE o id do post)
+function buildUpdateBody(postId: number, payload: UpdatePostPayload): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    id: Number(postId), // 👈 manda o id do post no body
+    usuarioId:
+      payload.usuarioId != null && !Number.isNaN(Number(payload.usuarioId))
+        ? Number(payload.usuarioId)
+        : undefined,
     titulo: trimOrUndefined(payload.titulo),
     descricao: trimOrUndefined(payload.descricao),
   };
@@ -116,14 +144,43 @@ function extractErrorMessage(err: any): string {
   return err?.message || 'Falha na requisição.';
 }
 
+/**
+ * Erro específico para o caso de tentar votar no próprio post/comentário.
+ * O back manda mensagens:
+ * - "Você não pode votar no próprio post"
+ * - "Você não pode votar no próprio comentário"
+ */
+export class OwnContentVoteError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OwnContentVoteError';
+  }
+}
+
 // ===== API =====
 export async function createPost(payload: CreatePostPayload) {
   try {
-    const body = buildBody(payload);
+    const body = buildCreateBody(payload);
     const { data } = await api.post(POSTS_ENDPOINT, body);
     return data as PostDetalhesDTO;
   } catch (err: any) {
-    console.log('[POST][DEBUG]', err?.response?.status, err?.response?.data);
+    console.log('[POST][CREATE][ERR]', err?.response?.status, err?.response?.data);
+    throw new Error(extractErrorMessage(err));
+  }
+}
+
+/** PUT /api/posts/{id} - atualização de post */
+export async function updatePost(postId: number, payload: UpdatePostPayload) {
+  try {
+    const body = buildUpdateBody(postId, payload);
+    console.log('[POST][UPDATE][REQ]', { postId, body });
+
+    const { data } = await api.patch<PostDetalhesDTO>(`${POSTS_ENDPOINT}/${postId}`, body);
+
+    console.log('[POST][UPDATE][OK]', { postId, data });
+    return data;
+  } catch (err: any) {
+    console.log('[POST][UPDATE][ERR]', err?.response?.status, err?.response?.data);
     throw new Error(extractErrorMessage(err));
   }
 }
@@ -284,10 +341,17 @@ export async function upvotePost(postId: number): Promise<UpvoteResponse> {
     const status = err?.response?.status;
     const body = err?.response?.data;
 
+    const rawMsg = typeof body === 'string' ? body : body?.message || extractErrorMessage(err);
+    const lower = String(rawMsg).toLowerCase();
+
+    // caso específico: back barrou voto no próprio post
+    if (lower.includes('você não pode votar no próprio post')) {
+      throw new OwnContentVoteError(String(rawMsg));
+    }
+
     // Caso comum: servidor retorna 409/400 dizendo que já estava votado
     if (status === 409 || status === 400) {
-      const msg = (typeof body === 'string' ? body : body?.message || '').toLowerCase();
-      if (msg.includes('já vot') || msg.includes('already')) {
+      if (lower.includes('já vot') || lower.includes('already')) {
         return { userVoted: true };
       }
     }
@@ -302,7 +366,14 @@ export async function upvoteComment(comentarioId: number) {
     const { data } = await api.post(`${VOTES_ENDPOINT}/comentario/${comentarioId}`);
     return data;
   } catch (err: any) {
-    throw new Error(extractErrorMessage(err));
+    const message = extractErrorMessage(err);
+    const lower = message.toLowerCase();
+
+    if (lower.includes('você não pode votar no próprio comentário')) {
+      throw new OwnContentVoteError(message);
+    }
+
+    throw new Error(message);
   }
 }
 
@@ -311,6 +382,89 @@ export async function superVoteComment(comentarioId: number) {
   try {
     const { data } = await api.post(`${VOTES_ENDPOINT}/comentario/${comentarioId}/super`);
     return data;
+  } catch (err: any) {
+    const message = extractErrorMessage(err);
+    const lower = message.toLowerCase();
+
+    if (lower.includes('você não pode votar no próprio comentário')) {
+      throw new OwnContentVoteError(message);
+    }
+
+    throw new Error(message);
+  }
+}
+
+/**
+ * Upload de imagens de post
+ * Usa exatamente o endpoint do back:
+ *   POST /api/imagem/upload
+ *   body: byte[] da imagem
+ *   params: type=POST, id_type={postId}
+ */
+async function uriToBytes(uri: string): Promise<ArrayBuffer> {
+  const res = await fetch(uri);
+  if (!res.ok) {
+    throw new Error(`Falha ao ler imagem local (status ${res.status})`);
+  }
+  return res.arrayBuffer();
+}
+
+export async function uploadPostImages(postId: number, imageUris: string[]): Promise<Imagem[]> {
+  const validUris = Array.from(
+    new Set((imageUris || []).filter((u) => typeof u === 'string' && u.trim().length > 0))
+  );
+
+  if (!validUris.length) return [];
+
+  const uploaded: Imagem[] = [];
+
+  for (const uri of validUris) {
+    try {
+      const bytes = await uriToBytes(uri);
+
+      const { data } = await api.post<Imagem>(`${IMAGEM_ENDPOINT}/upload`, bytes, {
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
+        params: {
+          type: 'POST',
+          id_type: String(postId),
+        },
+      });
+
+      uploaded.push(data);
+    } catch (err: any) {
+      console.log('[uploadPostImages][ERR]', { uri, errMessage: err?.message });
+      // propaga como erro "bonitinho" pro caller
+      throw new Error(extractErrorMessage(err));
+    }
+  }
+
+  return uploaded;
+}
+
+export async function updatePostImage(imagemId: number, uri: string): Promise<Imagem> {
+  try {
+    const bytes = await uriToBytes(uri);
+
+    const { data } = await api.put<Imagem>(`${IMAGEM_ENDPOINT}/update/${imagemId}`, bytes, {
+      headers: {
+        // o back do cURL usa image/png, mas application/octet-stream tbm costuma funcionar
+        'Content-Type': 'application/octet-stream',
+      },
+    });
+
+    return data;
+  } catch (err: any) {
+    console.log('[updatePostImage][ERR]', { imagemId, errMessage: err?.message });
+    throw new Error(extractErrorMessage(err));
+  }
+}
+
+/** DELETE /api/posts/{id} */
+export async function deletePost(postId: number) {
+  try {
+    await api.delete(`${POSTS_ENDPOINT}/${postId}`);
   } catch (err: any) {
     throw new Error(extractErrorMessage(err));
   }

@@ -17,13 +17,15 @@ export interface ImageUploaderProps {
 export default function ImageUploader({
   onChange,
   maxImages = 4,
-  initialUris = [],
+  initialUris,
   label,
 }: ImageUploaderProps) {
-  const [images, setImages] = useState<string[]>(initialUris);
+  // inicializa com o que vier de initialUris ou array vazio
+  const [images, setImages] = useState<string[]>(initialUris ?? []);
 
-  // se o pai mudar initialUris (ex.: ao carregar o perfil), sincroniza
+  // se o pai mudar initialUris (ex.: tela de edição), sincroniza
   useEffect(() => {
+    if (!initialUris) return;
     setImages(initialUris);
   }, [initialUris]);
 

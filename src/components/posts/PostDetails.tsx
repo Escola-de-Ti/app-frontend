@@ -1,3 +1,4 @@
+// src/components/posts/PostDetails.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -7,8 +8,12 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import RNModal from 'react-native-modal';
+
 import { CommentItem, CommentModel, ID } from '../CommentItem';
 import {
   getPostDetails,
@@ -16,7 +21,9 @@ import {
   upvoteComment,
   upvotePost,
   getCommentReplies,
+  deletePost,
 } from '../../services/posts';
+import { useAuth } from '../../hooks/useAuth';
 
 type PostDetailsProps = {
   postId: number;
@@ -24,6 +31,8 @@ type PostDetailsProps = {
   initiallyUpvoted?: boolean;
   initiallyUpvotes?: number;
   onMetaChange?: (meta: { comments?: number; upvotes?: number; userUpvoted?: boolean }) => void;
+  /** Usado pelo pai (PostCard / Feed) pra fechar o modal antes de navegar pra edição */
+  onRequestClose?: () => void;
 };
 
 function formatDate(iso: string) {
@@ -92,7 +101,6 @@ function normalizeComment(raw: any): CommentModel {
     upvotes: Number(raw.totalUpVotes ?? raw.upvotes ?? 0),
     replies,
     repliesCount,
-    // assumimos que pode haver mais (o botão "ver mais" decide de acordo com contagem)
     canLoadMore: true,
   };
 }
@@ -103,7 +111,11 @@ export function PostDetails({
   initiallyUpvoted = false,
   initiallyUpvotes,
   onMetaChange,
+  onRequestClose,
 }: PostDetailsProps) {
+  const navigation = useNavigation<any>();
+  const { userId } = useAuth();
+
   const [postTitle, setPostTitle] = useState('');
   const [postDescription, setPostDescription] = useState('');
   const [postAuthor, setPostAuthor] = useState('');
@@ -113,10 +125,21 @@ export function PostDetails({
   const [comments, setComments] = useState<CommentModel[]>([]);
   const [hasMoreComments, setHasMoreComments] = useState(false);
 
+  // URLs pra exibir no detalhe
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  // Imagens com id + url pra mandar pro EditPostScreen
+  const [postImagesForEdit, setPostImagesForEdit] = useState<{ id: number; url: string }[]>([]);
+
+  // tags do post (nomes)
+  const [postTags, setPostTags] = useState<string[]>([]);
+
+  const [postOwnerId, setPostOwnerId] = useState<number | null>(null);
+
   const [newComment, setNewComment] = useState('');
   const inputRef = useRef<TextInput>(null);
 
-  // ==== refs para estabilidade/guards
+  const [menuVisible, setMenuVisible] = useState(false);
+
   const metaRef = useRef<PostDetailsProps['onMetaChange']>(onMetaChange);
   useEffect(() => {
     metaRef.current = onMetaChange;
@@ -124,7 +147,10 @@ export function PostDetails({
 
   const currentPostIdRef = useRef<number | null>(null);
   const firstLevelHydratedRef = useRef<boolean>(false);
-  const inflightRepliesRef = useRef<Set<string>>(new Set()); // track por commentId
+  const inflightRepliesRef = useRef<Set<string>>(new Set());
+
+  const isOwner =
+    userId != null && postOwnerId != null ? Number(userId) === Number(postOwnerId) : false;
 
   useEffect(() => {
     if (focusComment && inputRef.current) {
@@ -133,13 +159,12 @@ export function PostDetails({
     }
   }, [focusComment]);
 
-  // Carrega detalhes do post. ***Depende somente de postId***
   useEffect(() => {
     let mounted = true;
 
     currentPostIdRef.current = postId;
-    firstLevelHydratedRef.current = false; // reset ao trocar de post
-    inflightRepliesRef.current.clear(); // limpa in-flight por segurança
+    firstLevelHydratedRef.current = false;
+    inflightRepliesRef.current.clear();
 
     (async () => {
       try {
@@ -150,6 +175,9 @@ export function PostDetails({
         setPostDescription(String(data.descricao ?? ''));
         setPostAuthor(String(data.usuarioNome ?? ''));
         setPostCreatedAt(formatDate(String(data.dataCriacao ?? '')));
+        setPostOwnerId(
+          typeof (data as any).usuarioId !== 'undefined' ? Number((data as any).usuarioId) : null
+        );
 
         const apiUpvotes = Number(data.totalUpVotes ?? 0);
         setPostUpvotes((prev) => (prev > 0 ? Math.max(prev, apiUpvotes) : apiUpvotes));
@@ -158,6 +186,42 @@ export function PostDetails({
 
         if (typeof (data as any).usuarioJaVotou === 'boolean') {
           setPostUpvoted(Boolean((data as any).usuarioJaVotou));
+        }
+
+        // tags do post vindas do back
+        const rawTags = (data as any)?.tags ?? [];
+        if (Array.isArray(rawTags)) {
+          const names = rawTags
+            .map((t: any) => String(t.name ?? t.nome ?? t.descricao ?? '').trim())
+            .filter((n) => n.length > 0);
+          setPostTags(names);
+        } else {
+          setPostTags([]);
+        }
+
+        // Imagens do post: urlsImagens ou imagens (cada item deve ter id + url/urlImagem)
+        const urlsRaw = (data as any)?.urlsImagens ?? (data as any)?.imagens ?? [];
+        if (Array.isArray(urlsRaw)) {
+          const imagesForState: { id: number; url: string }[] = [];
+          const urls: string[] = [];
+
+          for (const item of urlsRaw) {
+            const url = String(item?.urlImagem ?? item?.url ?? '').trim();
+            if (!url) continue;
+
+            urls.push(url);
+
+            const rawId = Number(item?.id ?? item?.imagemId ?? item?.imageId);
+            if (Number.isFinite(rawId)) {
+              imagesForState.push({ id: rawId, url });
+            }
+          }
+
+          setImageUrls(urls);
+          setPostImagesForEdit(imagesForState);
+        } else {
+          setImageUrls([]);
+          setPostImagesForEdit([]);
         }
 
         const base =
@@ -170,7 +234,6 @@ export function PostDetails({
         const roots = Array.isArray(base) ? base.map(normalizeComment) : [];
         setComments(roots);
 
-        // Notifica meta (sem re-disparar efeito)
         metaRef.current?.({
           comments: countComments(roots),
           upvotes: apiUpvotes,
@@ -180,15 +243,13 @@ export function PostDetails({
               : undefined,
         });
 
-        // --- Hidrata 1º nível apenas uma vez por postId ---
+        // Hidrata 1º nível de respostas (uma vez por post)
         if (!firstLevelHydratedRef.current) {
-          // marca ANTES de iniciar para evitar corrida
           firstLevelHydratedRef.current = true;
 
           try {
             const hydrated = await Promise.all(
               roots.map(async (root) => {
-                // se já veio com replies do back, não hidrata esse id
                 if (Array.isArray(root.replies) && root.replies.length > 0) {
                   return root;
                 }
@@ -248,7 +309,7 @@ export function PostDetails({
     return () => {
       mounted = false;
     };
-  }, [postId]); // <<< só postId (onMetaChange está em ref)
+  }, [postId, userId]);
 
   const totalComments = useMemo(() => countComments(comments), [comments]);
 
@@ -393,7 +454,7 @@ export function PostDetails({
 
   const handleLoadMoreReplies = async (parentId: ID) => {
     const key = String(parentId);
-    if (inflightRepliesRef.current.has(key)) return; // já carregando
+    if (inflightRepliesRef.current.has(key)) return;
     inflightRepliesRef.current.add(key);
     try {
       const repliesDto = await getCommentReplies(Number(parentId), 50);
@@ -442,87 +503,212 @@ export function PostDetails({
       if (willUpvote) {
         await upvoteComment(Number(commentId));
       } else {
-        // se houver endpoint para desfazer o voto, chamar aqui
+        // se tiver endpoint de "desvotar", chamar aqui
       }
     } catch (e) {
       throw e;
     }
   };
 
+  const handleOpenPostMenu = () => {
+    if (!isOwner) return;
+    setMenuVisible(true);
+  };
+
+  const handleEditPost = () => {
+    setMenuVisible(false);
+    // fecha o modal de detalhes lá no pai
+    onRequestClose?.();
+    navigation.navigate('EditPostScreen', {
+      postId,
+      initialTitle: postTitle,
+      initialContent: postDescription,
+      initialImageUrls: imageUrls,
+      initialTags: postTags,
+      initialImages: postImagesForEdit,
+    });
+  };
+
+  const handleDeletePost = () => {
+    setMenuVisible(false);
+    Alert.alert('Excluir post', 'Tem certeza que deseja excluir este post?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deletePost(postId);
+            Alert.alert('Sucesso', 'Post excluído com sucesso.');
+            onRequestClose?.();
+            navigation.goBack?.();
+          } catch (e: any) {
+            Alert.alert('Erro', 'Não foi possível excluir o post.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleClose = () => {
+    if (onRequestClose) {
+      onRequestClose();
+    } else {
+      navigation.goBack?.();
+    }
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.userInfo}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{(postAuthor || '?').charAt(0).toUpperCase()}</Text>
-          </View>
-          <View>
-            <View style={styles.nameRow}>
-              <Text style={styles.userName}>{postAuthor || 'Usuário'}</Text>
-              <View style={styles.levelContainer}>
-                <Text style={styles.levelText}>Nvl. —</Text>
+    <>
+      <ScrollView style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity
+              onPress={handleClose}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.closeButton}
+            >
+              <Feather name="x" size={20} color="#ccc" />
+            </TouchableOpacity>
+
+            <View style={styles.userInfo}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{(postAuthor || '?').charAt(0).toUpperCase()}</Text>
+              </View>
+              <View>
+                <View style={styles.nameRow}>
+                  <Text style={styles.userName}>{postAuthor || 'Usuário'}</Text>
+                  <View style={styles.levelContainer}>
+                    <Text style={styles.levelText}>Nvl. —</Text>
+                  </View>
+                </View>
+                <Text style={styles.postDate}>{postCreatedAt}</Text>
               </View>
             </View>
-            <Text style={styles.postDate}>{postCreatedAt}</Text>
           </View>
+
+          {isOwner && (
+            <TouchableOpacity
+              onPress={handleOpenPostMenu}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Feather name="more-horizontal" size={22} color="#ccc" />
+            </TouchableOpacity>
+          )}
         </View>
-      </View>
 
-      {/* Título + Descrição */}
-      <Text style={styles.title}>{postTitle}</Text>
-      {!!postDescription && <Text style={styles.description}>{postDescription}</Text>}
+        {/* Título + Descrição */}
+        <Text style={styles.title}>{postTitle}</Text>
+        {!!postDescription && <Text style={styles.description}>{postDescription}</Text>}
 
-      <TouchableOpacity onPress={handlePostToggleUpvote} activeOpacity={0.8}>
-        <View style={[styles.upvoteContainer, postUpvoted && styles.upvoteActive]}>
-          <Feather name="arrow-up" size={16} color={postUpvoted ? '#003d2b' : '#fff'} />
-          <Text style={[styles.upvoteText, postUpvoted && styles.upvoteTextActive]}>
-            {postUpvotes}
+        {/* Tags do post */}
+        {postTags.length > 0 && (
+          <View style={styles.tagsRow}>
+            {postTags.map((t) => (
+              <View key={t} style={styles.tagPill}>
+                <Text style={styles.tagText}>#{t}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Imagens do post */}
+        {!!imageUrls.length && (
+          <View style={styles.imagesContainer}>
+            {imageUrls.map((url) => (
+              <View key={url} style={styles.imageWrapper}>
+                <Image source={{ uri: url }} style={styles.image} resizeMode="cover" />
+              </View>
+            ))}
+          </View>
+        )}
+
+        <TouchableOpacity onPress={handlePostToggleUpvote} activeOpacity={0.8}>
+          <View style={[styles.upvoteContainer, postUpvoted && styles.upvoteActive]}>
+            <Feather name="arrow-up" size={16} color={postUpvoted ? '#003d2b' : '#fff'} />
+            <Text style={[styles.upvoteText, postUpvoted && styles.upvoteTextActive]}>
+              {postUpvotes}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Comentários */}
+        <View style={styles.divider} />
+        <View style={styles.commentsSection}>
+          <Text style={styles.commentTitle}>
+            Comentários ({totalComments}
+            {hasMoreComments ? '+' : ''})
           </Text>
+
+          <View style={styles.inputContainer}>
+            <TextInput
+              ref={inputRef}
+              style={styles.commentInput}
+              placeholder="Escreva um comentário..."
+              placeholderTextColor="#888"
+              value={newComment}
+              onChangeText={setNewComment}
+              multiline
+            />
+            <TouchableOpacity style={styles.sendButton} onPress={handleAddComment}>
+              <Feather name="send" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {comments.map((comment) => (
+            <CommentItem
+              key={String(comment.id)}
+              comment={comment}
+              depth={0}
+              onReply={handleReply}
+              onUpvote={handleCommentUpvote}
+              onLoadMoreReplies={handleLoadMoreReplies}
+            />
+          ))}
         </View>
-      </TouchableOpacity>
+      </ScrollView>
 
-      {/* Comentários */}
-      <View style={styles.divider} />
-      <View style={styles.commentsSection}>
-        <Text style={styles.commentTitle}>
-          Comentários ({totalComments}
-          {hasMoreComments ? '+' : ''})
-        </Text>
+      {/* Menu de ações do post (Editar / Excluir) */}
+      <RNModal
+        isVisible={menuVisible}
+        onBackdropPress={() => setMenuVisible(false)}
+        onBackButtonPress={() => setMenuVisible(false)}
+        style={styles.menuModal}
+        backdropOpacity={0.6}
+        useNativeDriverForBackdrop
+      >
+        <View style={styles.menuContainer}>
+          <TouchableOpacity style={styles.menuItem} onPress={handleEditPost}>
+            <Feather name="edit-2" size={18} color="#fff" />
+            <Text style={styles.menuItemText}>Editar post</Text>
+          </TouchableOpacity>
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            ref={inputRef}
-            style={styles.commentInput}
-            placeholder="Escreva um comentário..."
-            placeholderTextColor="#888"
-            value={newComment}
-            onChangeText={setNewComment}
-            multiline
-          />
-          <TouchableOpacity style={styles.sendButton} onPress={handleAddComment}>
-            <Feather name="send" size={18} color="#fff" />
+          <TouchableOpacity style={styles.menuItem} onPress={handleDeletePost}>
+            <Feather name="trash-2" size={18} color="#ff6b6b" />
+            <Text style={[styles.menuItemText, { color: '#ff6b6b' }]}>Excluir post</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.menuItem, styles.menuCancel]}
+            onPress={() => setMenuVisible(false)}
+          >
+            <Text style={styles.menuCancelText}>Cancelar</Text>
           </TouchableOpacity>
         </View>
-
-        {comments.map((comment) => (
-          <CommentItem
-            key={String(comment.id)}
-            comment={comment}
-            depth={0}
-            onReply={handleReply}
-            onUpvote={handleCommentUpvote}
-            onLoadMoreReplies={handleLoadMoreReplies}
-          />
-        ))}
-      </View>
-    </ScrollView>
+      </RNModal>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: { backgroundColor: '#0b0b0f', flex: 1, padding: 16 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  closeButton: { padding: 4 },
+
   userInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: {
     width: 38,
@@ -543,8 +729,41 @@ const styles = StyleSheet.create({
   },
   levelText: { color: '#82caff', fontSize: 12, fontWeight: '600' },
   postDate: { color: '#aaa', fontSize: 12 },
+
   title: { color: '#fff', fontWeight: '700', fontSize: 17, marginTop: 14, marginBottom: 6 },
   description: { color: '#ccc', fontSize: 14, lineHeight: 20, marginBottom: 8 },
+
+  imagesContainer: { marginTop: 10, gap: 10 },
+  imageWrapper: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#333',
+    marginBottom: 10,
+  },
+  image: { width: '100%', height: 220 },
+
+  // tags
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  tagPill: {
+    backgroundColor: '#1f2733',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#32425a',
+  },
+  tagText: {
+    color: '#9fd3ff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+
   upvoteContainer: {
     marginTop: 8,
     flexDirection: 'row',
@@ -558,6 +777,7 @@ const styles = StyleSheet.create({
   upvoteActive: { backgroundColor: '#6ef7c3' },
   upvoteText: { color: '#ccc', fontSize: 13 },
   upvoteTextActive: { color: '#003d2b', fontWeight: '600' },
+
   divider: {
     marginTop: 24,
     marginBottom: 10,
@@ -578,4 +798,39 @@ const styles = StyleSheet.create({
   },
   commentInput: { flex: 1, color: '#fff', fontSize: 14, paddingVertical: 8, minHeight: 50 },
   sendButton: { marginLeft: 10, backgroundColor: '#5b2eff', padding: 8, borderRadius: 8 },
+
+  // Menu de ações
+  menuModal: {
+    justifyContent: 'flex-end',
+    margin: 0,
+  },
+  menuContainer: {
+    backgroundColor: '#15151a',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 10,
+  },
+  menuItemText: {
+    color: '#fff',
+    fontSize: 15,
+  },
+  menuCancel: {
+    marginTop: 8,
+    justifyContent: 'center',
+  },
+  menuCancelText: {
+    color: '#bbb',
+    fontSize: 15,
+    textAlign: 'center',
+    width: '100%',
+  },
 });
+
+export default PostDetails;
