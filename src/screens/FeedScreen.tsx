@@ -272,13 +272,12 @@ export default function FeedScreen() {
     [maybePrefillScreen]
   );
 
-  // ===== votação (usa campo 'jaVotou'/'votado' do back) =====
+  // ===== votação =====
   const handleUpvote = useCallback(
     async (postId: number, willUpvote: boolean): Promise<UpvoteResponse | void> => {
       try {
         const resp = await upvotePost(postId);
 
-        // prioriza jaVotou também aqui
         const serverVoted = toBool(
           (resp as any)?.jaVotou ?? (resp as any)?.userVoted ?? (resp as any)?.votado
         );
@@ -295,7 +294,7 @@ export default function FeedScreen() {
 
             let nextCount = p.totalUpVotes ?? 0;
             if (typeof nextCountNumber === 'number') {
-              nextCount = nextCountNumber; // confia no backend se veio
+              nextCount = nextCountNumber;
             } else if (final !== prevVoted) {
               nextCount = Math.max(0, (p.totalUpVotes ?? 0) + (final ? 1 : -1));
             }
@@ -372,7 +371,13 @@ export default function FeedScreen() {
         ListHeaderComponent={header}
         ItemSeparatorComponent={ItemSeparator}
         renderItem={({ item }: ListRenderItemInfo<PostFeedModel>) => (
-          <TouchableOpacity activeOpacity={0.9} onPress={() => handleOpenPost(Number(item.id))}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            // 👇 enquanto o modal de detalhes estiver aberto,
+            // esse onPress fica desativado pra não abrir outro detalhe "por baixo"
+            // onPress={detailsVisible ? undefined : () => handleOpenPost(Number(item.id))}
+            // disabled={detailsVisible}
+          >
             <PostCard
               post={item}
               initiallyUpvoted={!!item.usuarioJaVotou}

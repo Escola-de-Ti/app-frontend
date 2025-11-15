@@ -1,13 +1,16 @@
 // src/components/posts/PostCard.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import RNModal from 'react-native-modal';
+import { useNavigation } from '@react-navigation/native';
+
 import { PostDetails } from './PostDetails';
 
 import type { PostFeedModel } from '../../types';
 import type { UpvoteResponse } from '../../services/posts';
 import { OwnContentVoteError } from '../../services/posts';
+import { getUserDetails } from '../../services/profile';
 
 type PostCardProps = {
   post: PostFeedModel;
@@ -40,6 +43,8 @@ export function PostCard({
   initiallyUpvoted,
   onUpvote,
 }: PostCardProps) {
+  const navigation = useNavigation<any>();
+
   const [menuVisible, setMenuVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [focusComment, setFocusComment] = useState(false);
@@ -72,6 +77,57 @@ export function PostCard({
 
   const isAuthor = currentUserName && currentUserName === post.nomeUsuario;
   const createdAt = useMemo(() => formatDate(post.dataCriacao), [post.dataCriacao]);
+
+  // ==== INFO DO AUTOR (ID) ==================================
+  const authorId = useMemo(() => {
+    const anyPost: any = post;
+    const raw = anyPost.usuarioId ?? anyPost.autorId ?? anyPost.userId ?? null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }, [post]);
+
+  // ==== AVATAR DO AUTOR (buscando em /api/usuarios/detalhes/{id}) ====
+  const [authorAvatarUrl, setAuthorAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAuthor() {
+      if (!authorId) {
+        setAuthorAvatarUrl(null);
+        return;
+      }
+
+      try {
+        const details: any = await getUserDetails(authorId);
+        if (cancelled) return;
+
+        // exemplo de resposta:
+        // {
+        //   "nome": "João Silva",
+        //   "imagemUrl": "https://..."
+        //   ...
+        // }
+        const avatar = details.urlImagemPerfil ?? details.avatarUrl ?? details.imagemUrl ?? null;
+
+        setAuthorAvatarUrl(avatar);
+      } catch (err) {
+        console.log('[PostCard][author][ERR]', err);
+        if (!cancelled) setAuthorAvatarUrl(null);
+      }
+    }
+
+    loadAuthor();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authorId]);
+
+  const authorInitial = useMemo(
+    () => (post.nomeUsuario || '?').charAt(0).toUpperCase(),
+    [post.nomeUsuario]
+  );
 
   const handleUpvote = async () => {
     if (votingRef.current) return; // trava enquanto a chamada anterior não termina
@@ -113,7 +169,8 @@ export function PostCard({
   };
 
   const handleProfilePress = () => {
-    Alert.alert('Perfil', `Abrir perfil de ${post.nomeUsuario}`);
+    if (!authorId) return;
+    navigation.navigate('ProfileScreen', { userId: authorId });
   };
 
   const handleMetaChange = (meta: {
@@ -143,9 +200,11 @@ export function PostCard({
               onPress={handleProfilePress}
             >
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {(post.nomeUsuario || '?').charAt(0).toUpperCase()}
-                </Text>
+                {authorAvatarUrl ? (
+                  <Image source={{ uri: authorAvatarUrl }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarText}>{authorInitial}</Text>
+                )}
               </View>
               <View>
                 <View style={styles.nameRow}>
@@ -229,7 +288,7 @@ export function PostCard({
             initiallyUpvoted={hasUpvoted}
             initiallyUpvotes={upvotes}
             onMetaChange={handleMetaChange}
-            onRequestClose={closeModal} // <<< ESSENCIAL
+            onRequestClose={closeModal}
           />
         </View>
       </RNModal>
@@ -254,6 +313,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#3a3a40',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 50,
   },
   avatarText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -304,9 +369,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  // commentContainerActive: { backgroundColor: '#4a334d' },
   commentText: { color: '#ccc', fontSize: 13 },
-  // commentTextActive: { color: '#ffeaff', fontWeight: '600' },
   modal: { justifyContent: 'flex-end', margin: 0 },
   modalContent: {
     height: '95%',

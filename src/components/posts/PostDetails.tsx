@@ -10,6 +10,9 @@ import {
   Alert,
   Platform,
   Image,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -25,6 +28,7 @@ import {
   deletePost,
 } from '../../services/posts';
 import { useAuth } from '../../hooks/useAuth';
+import { getUserDetails } from '../../services/profile';
 
 type PostDetailsProps = {
   postId: number;
@@ -37,6 +41,10 @@ type PostDetailsProps = {
   /** Chamado quando o post é excluído com sucesso, para o pai atualizar o feed */
   onDeleted?: (postId: number) => void;
 };
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Mesma largura do conteúdo (padding horizontal 16 + 16)
+const IMAGE_WIDTH = SCREEN_WIDTH - 32;
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -67,7 +75,7 @@ function mergeReplies(current: CommentModel[] = [], incoming: CommentModel[] = [
     const key = String(inc.id);
     if (byId.has(key)) {
       const prev = byId.get(key)!;
-      byId.set(key, {
+      const merged: CommentModel = {
         ...prev,
         ...inc,
         replies: mergeReplies(prev.replies || [], inc.replies || []),
@@ -76,7 +84,8 @@ function mergeReplies(current: CommentModel[] = [], incoming: CommentModel[] = [
             ? Math.max(Number(prev.repliesCount || 0), Number(inc.repliesCount || 0))
             : (prev.repliesCount ?? inc.repliesCount),
         canLoadMore: (prev.canLoadMore ?? false) || (inc.canLoadMore ?? false),
-      });
+      };
+      byId.set(key, merged);
     } else {
       byId.set(key, inc);
     }
@@ -88,7 +97,9 @@ function normalizeComment(raw: any): CommentModel {
   const repliesArray =
     raw.replies || raw.children || raw.comentarios || raw.comentariosDoComentario || [];
 
-  const replies = Array.isArray(repliesArray) ? repliesArray.map(normalizeComment) : [];
+  const replies: CommentModel[] = Array.isArray(repliesArray)
+    ? repliesArray.map(normalizeComment)
+    : [];
 
   const repliesCount =
     typeof raw.repliesCount === 'number'
@@ -133,11 +144,16 @@ export function PostDetails({
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   // Imagens com id + url pra mandar pro EditPostScreen
   const [postImagesForEdit, setPostImagesForEdit] = useState<{ id: number; url: string }[]>([]);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   // tags do post (nomes)
   const [postTags, setPostTags] = useState<string[]>([]);
 
   const [postOwnerId, setPostOwnerId] = useState<number | null>(null);
+
+  // avatar + nível do autor
+  const [authorAvatarUrl, setAuthorAvatarUrl] = useState<string | null>(null);
+  const [authorLevel, setAuthorLevel] = useState<number | null>(null);
 
   const [newComment, setNewComment] = useState('');
   const inputRef = useRef<TextInput>(null);
@@ -155,6 +171,8 @@ export function PostDetails({
 
   const isOwner =
     userId != null && postOwnerId != null ? Number(userId) === Number(postOwnerId) : false;
+
+  const authorInitial = useMemo(() => (postAuthor || '?').charAt(0).toUpperCase(), [postAuthor]);
 
   useEffect(() => {
     if (focusComment && inputRef.current) {
@@ -192,7 +210,7 @@ export function PostDetails({
           setPostUpvoted(Boolean((data as any).usuarioJaVotou));
         }
 
-        // tags do post vindas do back
+        // tags do post
         const rawTags = (data as any)?.tags ?? [];
         if (Array.isArray(rawTags)) {
           const names = rawTags
@@ -203,7 +221,7 @@ export function PostDetails({
           setPostTags([]);
         }
 
-        // Imagens do post: urlsImagens ou imagens (cada item deve ter id + url/urlImagem)
+        // Imagens do post
         const urlsRaw = (data as any)?.urlsImagens ?? (data as any)?.imagens ?? [];
         if (Array.isArray(urlsRaw)) {
           const imagesForState: { id: number; url: string }[] = [];
@@ -223,9 +241,11 @@ export function PostDetails({
 
           setImageUrls(urls);
           setPostImagesForEdit(imagesForState);
+          setActiveImageIndex(0);
         } else {
           setImageUrls([]);
           setPostImagesForEdit([]);
+          setActiveImageIndex(0);
         }
 
         const base =
@@ -235,7 +255,10 @@ export function PostDetails({
           (data as any)?.comentariosDoPost ??
           [];
 
-        const roots = Array.isArray(base) ? base.map(normalizeComment) : [];
+        const roots: CommentModel[] = Array.isArray(base)
+          ? (base as any[]).map((c) => normalizeComment(c))
+          : [];
+
         setComments(roots);
 
         metaRef.current?.({
@@ -247,13 +270,13 @@ export function PostDetails({
               : undefined,
         });
 
-        // Hidrata 1º nível de respostas (uma vez por post)
+        // Hidrata 1º nível de respostas
         if (!firstLevelHydratedRef.current) {
           firstLevelHydratedRef.current = true;
 
           try {
-            const hydrated = await Promise.all(
-              roots.map(async (root) => {
+            const hydrated: CommentModel[] = await Promise.all(
+              roots.map(async (root): Promise<CommentModel> => {
                 if (Array.isArray(root.replies) && root.replies.length > 0) {
                   return root;
                 }
@@ -270,7 +293,7 @@ export function PostDetails({
                     return { ...root, canLoadMore: false };
                   }
 
-                  const mapped = repliesDto.map((r) => ({
+                  const mapped: CommentModel[] = repliesDto.map((r) => ({
                     id: String(r.id),
                     user: String(r.usuarioNome ?? 'Usuário'),
                     content: String(r.texto ?? ''),
@@ -278,17 +301,23 @@ export function PostDetails({
                     replies: [],
                     repliesCount: (r as any)?.repliesCount ?? undefined,
                     canLoadMore: true,
-                  })) as CommentModel[];
+                  }));
 
-                  return {
+                  const mergedReplies = mergeReplies(root.replies || [], mapped);
+
+                  const repliesCount =
+                    typeof root.repliesCount === 'number'
+                      ? Math.max(root.repliesCount, mergedReplies.length)
+                      : Math.max(root.replies?.length || 0, mergedReplies.length);
+
+                  const result: CommentModel = {
                     ...root,
-                    replies: mergeReplies(root.replies || [], mapped),
-                    repliesCount:
-                      typeof root.repliesCount === 'number'
-                        ? Math.max(root.repliesCount, mapped.length)
-                        : Math.max(root.replies?.length || 0, mapped.length),
+                    replies: mergedReplies,
+                    repliesCount,
                     canLoadMore: true,
                   };
+
+                  return result;
                 } catch {
                   return root;
                 } finally {
@@ -314,6 +343,43 @@ export function PostDetails({
       mounted = false;
     };
   }, [postId, userId]);
+
+  // Detalhes do autor
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAuthorDetails() {
+      if (!postOwnerId) {
+        setAuthorAvatarUrl(null);
+        setAuthorLevel(null);
+        return;
+      }
+
+      try {
+        const details: any = await getUserDetails(postOwnerId);
+        if (cancelled) return;
+
+        const avatar = details.urlImagemPerfil ?? details.avatarUrl ?? details.imagemUrl ?? null;
+
+        setAuthorAvatarUrl(avatar);
+        setAuthorLevel(
+          typeof details.nivel === 'number' && !Number.isNaN(details.nivel) ? details.nivel : null
+        );
+      } catch (e: any) {
+        console.log('[PostDetails][author][ERR]', e?.message);
+        if (!cancelled) {
+          setAuthorAvatarUrl(null);
+          setAuthorLevel(null);
+        }
+      }
+    }
+
+    loadAuthorDetails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [postOwnerId]);
 
   const totalComments = useMemo(() => countComments(comments), [comments]);
 
@@ -361,6 +427,7 @@ export function PostDetails({
       content: texto,
       upvotes: 0,
       replies: [],
+      repliesCount: 0,
       canLoadMore: false,
     };
     setComments((prev) => [optimistic, ...prev]);
@@ -478,20 +545,27 @@ export function PostDetails({
         list.map((c) => {
           if (String(c.id) === key) {
             if (mapped.length === 0) {
-              return { ...c, canLoadMore: false };
+              const noMore: CommentModel = { ...c, canLoadMore: false };
+              return noMore;
             }
             const mergedReplies = mergeReplies(c.replies || [], mapped);
-            return {
+            const repliesCount =
+              typeof c.repliesCount === 'number'
+                ? Math.max(c.repliesCount, mergedReplies.length)
+                : Math.max(c.replies?.length || 0, mergedReplies.length);
+
+            const updated: CommentModel = {
               ...c,
               replies: mergedReplies,
-              repliesCount:
-                typeof c.repliesCount === 'number'
-                  ? Math.max(c.repliesCount, mergedReplies.length)
-                  : Math.max(c.replies?.length || 0, mergedReplies.length),
+              repliesCount,
               canLoadMore: true,
             };
+            return updated;
           }
-          return { ...c, replies: c.replies ? mergeIntoTree(c.replies) : [] };
+          return {
+            ...c,
+            replies: c.replies ? mergeIntoTree(c.replies) : [],
+          };
         });
 
       setComments((prev) => mergeIntoTree(prev));
@@ -521,7 +595,6 @@ export function PostDetails({
 
   const handleEditPost = () => {
     setMenuVisible(false);
-    // fecha o modal de detalhes lá no pai
     onRequestClose?.();
     navigation.navigate('EditPostScreen', {
       postId,
@@ -534,14 +607,12 @@ export function PostDetails({
   };
 
   const handleDeletePost = () => {
-    // fecha o menu em qualquer plataforma
     setMenuVisible(false);
 
     const doDelete = async () => {
       try {
         await deletePost(postId);
 
-        // feedback de sucesso
         if (Platform.OS === 'web') {
           if (typeof window !== 'undefined') {
             window.alert('Sucesso\n\nPost excluído com sucesso.');
@@ -550,10 +621,8 @@ export function PostDetails({
           Alert.alert('Sucesso', 'Post excluído com sucesso.');
         }
 
-        // avisa o pai pra atualizar o feed
         onDeleted?.(postId);
 
-        // fecha o detalhe: se for modal, o pai fecha; se for screen, volta
         if (onRequestClose) {
           onRequestClose();
         } else {
@@ -598,6 +667,28 @@ export function PostDetails({
     }
   };
 
+  const handleProfilePress = () => {
+    if (!postOwnerId) return;
+    // se estiver dentro do modal do Feed, fecha antes de ir pro perfil
+    if (onRequestClose) {
+      onRequestClose();
+    }
+    navigation.navigate('ProfileScreen', { userId: postOwnerId });
+  };
+
+  const handleImageScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset } = event.nativeEvent;
+    const rawIndex = contentOffset.x / IMAGE_WIDTH;
+    const index = Math.round(rawIndex);
+
+    if (!Number.isFinite(index)) return;
+    const safeIndex = Math.max(0, Math.min(index, imageUrls.length - 1));
+
+    if (safeIndex !== activeImageIndex) {
+      setActiveImageIndex(safeIndex);
+    }
+  };
+
   return (
     <>
       <ScrollView style={styles.container}>
@@ -613,20 +704,30 @@ export function PostDetails({
               <Feather name="x" size={20} color="#ccc" />
             </TouchableOpacity>
 
-            <View style={styles.userInfo}>
+            <TouchableOpacity
+              style={styles.userInfo}
+              activeOpacity={0.8}
+              onPress={handleProfilePress}
+            >
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{(postAuthor || '?').charAt(0).toUpperCase()}</Text>
+                {authorAvatarUrl ? (
+                  <Image source={{ uri: authorAvatarUrl }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarText}>{authorInitial}</Text>
+                )}
               </View>
               <View>
                 <View style={styles.nameRow}>
                   <Text style={styles.userName}>{postAuthor || 'Usuário'}</Text>
                   <View style={styles.levelContainer}>
-                    <Text style={styles.levelText}>Nvl. —</Text>
+                    <Text style={styles.levelText}>
+                      {authorLevel != null ? `Nvl. ${authorLevel}` : 'Nvl. —'}
+                    </Text>
                   </View>
                 </View>
                 <Text style={styles.postDate}>{postCreatedAt}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
 
           {isOwner && (
@@ -655,14 +756,38 @@ export function PostDetails({
           </View>
         )}
 
-        {/* Imagens do post */}
+        {/* Imagens do post - carrossel */}
         {!!imageUrls.length && (
-          <View style={styles.imagesContainer}>
-            {imageUrls.map((url) => (
-              <View key={url} style={styles.imageWrapper}>
-                <Image source={{ uri: url }} style={styles.image} resizeMode="cover" />
+          <View style={styles.carouselContainer}>
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onScroll={handleImageScroll}
+              scrollEventThrottle={16}
+            >
+              {imageUrls.map((url, index) => (
+                <View key={url || String(index)} style={styles.imageWrapper}>
+                  <Image source={{ uri: url }} style={styles.image} resizeMode="cover" />
+                </View>
+              ))}
+            </ScrollView>
+
+            {imageUrls.length > 1 && (
+              <View style={styles.carouselFooter}>
+                <View style={styles.dotsContainer}>
+                  {imageUrls.map((_, index) => (
+                    <View
+                      key={index}
+                      style={[styles.dot, index === activeImageIndex && styles.dotActive]}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.counterText}>
+                  {activeImageIndex + 1}/{imageUrls.length}
+                </Text>
               </View>
-            ))}
+            )}
           </View>
         )}
 
@@ -757,6 +882,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#3a3a40',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 50,
   },
   avatarText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -773,15 +904,45 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontWeight: '700', fontSize: 17, marginTop: 14, marginBottom: 6 },
   description: { color: '#ccc', fontSize: 14, lineHeight: 20, marginBottom: 8 },
 
-  imagesContainer: { marginTop: 10, gap: 10 },
+  // carrossel
+  carouselContainer: {
+    marginTop: 10,
+    marginBottom: 4,
+  },
   imageWrapper: {
+    width: IMAGE_WIDTH,
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#333',
-    marginBottom: 10,
+    marginRight: 10,
   },
   image: { width: '100%', height: 220 },
+  carouselFooter: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#555',
+  },
+  dotActive: {
+    backgroundColor: '#7C73FF',
+    width: 10,
+  },
+  counterText: {
+    color: '#999',
+    fontSize: 12,
+  },
 
   // tags
   tagsRow: {
