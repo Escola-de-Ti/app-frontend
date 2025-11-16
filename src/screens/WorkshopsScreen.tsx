@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import AppLayout from '../components/AppLayout';
+import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout'; // 👈 importa offsets
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 
@@ -24,12 +24,11 @@ import {
   NotEnoughTokensEnrollError,
 } from '../services/workshops';
 
-import type { Workshop } from '../types';
+import type { Workshop, ID } from '../types';
 import AvailableWorkshops from '../components/workshops/AvailableWorkshops';
 import MyWorkshops from '../components/workshops/MyWorkshops';
 import EnrolledWorkshops from '../components/workshops/EnrolledWorkshops';
 
-// 🔑 resolução de usuário “do jeito certo”
 import { useAuth } from '../hooks/useAuth';
 import { getAccessToken } from '../lib/secure';
 import { getUserIdFromJwt, getEmailFromJwt } from '../lib/jwt';
@@ -111,11 +110,9 @@ export default function WorkshopsScreen() {
   const [isInstructor, setIsInstructor] = useState(false);
   const [userTokens, setUserTokens] = useState<number | null>(null);
 
-  // termo de busca
   const [q, setQ] = useState('');
   const [searching, setSearching] = useState(false);
 
-  // 🔑 resolve instrutorId: useAuth → token(userId) → token(email) → API
   const resolveUserId = useCallback(async (): Promise<number | null> => {
     if (userId && Number.isFinite(Number(userId))) return Number(userId);
 
@@ -142,7 +139,6 @@ export default function WorkshopsScreen() {
     try {
       const myId = await resolveUserId();
 
-      // Descobre se o usuário é INSTRUTOR e pega saldo de tokens
       if (myId != null) {
         try {
           const details: any = await getUserDetails(myId);
@@ -177,17 +173,13 @@ export default function WorkshopsScreen() {
         setUserTokens(null);
       }
 
-      // Disponíveis = status ABERTO (que ainda não estou inscrito)
       const abertosRaw = await listOpen();
       const disponiveis = (abertosRaw as any[]).filter((w) => !w?.inscrito);
       setAvailable(disponiveis);
 
-      // Meus = todos com instrutorId = meuId (independente de status)
       const meus = myId ? await listAll({ instrutorId: myId }) : [];
       setMine(meus);
 
-      // Inscritos = todos que vierem com inscrito === true (qualquer status),
-      // e que não sejam workshops onde EU sou o instrutor.
       const todos = await listAll();
       const myIdNum = myId != null ? Number(myId) : null;
 
@@ -220,7 +212,6 @@ export default function WorkshopsScreen() {
     }, [load])
   );
 
-  // 🔎 filtro client-side mínimo
   const matches = useCallback((w: Workshop, term: string) => {
     if (!term) return true;
     const t = term.toLowerCase();
@@ -256,10 +247,12 @@ export default function WorkshopsScreen() {
     }
   }, []);
 
-  // Handlers
-  const onInscrever = async (id: number) => {
+  const onInscrever = async (id: ID) => {
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId)) return;
+
     try {
-      await enrollInWorkshop(id);
+      await enrollInWorkshop(numericId);
 
       Toast.show({
         type: 'success',
@@ -295,12 +288,18 @@ export default function WorkshopsScreen() {
     }
   };
 
-  const onCancelar = async (id: number) => {
-    Alert.alert('Inscrição', `Cancelamento de inscrição simulado para o workshop #${id}`);
+  const onCancelar = async (id: ID) => {
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId)) return;
+
+    Alert.alert('Inscrição', `Cancelamento de inscrição simulado para o workshop #${numericId}`);
   };
 
-  const onEditar = (id: number) => {
-    navigation.navigate('EditWorkshopScreen', { id });
+  const onEditar = (id: ID) => {
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId)) return;
+
+    navigation.navigate('EditWorkshopScreen', { id: numericId });
   };
 
   const goCreateWorkshop = () => {
@@ -352,11 +351,10 @@ export default function WorkshopsScreen() {
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
 
-        {/* header */}
+        {/* header da tela (abaixo do header global) */}
         <View style={styles.header}>
           <View style={styles.titleRow}>
             <Text style={styles.h1}>Workshops</Text>
-            {/* 💰 badge de tokens no canto superior direito */}
             <TokenBadge tokens={userTokens} />
           </View>
 
@@ -365,23 +363,21 @@ export default function WorkshopsScreen() {
           <View style={styles.headerRow}>
             <ModeDropdown value={mode} onChange={setMode} />
 
-            {canShowCreateButton && (
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={goCreateWorkshop}
-                style={styles.createBtnWrapper}
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={goCreateWorkshop}
+              style={styles.createBtnWrapper}
+            >
+              <LinearGradient
+                colors={['#00FFA3', '#7C73FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.createBtn}
               >
-                <LinearGradient
-                  colors={['#00FFA3', '#7C73FF']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.createBtn}
-                >
-                  <Feather name="plus-circle" size={16} color="#0B0B0E" />
-                  <Text style={styles.createBtnText}>Criar workshop</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
+                <Feather name="plus-circle" size={16} color="#0B0B0E" />
+                <Text style={styles.createBtnText}>Criar workshop</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -392,7 +388,12 @@ export default function WorkshopsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'rgb(17, 17, 17)' },
+  container: {
+    flex: 1,
+    backgroundColor: 'rgb(17, 17, 17)',
+    paddingTop: HEADER_OFFSET + 8, // 👈 empurra abaixo do header global
+    paddingBottom: FOOTER_OFFSET, // 👈 deixa espaço pro footer
+  },
 
   header: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 10 },
   titleRow: {
@@ -433,7 +434,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  // 🎨 badge de tokens
   tokenBadge: {
     flexDirection: 'row',
     alignItems: 'center',
