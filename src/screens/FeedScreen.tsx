@@ -22,7 +22,7 @@ import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout
 import PostCard from '../components/posts/PostCard';
 import PostDetails from '../components/posts/PostDetails';
 
-import type { PostFeedModel, PostFeedDTO } from '../types';
+import type { PostFeedModel, PostFeedDTO, ID } from '../types'; // 👈 adicionado ID
 import { getFeed, upvotePost, type OrderBy } from '../services/posts';
 import type { UpvoteResponse } from '../services/posts';
 
@@ -72,9 +72,6 @@ const mapFilterToOrderBy = (filter: OrderFilter): OrderBy | undefined => {
       return 'DATE_DESC';
     case 'Mais antigos':
       return 'DATE_ASC';
-    // "Mais comentados" não tem enum próprio no back,
-    // então deixamos undefined pra usar a ordenação padrão (RELEVANCE)
-    // e tratamos a ordenação no client.
     case 'Mais comentados':
     default:
       return undefined;
@@ -110,11 +107,13 @@ export default function FeedScreen() {
 
   // ===== filtro de ordenação =====
   const [orderFilter, setOrderFilter] = useState<OrderFilter>(null);
-  // ref pra mandar pro back sem precisar entrar em deps de hook
   const orderByRef = useRef<OrderBy | undefined>(undefined);
 
-  const handleOpenPost = useCallback((postId: number) => {
-    setSelectedPostId(postId);
+  // 👇 aqui o ajuste: recebe ID e converte pra number
+  const handleOpenPost = useCallback((postId: ID) => {
+    const numericId = Number(postId);
+    if (!Number.isFinite(numericId)) return;
+    setSelectedPostId(numericId);
     setDetailsVisible(true);
   }, []);
 
@@ -131,7 +130,6 @@ export default function FeedScreen() {
         setSelectedPostId(id);
         setDetailsVisible(true);
       }
-      // limpa o param pra não reabrir em outras navegações
       navigation.setParams?.({ openPostId: undefined });
     }
   }, [params?.openPostId, navigation]);
@@ -153,7 +151,6 @@ export default function FeedScreen() {
       (p as any).totalComentarios ?? (p as any).comentariosCount ?? (p as any).comments ?? 0
     );
 
-    // prioriza jaVotou vindo do back
     const voted =
       (p as any).jaVotou ??
       (p as any).votado ??
@@ -196,7 +193,6 @@ export default function FeedScreen() {
             }
           : {};
 
-      // monta params já incluindo orderBy quando existir
       const params: any = {
         pageSize: PAGE_SIZE,
         q: queryRef.current,
@@ -251,7 +247,6 @@ export default function FeedScreen() {
     }
   }, [fetchFeed]);
 
-  // 👉 Toda vez que a tela ganhar foco (navigate pra ela), dá refresh no feed
   useFocusEffect(
     useCallback(() => {
       onRefresh();
@@ -369,8 +364,6 @@ export default function FeedScreen() {
 
   const ItemSeparator = useCallback(() => <View style={{ height: 14 }} />, []);
 
-  // ===== ordenação em memória =====
-  // Só tratamos "Mais comentados" no client; o resto fica por conta do back
   const sortedData = useMemo(() => {
     if (orderFilter !== 'Mais comentados') return data;
 
@@ -383,15 +376,12 @@ export default function FeedScreen() {
       const nextFilter = filter as OrderFilter;
       setOrderFilter(nextFilter);
 
-      // atualiza orderBy usado pela API
       orderByRef.current = mapFilterToOrderBy(nextFilter);
 
-      // reset de paginação quando muda ordenação
       cursorRef.current = null;
       initialLoadedRef.current = false;
       setHasMore(true);
 
-      // refetch com novo orderBy
       fetchFeed({ reset: true });
     },
     [fetchFeed]
@@ -462,7 +452,7 @@ export default function FeedScreen() {
         }}
         ItemSeparatorComponent={ItemSeparator}
         renderItem={({ item }: ListRenderItemInfo<PostFeedModel>) => (
-          <TouchableOpacity activeOpacity={0.9}>
+          <TouchableOpacity activeOpacity={0.9} onPress={() => handleOpenPost(item.id)}>
             <PostCard
               post={item}
               initiallyUpvoted={!!item.usuarioJaVotou}
@@ -498,7 +488,6 @@ export default function FeedScreen() {
         }
       />
 
-      {/* Modal com PostDetails */}
       <Modal
         visible={detailsVisible && selectedPostId != null}
         animationType="slide"

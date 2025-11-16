@@ -1,5 +1,5 @@
 // === src/screens/CreateWorkshopScreen.tsx ===
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   ScrollView,
   View,
@@ -11,9 +11,10 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Pressable,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import AppLayout from '../components/AppLayout';
+import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 import AppInput from '../components/AppInput';
 import ImageUploader from '../components/ImageUploader';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -29,7 +30,6 @@ import {
   uploadWorkshopImages,
 } from '../services/workshops';
 
-// ✅ resolução de usuário "do jeito certo"
 import { useAuth } from '../hooks/useAuth';
 import { getAccessToken } from '../lib/secure';
 import { getUserIdFromJwt, getEmailFromJwt } from '../lib/jwt';
@@ -37,7 +37,6 @@ import { getUsuarioIdByEmail } from '../services/user';
 
 const MAX_IMAGES = 10;
 
-// 👇 truquezinho pra TS parar de chorar com 'web'
 const IS_WEB = Platform.OS === ('web' as any);
 
 type RouteParams = { id?: number };
@@ -47,6 +46,9 @@ export default function CreateWorkshopScreen() {
   const route = useRoute<any>();
   const { id } = (route?.params || {}) as RouteParams;
   const isEdit = useMemo(() => typeof id === 'number', [id]);
+
+  // animação de scroll pro AppLayout (header/footer colapsáveis)
+  const layoutScrollY = useRef(new Animated.Value(0)).current;
 
   // Media & meta
   const [images, setImages] = useState<string[]>([]);
@@ -348,6 +350,7 @@ export default function CreateWorkshopScreen() {
       wrapWithScroll={false}
       initialActivePage="Workshops"
       backgroundColor="rgb(17, 17, 17)"
+      externalScrollY={layoutScrollY}
     >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -357,7 +360,15 @@ export default function CreateWorkshopScreen() {
         <ScrollView
           style={styles.container}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 48 }}
+          contentContainerStyle={{
+            paddingHorizontal: 20,
+            paddingTop: HEADER_OFFSET + 20,
+            paddingBottom: FOOTER_OFFSET + 48,
+          }}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: layoutScrollY } } }], {
+            useNativeDriver: false,
+          })}
+          scrollEventThrottle={16}
         >
           <View style={styles.headerView}>
             <Text style={styles.title}>{isEdit ? 'Editar Workshop' : 'Criar Workshop'}</Text>
@@ -567,7 +578,10 @@ export default function CreateWorkshopScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'rgb(17, 17, 17)', padding: 20, paddingTop: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: 'rgb(17, 17, 17)',
+  },
   title: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
   subtitle: { color: '#ccc', fontSize: 14, marginBottom: 20 },
   card: {
@@ -578,7 +592,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333',
   },
-  headerView: { marginTop: 0 },
+  headerView: { marginTop: 0, marginBottom: 16 },
   sectionTitle: { color: '#fff', fontWeight: 'bold', fontSize: 18, marginBottom: 16 },
   label: { color: '#ccc', marginTop: 12, marginBottom: 4 },
   labelRow: {

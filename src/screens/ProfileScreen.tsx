@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
-import AppLayout from '../components/AppLayout';
+import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 import Tag from '../components/Tag';
 import type { MyProfile } from '../types';
 import { getMyProfile, getUserById, getUserDetails } from '../services/profile';
@@ -141,7 +141,7 @@ export default function ProfileScreen() {
           details = await getUserDetails((base as any).id); // /usuarios/detalhes/id
         }
 
-        // 🔥 base primeiro, depois details: detalhes (incl. tags bonitinhas) sobrescrevem o básico
+        // base primeiro, depois details
         const merged: any = {
           ...(base || {}),
           ...(details || {}),
@@ -155,7 +155,6 @@ export default function ProfileScreen() {
         const base = await getUserById(fetchId); // /usuarios/{id}
         const details = await getUserDetails(fetchId); // /usuarios/detalhes/{id}
 
-        // mesma lógica: base primeiro, details por cima
         const merged: any = {
           ...(base || {}),
           ...(details || {}),
@@ -208,6 +207,8 @@ export default function ProfileScreen() {
             backgroundColor: 'rgb(17,17,17)',
             alignItems: 'center',
             justifyContent: 'center',
+            paddingTop: HEADER_OFFSET,
+            paddingBottom: FOOTER_OFFSET,
           }}
         >
           <ActivityIndicator size="large" color="#00FFA3" />
@@ -219,7 +220,11 @@ export default function ProfileScreen() {
 
   if (error || !profile) {
     return (
-      <AppLayout initialActivePage="Perfil" backgroundColor="rgb(17, 17, 17)">
+      <AppLayout
+        wrapWithScroll={false}
+        initialActivePage="Perfil"
+        backgroundColor="rgb(17, 17, 17)"
+      >
         <View
           style={{
             flex: 1,
@@ -227,6 +232,8 @@ export default function ProfileScreen() {
             alignItems: 'center',
             justifyContent: 'center',
             padding: 16,
+            paddingTop: HEADER_OFFSET,
+            paddingBottom: FOOTER_OFFSET,
           }}
         >
           <Text style={{ color: '#ff9aa2', fontWeight: '800', textAlign: 'center' }}>
@@ -266,7 +273,7 @@ export default function ProfileScreen() {
       ? anyProfile.tags
           .map((t: any) => {
             if (typeof t === 'string') return t;
-            if (typeof t === 'number') return String(t); // fallback feio, mas evita sumir
+            if (typeof t === 'number') return String(t);
             return t?.name ?? t?.nome ?? '';
           })
           .filter((n: string) => !!n && !!n.trim())
@@ -274,7 +281,11 @@ export default function ProfileScreen() {
 
   return (
     <AppLayout wrapWithScroll={false} initialActivePage="Perfil" backgroundColor="rgb(17, 17, 17)">
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* CAPA / HERO */}
         <LinearGradient
           colors={[withOpacity(colorA, opacity), withOpacity(colorB, opacity)]}
@@ -293,7 +304,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Botão editar fundo (só pra mim) */}
           {isMe && (
             <LinearGradient
               colors={['#55F6C9', '#F985CD', '#5468FF', '#8476D9', '#F08E90']}
@@ -334,10 +344,6 @@ export default function ProfileScreen() {
 
           {/* Badges */}
           <View style={styles.badgesRow}>
-            {/* <View style={styles.badgePill}>
-              <Feather name="bar-chart-2" size={14} color="#0B0B0E" />
-              <Text style={styles.badgeText}>Perfil</Text>
-            </View> */}
             <View style={styles.badgePill}>
               <Feather name="award" size={14} color="#0B0B0E" />
               <Text style={styles.badgeText}>{tipoUsuario}</Text>
@@ -581,7 +587,12 @@ function Swatch({ color, onPick }: { color: string; onPick: (hex: string) => voi
 
 /* ---------- Styles ---------- */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'rgb(17, 17, 17)' },
+  container: {
+    flex: 1,
+    backgroundColor: 'rgb(17, 17, 17)',
+    paddingTop: HEADER_OFFSET,
+    paddingBottom: FOOTER_OFFSET,
+  },
 
   cover: {
     paddingHorizontal: 16,

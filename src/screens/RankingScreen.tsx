@@ -13,7 +13,7 @@ import {
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import AppLayout from '../components/AppLayout';
+import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 import { getRankingModel } from '../services/ranking';
 import type { RankingUser } from '../types';
 
@@ -52,10 +52,15 @@ export default function RankingScreen() {
   const data = useMemo(() => items, [items]);
 
   return (
-    <AppLayout wrapWithScroll={false} initialActivePage="Ranking" backgroundColor="rgb(11,11,15)">
+    <AppLayout
+      wrapWithScroll={false}
+      collapsible={false}
+      initialActivePage="Ranking"
+      backgroundColor="rgb(11,11,15)"
+    >
       <StatusBar barStyle="light-content" />
       <View style={s.container}>
-        {/* Header */}
+        {/* Header de conteúdo */}
         <View style={s.header}>
           <Text style={s.title}>Ranking de Usuários</Text>
           <Text style={s.subtitle}>Acompanhe sua posição na comunidade</Text>
@@ -188,7 +193,13 @@ function hexWithAlpha(hex: string, alpha: number) {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
+  container: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: HEADER_OFFSET + 16,
+    paddingBottom: FOOTER_OFFSET,
+    backgroundColor: 'rgb(11,11,15)',
+  },
   header: { marginBottom: 12 },
   title: { color: '#fff', fontSize: 24, fontWeight: '700' },
   subtitle: { color: '#aaa', marginTop: 4 },

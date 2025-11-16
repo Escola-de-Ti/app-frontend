@@ -29,6 +29,8 @@ const DEFAULT_FOOTER = 72;
 // tunáveis
 const DIR_THRESHOLD = 6; // pixels de histerese pra trocar direção
 const ANIM_DURATION = 160; // ms
+const TOP_LOCK_DISTANCE = 50; // px a partir do topo
+const BOTTOM_LOCK_DISTANCE = 50; // px antes do fim do conteúdo
 
 export default function AppLayout({
   children,
@@ -58,14 +60,61 @@ export default function AppLayout({
   const headerHiddenRef = useRef(false);
   const footerHiddenRef = useRef(false);
 
+  // Infos de altura pra saber "50px antes do fim" (apenas pro scroll interno)
+  const viewHeightRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const maxScrollYRef = useRef<number | null>(null);
+
+  const updateMaxScroll = () => {
+    if (!viewHeightRef.current || !contentHeightRef.current) {
+      maxScrollYRef.current = null;
+      return;
+    }
+    maxScrollYRef.current = Math.max(0, contentHeightRef.current - viewHeightRef.current);
+  };
+
   // Assina mudanças do scrollY (de fora ou interno) para detectar direção
   useEffect(() => {
     if (!collapsible) return;
 
     const sub = scrollY.addListener(({ value }) => {
-      const dy = value - lastYRef.current;
+      const currentY = value ?? 0;
+      const maxScroll = maxScrollYRef.current ?? Infinity;
 
-      if (Math.abs(dy) < DIR_THRESHOLD) return; // histerese
+      // Zona "travada" no topo ou perto do fim:
+      // força header/footer visíveis e ignora esconder/mostrar por direção
+      const inTopLockZone = currentY <= TOP_LOCK_DISTANCE;
+      const inBottomLockZone =
+        currentY >= maxScroll - BOTTOM_LOCK_DISTANCE && maxScroll !== Infinity;
+
+      if (inTopLockZone || inBottomLockZone) {
+        // garante visíveis
+        if (headerHiddenRef.current && !hideHeader) {
+          headerHiddenRef.current = false;
+          Animated.timing(headerTY, {
+            toValue: 0,
+            duration: ANIM_DURATION,
+            useNativeDriver: true,
+          }).start();
+        }
+        if (footerHiddenRef.current && !hideFooter) {
+          footerHiddenRef.current = false;
+          Animated.timing(footerTY, {
+            toValue: 0,
+            duration: ANIM_DURATION,
+            useNativeDriver: true,
+          }).start();
+        }
+
+        lastYRef.current = currentY;
+        return;
+      }
+
+      const dy = currentY - lastYRef.current;
+      if (Math.abs(dy) < DIR_THRESHOLD) {
+        lastYRef.current = currentY;
+        return; // histerese
+      }
 
       if (dy > 0) {
         // rolando pra BAIXO -> esconder header e footer (se já não estiverem escondidos)
@@ -105,7 +154,7 @@ export default function AppLayout({
         }
       }
 
-      lastYRef.current = value;
+      lastYRef.current = currentY;
     });
 
     return () => {
@@ -162,6 +211,14 @@ export default function AppLayout({
           style={[styles.container, { backgroundColor }]}
           scrollEventThrottle={16}
           onScroll={handleInternalScroll}
+          onLayout={(e) => {
+            viewHeightRef.current = e.nativeEvent.layout.height;
+            updateMaxScroll();
+          }}
+          onContentSizeChange={(w, h) => {
+            contentHeightRef.current = h;
+            updateMaxScroll();
+          }}
           contentContainerStyle={{
             paddingTop: hideHeader ? 0 : HEADER_OFFSET,
             paddingBottom: hideFooter ? 0 : FOOTER_OFFSET,
@@ -192,7 +249,7 @@ export default function AppLayout({
           ]}
         >
           <Footer
-            translateY={footerTY} // segue funcionando
+            translateY={footerTY} // segue funcionando (usa só pra compor estilo)
             activePage={activePage}
             onChangePage={setActivePage}
           />

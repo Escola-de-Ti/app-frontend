@@ -178,14 +178,14 @@ export async function createPost(payload: CreatePostPayload) {
 export async function updatePost(postId: number, payload: UpdatePostPayload) {
   try {
     const body = buildUpdateBody(postId, payload);
-    console.log('[POST][UPDATE][REQ]', { postId, body });
+    // console.log('[POST][UPDATE][REQ]', { postId, body });
 
     const { data } = await api.patch<PostDetalhesDTO>(`${POSTS_ENDPOINT}/${postId}`, body);
 
-    console.log('[POST][UPDATE][OK]', { postId, data });
+    // console.log('[POST][UPDATE][OK]', { postId, data });
     return data;
   } catch (err: any) {
-    console.log('[POST][UPDATE][ERR]', err?.response?.status, err?.response?.data);
+    // console.log('[POST][UPDATE][ERR]', err?.response?.status, err?.response?.data);
     throw new Error(extractErrorMessage(err));
   }
 }
@@ -212,17 +212,17 @@ export async function getFeed(params: FeedParams = {}): Promise<GetFeedResponseD
   const seq = ++FEED_SEQ;
   const finalParams = { pageSize: 20, ...params };
 
-  console.log('[FEED][API][REQ]', { seq, finalParams });
+  // console.log('[FEED][API][REQ]', { seq, finalParams });
 
   const { data } = await api.get<GetFeedResponseDTO>('/api/posts/feed', { params: finalParams });
 
   const count = Array.isArray((data as any)?.posts) ? (data as any).posts.length : 0;
-  console.log('[FEED][API][RESP]', {
-    seq,
-    count,
-    lastPostId: (data as any)?.lastPostId,
-    lastScore: (data as any)?.lastScore,
-  });
+  // console.log('[FEED][API][RESP]', {
+  //   seq,
+  //   count,
+  //   lastPostId: (data as any)?.lastPostId,
+  //   lastScore: (data as any)?.lastScore,
+  // });
 
   return {
     posts: Array.isArray((data as any)?.posts) ? (data as any).posts : [],
@@ -316,7 +316,7 @@ export async function createComment(args: {
     });
     return data;
   } catch (err: any) {
-    console.log('[createComment][ERR]', err?.response?.status, err?.response?.data);
+    // console.log('[createComment][ERR]', err?.response?.status, err?.response?.data);
     throw new Error(extractErrorMessage(err));
   }
 }
@@ -337,7 +337,7 @@ export async function getCommentReplies(
     if (Array.isArray((data as any)?.items)) return (data as any).items as ComentarioDTO[];
     return [];
   } catch (err: any) {
-    console.log('[getCommentReplies][ERR]', err?.response?.status, err?.response?.data);
+    // console.log('[getCommentReplies][ERR]', err?.response?.status, err?.response?.data);
     throw new Error(extractErrorMessage(err));
   }
 }
@@ -452,7 +452,7 @@ export async function uploadPostImages(postId: number, imageUris: string[]): Pro
 
       uploaded.push(data);
     } catch (err: any) {
-      console.log('[uploadPostImages][ERR]', { uri, errMessage: err?.message });
+      // console.log('[uploadPostImages][ERR]', { uri, errMessage: err?.message });
       throw new Error(extractErrorMessage(err));
     }
   }
@@ -472,7 +472,7 @@ export async function updatePostImage(imagemId: number, uri: string): Promise<Im
 
     return data;
   } catch (err: any) {
-    console.log('[updatePostImage][ERR]', { imagemId, errMessage: err?.message });
+    // console.log('[updatePostImage][ERR]', { imagemId, errMessage: err?.message });
     throw new Error(extractErrorMessage(err));
   }
 }
@@ -482,7 +482,7 @@ export async function deletePostImage(imagemId: number): Promise<void> {
   try {
     await api.delete(`${IMAGEM_ENDPOINT}/delete/${imagemId}`);
   } catch (err: any) {
-    console.log('[deletePostImage][ERR]', { imagemId, errMessage: err?.message });
+    // console.log('[deletePostImage][ERR]', { imagemId, errMessage: err?.message });
     throw new Error(extractErrorMessage(err));
   }
 }

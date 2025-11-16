@@ -13,7 +13,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import AppLayout from '../components/AppLayout';
+import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 import TransactionItem from '../components/transactions/TransactionItem';
 import { getTransactionHistory, type GetHistoryParams } from '../services/transactions';
 import type { Transaction } from '../types';
@@ -179,7 +179,13 @@ function SummaryPill({ label, value, color }: { label: string; value: number; co
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f', padding: 16 },
+  container: {
+    flex: 1,
+    backgroundColor: '#0b0b0f',
+    padding: 16,
+    paddingTop: HEADER_OFFSET,
+    paddingBottom: FOOTER_OFFSET,
+  },
   headerWrap: {
     marginBottom: 12,
   },

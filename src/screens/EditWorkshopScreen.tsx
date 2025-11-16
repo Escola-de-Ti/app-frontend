@@ -408,7 +408,7 @@ export default function EditWorkshopScreen() {
 
   return (
     <AppLayout
-      wrapWithScroll={false}
+      wrapWithScroll={true}
       initialActivePage="Workshops"
       backgroundColor="rgb(17, 17, 17)"
     >
