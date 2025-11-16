@@ -96,6 +96,10 @@ export default function CreateWorkshopScreen() {
 
         const link = (w as any).linkMeet ?? '';
         setMeetingLink(link);
+        setAddress(String(w.linkMeet || ''));
+
+        if ((w as any)?.vagasTotais != null) setCapacity(String((w as any).vagasTotais));
+        if ((w as any)?.tokens != null) setTokens(String((w as any).tokens));
       } catch (e: any) {
         Toast.show({ type: 'error', text1: 'Falha ao carregar', text2: e?.message ?? '' });
         navigation.goBack();
