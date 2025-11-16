@@ -28,7 +28,7 @@ import { getUserIdFromJwt, getEmailFromJwt } from '../lib/jwt';
 import { getUsuarioIdByEmail } from '../services/user';
 
 // ⬇️ input de filtro específico de workshops
-import FilterInputWorkshop from '../components/filters/FilterInputWorkshop';
+import FilterButton from '../components/filters/FilterButton';
 
 type Mode = 'Disponíveis' | 'Meus Workshops' | 'Inscritos';
 
@@ -266,16 +266,6 @@ export default function WorkshopsScreen() {
 
           <View style={styles.headerRow}>
             <ModeDropdown value={mode} onChange={setMode} />
-
-            <View style={{ flex: 1 }}>
-              <FilterInputWorkshop
-                value={q}
-                onChangeText={setQ}
-                loading={searching}
-                onSearch={onSearch}
-                placeholder="Buscar workshops, temas, instrutor…"
-              />
-            </View>
           </View>
         </View>
 

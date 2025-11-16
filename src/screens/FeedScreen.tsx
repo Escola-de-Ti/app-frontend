@@ -12,6 +12,7 @@ import {
   LayoutChangeEvent,
   TouchableOpacity,
   Modal,
+  Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
@@ -22,10 +23,11 @@ import PostCard from '../components/posts/PostCard';
 import PostDetails from '../components/posts/PostDetails';
 
 import type { PostFeedModel, PostFeedDTO } from '../types';
-import { getFeed, upvotePost } from '../services/posts';
+import { getFeed, upvotePost, type OrderBy } from '../services/posts';
 import type { UpvoteResponse } from '../services/posts';
 
 import InputFilterFeed from '../components/filters/InputFilterFeed';
+import FilterButton from '../components/filters/FilterButton';
 
 type Cursor = { lastPostId?: number | null; lastScore?: number | null } | null;
 type FeedRouteParams = {
@@ -45,6 +47,38 @@ const toBool = (v: any): boolean => {
 const toNum = (v: any): number => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+};
+
+// labels que aparecem na UI
+type OrderFilter =
+  | 'Relevância'
+  | 'Mais votados'
+  | 'Menos votados'
+  | 'Mais recentes'
+  | 'Mais antigos'
+  | 'Mais comentados'
+  | null;
+
+// mapeia o label do botão pro enum do back
+const mapFilterToOrderBy = (filter: OrderFilter): OrderBy | undefined => {
+  switch (filter) {
+    case 'Relevância':
+      return 'RELEVANCE';
+    case 'Mais votados':
+      return 'UPVOTES_DESC';
+    case 'Menos votados':
+      return 'UPVOTES_ASC';
+    case 'Mais recentes':
+      return 'DATE_DESC';
+    case 'Mais antigos':
+      return 'DATE_ASC';
+    // "Mais comentados" não tem enum próprio no back,
+    // então deixamos undefined pra usar a ordenação padrão (RELEVANCE)
+    // e tratamos a ordenação no client.
+    case 'Mais comentados':
+    default:
+      return undefined;
+  }
 };
 
 export default function FeedScreen() {
@@ -73,6 +107,11 @@ export default function FeedScreen() {
   // ===== controle de PostDetails aberto =====
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
   const [detailsVisible, setDetailsVisible] = useState(false);
+
+  // ===== filtro de ordenação =====
+  const [orderFilter, setOrderFilter] = useState<OrderFilter>(null);
+  // ref pra mandar pro back sem precisar entrar em deps de hook
+  const orderByRef = useRef<OrderBy | undefined>(undefined);
 
   const handleOpenPost = useCallback((postId: number) => {
     setSelectedPostId(postId);
@@ -149,7 +188,7 @@ export default function FeedScreen() {
       inFlightRef.current = true;
 
       const isReset = !!opts?.reset;
-      const params =
+      const cursorParams =
         !isReset && cursorRef.current?.lastPostId != null && cursorRef.current?.lastScore != null
           ? {
               lastPostId: cursorRef.current.lastPostId!,
@@ -157,8 +196,19 @@ export default function FeedScreen() {
             }
           : {};
 
+      // monta params já incluindo orderBy quando existir
+      const params: any = {
+        pageSize: PAGE_SIZE,
+        q: queryRef.current,
+        ...cursorParams,
+      };
+
+      if (orderByRef.current) {
+        params.orderBy = orderByRef.current;
+      }
+
       try {
-        const dto = await getFeed({ pageSize: PAGE_SIZE, q: queryRef.current, ...params } as any);
+        const dto = await getFeed(params as any);
 
         const rawPosts = Array.isArray((dto as any)?.posts) ? (dto as any).posts : [];
         const mapped = rawPosts.map(mapPost);
@@ -316,7 +366,36 @@ export default function FeedScreen() {
   );
 
   const keyExtractor = useCallback((item: PostFeedModel) => String(item.id), []);
+
   const ItemSeparator = useCallback(() => <View style={{ height: 14 }} />, []);
+
+  // ===== ordenação em memória =====
+  // Só tratamos "Mais comentados" no client; o resto fica por conta do back
+  const sortedData = useMemo(() => {
+    if (orderFilter !== 'Mais comentados') return data;
+
+    const copy = [...data];
+    return copy.sort((a, b) => (b.totalComentarios ?? 0) - (a.totalComentarios ?? 0));
+  }, [data, orderFilter]);
+
+  const handleSelectOrderFilter = useCallback(
+    (filter: string) => {
+      const nextFilter = filter as OrderFilter;
+      setOrderFilter(nextFilter);
+
+      // atualiza orderBy usado pela API
+      orderByRef.current = mapFilterToOrderBy(nextFilter);
+
+      // reset de paginação quando muda ordenação
+      cursorRef.current = null;
+      initialLoadedRef.current = false;
+      setHasMore(true);
+
+      // refetch com novo orderBy
+      fetchFeed({ reset: true });
+    },
+    [fetchFeed]
+  );
 
   const header = useMemo(
     () => (
@@ -325,31 +404,38 @@ export default function FeedScreen() {
         <Text style={styles.h1}>Feed</Text>
         <Text style={styles.subtitle}>Explore conteúdos da comunidade</Text>
 
-        <View style={{ marginTop: 10 }}>
-          <InputFilterFeed
-            value={q}
-            onChangeText={setQ}
-            loading={searching}
-            onSearch={async (query: string) => {
-              const normalized = query.trim();
-              if (normalized === queryRef.current && initialLoadedRef.current) return;
-              queryRef.current = normalized;
-              setSearching(true);
-              try {
-                cursorRef.current = null;
-                initialLoadedRef.current = false;
-                setHasMore(true);
-                await fetchFeed({ reset: true });
-              } finally {
-                setSearching(false);
-              }
-            }}
-            placeholder="Buscar posts e usuários…"
+        <View style={styles.searchRow}>
+          <View style={styles.searchInputWrapper}>
+            <InputFilterFeed
+              value={q}
+              onChangeText={setQ}
+              loading={searching}
+              onSearch={async (query: string) => {
+                const normalized = query.trim();
+                if (normalized === queryRef.current && initialLoadedRef.current) return;
+                queryRef.current = normalized;
+                setSearching(true);
+                try {
+                  cursorRef.current = null;
+                  initialLoadedRef.current = false;
+                  setHasMore(true);
+                  await fetchFeed({ reset: true });
+                } finally {
+                  setSearching(false);
+                }
+              }}
+              placeholder="Buscar posts e usuários…"
+            />
+          </View>
+
+          <FilterButton
+            onSelectFilter={handleSelectOrderFilter}
+            activeFilter={orderFilter ?? undefined}
           />
         </View>
       </View>
     ),
-    [q, searching, fetchFeed]
+    [q, searching, fetchFeed, handleSelectOrderFilter, orderFilter]
   );
 
   return (
@@ -365,19 +451,18 @@ export default function FeedScreen() {
           paddingHorizontal: 14,
           paddingTop: HEADER_OFFSET + 8,
           paddingBottom: FOOTER_OFFSET,
+          overflow: 'visible',
         }}
-        data={data}
+        data={sortedData}
         keyExtractor={keyExtractor}
         ListHeaderComponent={header}
+        ListHeaderComponentStyle={{
+          zIndex: 20,
+          ...(Platform.OS === 'android' ? { elevation: 20 } : {}),
+        }}
         ItemSeparatorComponent={ItemSeparator}
         renderItem={({ item }: ListRenderItemInfo<PostFeedModel>) => (
-          <TouchableOpacity
-            activeOpacity={0.9}
-            // 👇 enquanto o modal de detalhes estiver aberto,
-            // esse onPress fica desativado pra não abrir outro detalhe "por baixo"
-            // onPress={detailsVisible ? undefined : () => handleOpenPost(Number(item.id))}
-            // disabled={detailsVisible}
-          >
+          <TouchableOpacity activeOpacity={0.9}>
             <PostCard
               post={item}
               initiallyUpvoted={!!item.usuarioJaVotou}
@@ -397,7 +482,7 @@ export default function FeedScreen() {
         onEndReachedThreshold={0.2}
         onEndReached={onEndReached}
         initialNumToRender={PAGE_SIZE}
-        removeClippedSubviews
+        removeClippedSubviews={false}
         keyboardShouldPersistTaps="handled"
         windowSize={7}
         onScroll={onListScroll}
@@ -435,8 +520,30 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'rgb(17, 17, 17)' },
-  header: { paddingHorizontal: 2, paddingTop: 8, paddingBottom: 12 },
+  container: {
+    flex: 1,
+    backgroundColor: 'rgb(17, 17, 17)',
+    position: 'relative',
+  },
+  header: {
+    paddingHorizontal: 2,
+    paddingTop: 8,
+    paddingBottom: 12,
+    backgroundColor: 'rgb(17, 17, 17)',
+    zIndex: 20,
+    ...Platform.select({
+      android: { elevation: 20 },
+    }),
+  },
   h1: { color: '#F9F9FF', fontSize: 24, fontWeight: '800' },
   subtitle: { color: '#BDBDCC', marginTop: 4 },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    columnGap: 12,
+  },
+  searchInputWrapper: {
+    flex: 1,
+  },
 });

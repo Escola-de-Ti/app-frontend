@@ -26,7 +26,7 @@ export default function InputFilterFeed({
   onSearch,
   onDebouncedChange,
   loading,
-  placeholder = 'Buscar posts e usuários…',
+  placeholder = 'Buscar usuários…',
   debounceMs = 280,
   inputProps,
 }: Props) {

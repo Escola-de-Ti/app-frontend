@@ -1,3 +1,4 @@
+// src/components/filters/FilterButton.tsx
 import React, { useState } from 'react';
 import {
   TouchableOpacity,
@@ -13,13 +14,41 @@ import { Feather } from '@expo/vector-icons';
 type FilterButtonProps = {
   size?: number;
   onSelectFilter: (filter: string) => void;
+  /** Filtro atualmente ativo (ex.: 'Mais votados') */
+  activeFilter?: string | null;
 };
 
-export function FilterButton({ size = 25, onSelectFilter }: FilterButtonProps) {
+type FilterIcon =
+  | 'activity'
+  | 'thumbs-up'
+  | 'thumbs-down'
+  | 'clock'
+  | 'rotate-ccw'
+  | 'message-circle';
+
+type FilterDef = {
+  label:
+    | 'Relevância'
+    | 'Mais votados'
+    | 'Menos votados'
+    | 'Mais recentes'
+    | 'Mais antigos'
+    | 'Mais comentados';
+  icon: FilterIcon;
+};
+
+const FILTERS: FilterDef[] = [
+  { label: 'Relevância', icon: 'activity' },
+  { label: 'Mais votados', icon: 'thumbs-up' },
+  { label: 'Menos votados', icon: 'thumbs-down' },
+  { label: 'Mais recentes', icon: 'clock' },
+  { label: 'Mais antigos', icon: 'rotate-ccw' },
+  { label: 'Mais comentados', icon: 'message-circle' },
+];
+
+export function FilterButton({ size = 20, onSelectFilter, activeFilter }: FilterButtonProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [buttonHeight, setButtonHeight] = useState(0);
-
-  const filters = ['Mais votados', 'Mais recentes', 'Mais comentados'];
 
   const onButtonLayout = (event: LayoutChangeEvent) => {
     setButtonHeight(event.nativeEvent.layout.height);
@@ -34,14 +63,14 @@ export function FilterButton({ size = 25, onSelectFilter }: FilterButtonProps) {
     <View style={styles.container}>
       <TouchableOpacity
         activeOpacity={0.8}
-        onPress={() => setIsMenuOpen(!isMenuOpen)}
+        onPress={() => setIsMenuOpen((prev) => !prev)}
         onLayout={onButtonLayout}
       >
         <LinearGradient
           colors={['#ff00cc', '#7928ca', '#0066ff']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.gradientBorder}
+          style={[styles.gradientBorder, activeFilter && styles.gradientBorderActive]}
         >
           <View style={styles.innerCircle}>
             <Feather name="sliders" size={size} color="#ff8ce6" />
@@ -50,16 +79,33 @@ export function FilterButton({ size = 25, onSelectFilter }: FilterButtonProps) {
       </TouchableOpacity>
 
       {isMenuOpen && (
-        <View style={[styles.dropdown, { top: buttonHeight + 10 }]}>
-          {filters.map((filter) => (
-            <TouchableOpacity
-              key={filter}
-              style={styles.option}
-              onPress={() => handleSelectFilter(filter)}
-            >
-              <Text style={styles.optionText}>{filter}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={[styles.dropdown, { top: buttonHeight + 8 }]}>
+          {FILTERS.map(({ label, icon }) => {
+            const isActive = activeFilter === label;
+
+            return (
+              <TouchableOpacity
+                key={label}
+                style={[styles.option, isActive && styles.optionActive]}
+                onPress={() => handleSelectFilter(label)}
+              >
+                <View style={styles.optionContent}>
+                  <Feather
+                    name={icon}
+                    size={16}
+                    color={isActive ? '#ff8ce6' : '#ffffff'}
+                    style={styles.optionIcon}
+                  />
+                  <Text style={[styles.optionText, isActive && styles.optionTextActive]}>
+                    {label}
+                  </Text>
+                  {isActive && (
+                    <Feather name="check" size={16} color="#ff8ce6" style={styles.checkIcon} />
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
     </View>
@@ -70,25 +116,31 @@ const styles = StyleSheet.create({
   container: {
     position: 'relative',
     alignItems: 'flex-end',
+    // garante que o container do botão já tenha prioridade na pilha
+    zIndex: 20,
   },
   gradientBorder: {
-    width: 70,
-    height: 70,
-    borderRadius: 20,
+    width: 52, // menor
+    height: 52,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#7928ca',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 15,
+    shadowOpacity: 0.7,
+    shadowRadius: 10,
     ...Platform.select({
-      android: { elevation: 12 },
+      android: { elevation: 6 },
     }),
   },
+  gradientBorderActive: {
+    shadowOpacity: 0.9,
+    shadowRadius: 12,
+  },
   innerCircle: {
-    width: 66,
-    height: 66,
-    borderRadius: 18,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     backgroundColor: '#0b0b0f',
     alignItems: 'center',
     justifyContent: 'center',
@@ -99,21 +151,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#0b0b0f',
     borderRadius: 12,
     paddingVertical: 8,
-    width: 180,
+    width: 220,
     shadowColor: '#7928ca',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 10,
+    zIndex: 999, // 🔝 fica acima dos cards do FlatList
     ...Platform.select({
-      android: { elevation: 10 },
+      android: { elevation: 20 }, // 🔝 importante no Android
     }),
   },
   option: {
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  optionActive: {
+    backgroundColor: '#181528',
+  },
+  optionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  optionIcon: {
+    marginRight: 8,
   },
   optionText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
+  },
+  optionTextActive: {
+    fontWeight: '700',
+  },
+  checkIcon: {
+    marginLeft: 'auto',
   },
 });
+
+export default FilterButton;

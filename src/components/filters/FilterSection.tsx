@@ -1,34 +1,29 @@
+// src/components/filters/FilterSection.tsx
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { FilterButton } from './FilterButton';
 import { SelectedFilterTag } from './SelectedFilterTag';
 
 export function FilterSection() {
-  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
 
   const handleSelectFilter = (filter: string) => {
-    if (!selectedFilters.includes(filter)) {
-      setSelectedFilters((prev) => [...prev, filter]);
-    }
+    setSelectedFilter((prev) => (prev === filter ? null : filter));
   };
 
-  const handleRemoveFilter = (filter: string) => {
-    setSelectedFilters((prev) => prev.filter((f) => f !== filter));
+  const handleRemoveFilter = () => {
+    setSelectedFilter(null);
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.tagsContainer}>
-        {selectedFilters.map((filter) => (
-          <SelectedFilterTag
-            key={filter}
-            filter={filter}
-            onRemove={() => handleRemoveFilter(filter)}
-          />
-        ))}
+        {selectedFilter && (
+          <SelectedFilterTag filter={selectedFilter} onRemove={handleRemoveFilter} />
+        )}
       </View>
 
-      <FilterButton onSelectFilter={handleSelectFilter} />
+      <FilterButton onSelectFilter={handleSelectFilter} activeFilter={selectedFilter} />
     </View>
   );
 }

@@ -176,11 +176,14 @@ export async function updatePost(postId: number, payload: UpdatePostPayload) {
 }
 
 /* GET /api/posts/feed */
+export type OrderBy = 'RELEVANCE' | 'UPVOTES_DESC' | 'UPVOTES_ASC' | 'DATE_DESC' | 'DATE_ASC';
+
 export type FeedParams = {
   pageSize?: number;
   lastPostId?: number | null;
   lastScore?: number | null;
   q?: string;
+  orderBy?: OrderBy;
   // filtros opcionais:
   // tagIds?: number[];
   // tagOperador?: 'E' | 'OU';
