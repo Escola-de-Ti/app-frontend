@@ -13,7 +13,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 
 import Logo from '../components/LogoWhitName';
@@ -24,7 +23,6 @@ import type { TipoUsuario } from '../types';
 
 export default function AuthScreen() {
   const { login, register, isLoading } = useAuth();
-  const navigation = useNavigation<any>();
 
   // login
   const [emailLogin, setEmailLogin] = useState('');
@@ -51,7 +49,7 @@ export default function AuthScreen() {
       easing: Easing.out(Easing.exp),
       useNativeDriver: false,
     }).start();
-  }, [isRegister]);
+  }, [isRegister, cardHeight]);
 
   const toggleForm = () => {
     Animated.timing(anim, {
@@ -79,7 +77,7 @@ export default function AuthScreen() {
     }
     try {
       await login(emailLogin.trim(), senhaLogin);
-      navigation.reset({ index: 0, routes: [{ name: 'FeedScreen' }] });
+      // não precisa navegar manualmente: o Router troca pro stack autenticado
     } catch (e: any) {
       Toast.show({
         type: 'error',

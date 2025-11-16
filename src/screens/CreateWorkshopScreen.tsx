@@ -37,6 +37,9 @@ import { getUsuarioIdByEmail } from '../services/user';
 
 const MAX_IMAGES = 10;
 
+// 👇 truquezinho pra TS parar de chorar com 'web'
+const IS_WEB = Platform.OS === ('web' as any);
+
 type RouteParams = { id?: number };
 
 export default function CreateWorkshopScreen() {
@@ -65,6 +68,10 @@ export default function CreateWorkshopScreen() {
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
 
+  // textos das datas (pra web)
+  const [startAtText, setStartAtText] = useState('');
+  const [endAtText, setEndAtText] = useState('');
+
   const [loading, setLoading] = useState(false);
 
   const titleCount = title.trim().length;
@@ -79,6 +86,30 @@ export default function CreateWorkshopScreen() {
     )}:${pad(d.getMinutes())}`;
   };
 
+  // parser pra "dd/mm/aaaa hh:mm"
+  const parseDateTime = (value: string): Date | null => {
+    const text = value.trim();
+    const m = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+
+    const [, dd, mm, yyyy, hh, min] = m;
+    const day = Number(dd);
+    const month = Number(mm) - 1;
+    const year = Number(yyyy);
+    const hour = Number(hh);
+    const minute = Number(min);
+
+    const d = new Date(year, month, day, hour, minute);
+    if (Number.isNaN(d.getTime())) return null;
+    return d;
+  };
+
+  // mantem os textos sincronizados com as datas
+  useEffect(() => {
+    setStartAtText(formatDateTime(startAt));
+    setEndAtText(formatDateTime(endAt));
+  }, [startAt, endAt]);
+
   // carregar dados no modo edição
   useEffect(() => {
     if (!isEdit) return;
@@ -89,14 +120,17 @@ export default function CreateWorkshopScreen() {
         setTitle(w.titulo ?? '');
         const desc = (w as any)?.descricao?.descricao ?? (w as any)?.descricao ?? '';
         setDescription(desc);
-        setStartAt(w.dataInicio ?? new Date());
-        setEndAt((w as any).dataTermino ?? new Date(Date.now() + 2 * 60 * 60 * 1000));
+
+        const start = w.dataInicio ?? new Date();
+        const end = (w as any).dataTermino ?? new Date(Date.now() + 2 * 60 * 60 * 1000);
+        setStartAt(start);
+        setEndAt(end);
+
         setCapacity(String((w as any)?.capacidade ?? (w as any)?.vagasTotais ?? ''));
         setTokens(String((w as any)?.custo ?? (w as any)?.tokens ?? ''));
 
         const link = (w as any).linkMeet ?? '';
         setMeetingLink(link);
-        setAddress(String(w.linkMeet || ''));
 
         if ((w as any)?.vagasTotais != null) setCapacity(String((w as any).vagasTotais));
         if ((w as any)?.tokens != null) setTokens(String((w as any).tokens));
@@ -173,7 +207,6 @@ export default function CreateWorkshopScreen() {
       Alert.alert('Imagens demais', `Envie no máximo ${MAX_IMAGES} imagens.`);
       return;
     }
-    // se quiser manter uma validação mínima pro link quando preenchido:
     if (_link && _link.length < 6) {
       Toast.show({ type: 'error', text1: 'Link inválido', text2: 'Informe um link válido.' });
       Alert.alert('Link inválido', 'Informe um link válido.');
@@ -189,8 +222,8 @@ export default function CreateWorkshopScreen() {
         const payload = {
           titulo: _title,
           linkMeet: _link || undefined,
-          dataInicio: toIsoWithMillis(startAt), // ✅ 2025-11-10T18:30:00.000Z
-          dataTermino: toIsoWithMillis(endAt), // ✅ idem
+          dataInicio: toIsoWithMillis(startAt),
+          dataTermino: toIsoWithMillis(endAt),
           descricao: { tema, descricao: _desc },
           capacidade: Number(capacity),
           custo: Number(tokens),
@@ -200,7 +233,6 @@ export default function CreateWorkshopScreen() {
         const updated = await updateWorkshop(id!, payload);
         console.log('[Workshop][UPDATE][OK]', updated);
 
-        // 🔗 upload de imagens novas para o workshop já existente
         if (images.length > 0) {
           try {
             console.log('[CreateWorkshop] enviando imagens (edit) para o workshop', id, images);
@@ -234,8 +266,8 @@ export default function CreateWorkshopScreen() {
         const basePayload: any = {
           titulo: _title,
           linkMeet: _link || undefined,
-          dataInicio: toUtcNoMillis(startAt), // ✅ "yyyy-MM-dd'T'HH:mm:ss" (SEM Z)
-          dataTermino: toUtcNoMillis(endAt), // ✅ idem
+          dataInicio: toUtcNoMillis(startAt),
+          dataTermino: toUtcNoMillis(endAt),
           descricao: { tema, descricao: _desc },
           instrutorId,
           capacidade: Number(capacity),
@@ -246,7 +278,6 @@ export default function CreateWorkshopScreen() {
         const created = await createWorkshop(basePayload);
         console.log('[Workshop][CREATE][OK]', created);
 
-        // 🔗 se tiver imagens selecionadas, tenta anexar ao workshop recém-criado
         if (images.length > 0) {
           try {
             console.log(
@@ -313,7 +344,11 @@ export default function CreateWorkshopScreen() {
   }, []);
 
   return (
-    <AppLayout initialActivePage="Workshops" backgroundColor="rgb(17, 17, 17)">
+    <AppLayout
+      wrapWithScroll={false}
+      initialActivePage="Workshops"
+      backgroundColor="rgb(17, 17, 17)"
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.select({ ios: 'padding', android: undefined })}
@@ -376,18 +411,34 @@ export default function CreateWorkshopScreen() {
             <View style={styles.datetimeRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Início</Text>
-                <TouchableOpacity style={styles.dtBtn} onPress={() => setShowStartPicker(true)}>
-                  <Text style={styles.dtBtnText}>{formatDateTime(startAt)}</Text>
-                </TouchableOpacity>
-                {showStartPicker && (
-                  <DateTimePicker
-                    value={startAt}
-                    mode="datetime"
-                    onChange={(_, date) => {
-                      setShowStartPicker(false);
-                      if (date) setStartAt(date);
+
+                {IS_WEB ? (
+                  <AppInput
+                    placeholder="dd/mm/aaaa hh:mm"
+                    value={startAtText}
+                    onChangeText={(text) => {
+                      setStartAtText(text);
+                      const parsed = parseDateTime(text);
+                      if (parsed) setStartAt(parsed);
                     }}
+                    autoCapitalize="none"
                   />
+                ) : (
+                  <>
+                    <TouchableOpacity style={styles.dtBtn} onPress={() => setShowStartPicker(true)}>
+                      <Text style={styles.dtBtnText}>{formatDateTime(startAt)}</Text>
+                    </TouchableOpacity>
+                    {showStartPicker && !IS_WEB && (
+                      <DateTimePicker
+                        value={startAt}
+                        mode="datetime"
+                        onChange={(_, date) => {
+                          setShowStartPicker(false);
+                          if (date) setStartAt(date);
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </View>
 
@@ -395,18 +446,34 @@ export default function CreateWorkshopScreen() {
 
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Término</Text>
-                <TouchableOpacity style={styles.dtBtn} onPress={() => setShowEndPicker(true)}>
-                  <Text style={styles.dtBtnText}>{formatDateTime(endAt)}</Text>
-                </TouchableOpacity>
-                {showEndPicker && (
-                  <DateTimePicker
-                    value={endAt}
-                    mode="datetime"
-                    onChange={(_, date) => {
-                      setShowEndPicker(false);
-                      if (date) setEndAt(date);
+
+                {IS_WEB ? (
+                  <AppInput
+                    placeholder="dd/mm/aaaa hh:mm"
+                    value={endAtText}
+                    onChangeText={(text) => {
+                      setEndAtText(text);
+                      const parsed = parseDateTime(text);
+                      if (parsed) setEndAt(parsed);
                     }}
+                    autoCapitalize="none"
                   />
+                ) : (
+                  <>
+                    <TouchableOpacity style={styles.dtBtn} onPress={() => setShowEndPicker(true)}>
+                      <Text style={styles.dtBtnText}>{formatDateTime(endAt)}</Text>
+                    </TouchableOpacity>
+                    {showEndPicker && !IS_WEB && (
+                      <DateTimePicker
+                        value={endAt}
+                        mode="datetime"
+                        onChange={(_, date) => {
+                          setShowEndPicker(false);
+                          if (date) setEndAt(date);
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </View>
             </View>
@@ -446,8 +513,6 @@ export default function CreateWorkshopScreen() {
               maxImages={MAX_IMAGES}
               label={`Imagens (máx. ${MAX_IMAGES})`}
             />
-            {/* 👆 removemos o preview manual pra não duplicar,
-                o próprio ImageUploader já mostra as imagens */}
 
             {/* Footer */}
             <View style={styles.footer}>

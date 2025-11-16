@@ -34,6 +34,21 @@ function extractErrorMessage(err: any): string {
   return err?.message || 'Falha na requisição.';
 }
 
+// ===== Erros específicos de inscrição em workshop =====
+export class OwnWorkshopEnrollError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OwnWorkshopEnrollError';
+  }
+}
+
+export class NotEnoughTokensEnrollError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotEnoughTokensEnrollError';
+  }
+}
+
 // ========== WORKSHOPS CRUD BÁSICO ==========
 
 export async function listAll(params?: {
@@ -45,8 +60,8 @@ export async function listAll(params?: {
 }
 
 export async function listOpen(): Promise<Workshop[]> {
-  const { data } = await api.get<WorkshopDTO[]>('/api/workshops/abertos');
-  return data.map(mapWorkshopDTO);
+  // agora usa /api/workshops?status=ABERTO
+  return listAll({ status: 'ABERTO' });
 }
 
 export async function searchByTitle(termo: string): Promise<Workshop[]> {
@@ -73,6 +88,51 @@ export async function updateWorkshop(id: number, payload: WorkshopUpdateDTO): Pr
 
 export async function deleteWorkshop(id: number): Promise<void> {
   await api.delete(`/api/workshops/${id}`);
+}
+
+// ========== INSCRIÇÕES EM WORKSHOP ==========
+
+/**
+ * Inscreve o usuário logado em um workshop.
+ * POST /api/inscricoes/workshops/{id}
+ */
+export async function enrollInWorkshop(workshopId: number): Promise<void> {
+  try {
+    // body vazio mesmo, igual sua curl (só pra manter JSON)
+    await api.post(`/api/inscricoes/workshops/${workshopId}`, {});
+  } catch (err: any) {
+    const msg = extractErrorMessage(err);
+    const lower = (msg || '').toLowerCase();
+
+    // 🚫 tentar se inscrever no próprio workshop
+    if (
+      lower.includes('próprio workshop') ||
+      lower.includes('seu próprio workshop') ||
+      lower.includes('own workshop')
+    ) {
+      throw new OwnWorkshopEnrollError(
+        msg || 'Você não pode se inscrever no seu próprio workshop.'
+      );
+    }
+
+    // 💸 tokens insuficientes
+    if (
+      lower.includes('token') &&
+      (lower.includes('insuficiente') ||
+        lower.includes('insuficientes') ||
+        lower.includes('saldo') ||
+        lower.includes('não possui') ||
+        lower.includes('not enough') ||
+        lower.includes('insufficient'))
+    ) {
+      throw new NotEnoughTokensEnrollError(
+        msg || 'Você não possui tokens suficientes para se inscrever neste workshop.'
+      );
+    }
+
+    // fallback genérico
+    throw new Error(msg);
+  }
 }
 
 // ========== IMAGENS DE WORKSHOP ==========
@@ -136,10 +196,7 @@ export async function updateWorkshopImage(imagemId: number, uri: string): Promis
   }
 }
 
-/**
- * Remove definitivamente uma imagem (usada em workshop) pelo id.
- * DELETE /api/imagem/delete/{id}
- */
+/* DELETE /api/imagem/delete/{id} */
 export async function deleteWorkshopImage(imagemId: number): Promise<void> {
   try {
     await api.delete(`${IMAGEM_ENDPOINT}/delete/${imagemId}`);

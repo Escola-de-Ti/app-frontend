@@ -21,9 +21,9 @@ export default function Header() {
       }}
     >
       <Logo />
-      <TouchableOpacity>
+      {/* <TouchableOpacity>
         <Feather name="bell" size={22} color="#fff" />
-      </TouchableOpacity>
+      </TouchableOpacity> */}
     </View>
   );
 }
