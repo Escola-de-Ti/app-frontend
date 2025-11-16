@@ -13,6 +13,8 @@ import {
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -135,6 +137,108 @@ function normalizeComment(raw: any): CommentModel {
   };
 }
 
+// Toast Component
+function Toast({
+  message,
+  type = 'error',
+  visible,
+  onHide,
+}: {
+  message: string;
+  type?: 'error' | 'success' | 'info';
+  visible: boolean;
+  onHide: () => void;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(-20)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      const timer = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateY, {
+            toValue: -20,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          onHide();
+        });
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [visible, opacity, translateY, onHide]);
+
+  if (!visible) return null;
+
+  const iconName =
+    type === 'error' ? 'alert-circle' : type === 'success' ? 'check-circle' : 'info';
+  const bgColor =
+    type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : '#339af0';
+
+  return (
+    <Animated.View
+      style={[
+        toastStyles.container,
+        {
+          backgroundColor: bgColor,
+          opacity,
+          transform: [{ translateY }],
+        },
+      ]}
+    >
+      <Feather name={iconName} size={20} color="#fff" />
+      <Text style={toastStyles.message}>{message}</Text>
+    </Animated.View>
+  );
+}
+
+const toastStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    right: 16,
+    backgroundColor: '#ff6b6b',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    zIndex: 9999,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  message: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});
+
 export function PostDetails({
   postId,
   focusComment = false,
@@ -146,6 +250,14 @@ export function PostDetails({
 }: PostDetailsProps) {
   const navigation = useNavigation<any>();
   const { userId } = useAuth();
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Toast states
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'error' | 'success' | 'info'>('error');
 
   const [postTitle, setPostTitle] = useState('');
   const [postDescription, setPostDescription] = useState('');
@@ -190,6 +302,13 @@ export function PostDetails({
 
   const authorInitial = useMemo(() => (postAuthor || '?').charAt(0).toUpperCase(), [postAuthor]);
 
+  // Toast helper
+  const showToast = (message: string, type: 'error' | 'success' | 'info' = 'error') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
   useEffect(() => {
     if (focusComment && inputRef.current) {
       const t = setTimeout(() => inputRef.current?.focus(), 300);
@@ -205,6 +324,9 @@ export function PostDetails({
     inflightRepliesRef.current.clear();
 
     (async () => {
+      setLoading(true);
+      setError(null);
+
       try {
         const data = await getPostDetails(postId, 50);
         if (!mounted) return;
@@ -351,7 +473,14 @@ export function PostDetails({
         }
       } catch (e: any) {
         console.log('[PostDetails] erro ao carregar', e?.message);
-        Alert.alert('Erro', 'Não foi possível carregar os detalhes do post.');
+        const msg = e?.response?.data?.message || e?.message || 'Não foi possível carregar os detalhes do post.';
+        if (mounted) {
+          setError(msg);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
     })();
 
@@ -367,7 +496,6 @@ export function PostDetails({
     async function loadAuthorDetails() {
       if (!postOwnerId) {
         setAuthorAvatarUrl(null);
-        // não mexe no authorLevel se já veio do PostDetalhes
         return;
       }
 
@@ -428,7 +556,7 @@ export function PostDetails({
     } catch {
       setPostUpvoted(prevVoted);
       setPostUpvotes((prev) => Math.max(0, prev + (prevVoted ? 1 : -1)));
-      Alert.alert('Erro', 'Não foi possível registrar seu voto no post.');
+      showToast('Não foi possível registrar seu voto no post', 'error');
     }
   };
 
@@ -460,10 +588,11 @@ export function PostDetails({
         };
         return [mapped, ...withoutTemp];
       });
+      showToast('Comentário publicado com sucesso!', 'success');
     } catch {
       setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
       setNewComment(texto);
-      Alert.alert('Erro', 'Não foi possível publicar seu comentário.');
+      showToast('Não foi possível publicar seu comentário', 'error');
     }
   };
 
@@ -517,6 +646,7 @@ export function PostDetails({
         });
 
       setComments((prev) => replaceTemp(prev));
+      showToast('Resposta enviada com sucesso!', 'success');
     } catch {
       const removeTemp = (list: CommentModel[]): CommentModel[] =>
         list.map((c) => {
@@ -528,7 +658,7 @@ export function PostDetails({
         });
 
       setComments((prev) => removeTemp(prev));
-      Alert.alert('Erro', 'Não foi possível enviar a resposta.');
+      showToast('Não foi possível enviar a resposta', 'error');
     }
   };
 
@@ -575,6 +705,7 @@ export function PostDetails({
       setComments((prev) => mergeIntoTree(prev));
     } catch (e) {
       console.log('[PostDetails] handleLoadMoreReplies error:', (e as any)?.message);
+      showToast('Não foi possível carregar mais respostas', 'error');
     } finally {
       inflightRepliesRef.current.delete(key);
     }
@@ -593,16 +724,24 @@ export function PostDetails({
   };
 
   const handleCommentSuperVote = async (commentId: ID, willSuperVote: boolean) => {
-    try {
-      if (willSuperVote) {
-        await superVoteComment(Number(commentId));
-      } else {
-        // se no futuro tiver endpoint pra remover super voto, entra aqui
-      }
-    } catch (e) {
-      throw e;
-    }
-  };
+  if (!willSuperVote) {
+    showToast('Remover super voto ainda não está disponível', 'info');
+    throw new Error('Remover super voto ainda não implementado');
+  }
+
+  try {
+    const response = await superVoteComment(Number(commentId));
+    
+    showToast('Super voto registrado com sucesso!', 'success');
+    
+    return response;
+  } catch (e: any) {
+    const errorMsg = e?.response?.data?.message || e?.message || 'Não foi possível registrar o super voto';
+    showToast(errorMsg, 'error');
+    
+    throw e;
+  }
+};
 
   const handleOpenPostMenu = () => {
     if (!isOwner) return;
@@ -634,7 +773,7 @@ export function PostDetails({
             window.alert('Sucesso\n\nPost excluído com sucesso.');
           }
         } else {
-          Alert.alert('Sucesso', 'Post excluído com sucesso.');
+          showToast('Post excluído com sucesso!', 'success');
         }
 
         onDeleted?.(postId);
@@ -645,12 +784,13 @@ export function PostDetails({
           navigation.goBack?.();
         }
       } catch (e: any) {
+        const errorMsg = e?.response?.data?.message || e?.message || 'Não foi possível excluir o post';
         if (Platform.OS === 'web') {
           if (typeof window !== 'undefined') {
-            window.alert('Erro\n\nNão foi possível excluir o post.');
+            window.alert(`Erro\n\n${errorMsg}`);
           }
         } else {
-          Alert.alert('Erro', 'Não foi possível excluir o post.');
+          showToast(errorMsg, 'error');
         }
       }
     };
@@ -705,8 +845,48 @@ export function PostDetails({
     }
   };
 
+  const retryLoad = () => {
+    // Força um re-render do useEffect principal
+    setLoading(true);
+    setError(null);
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#7C73FF" />
+        <Text style={styles.loadingText}>Carregando post…</Text>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Feather name="alert-circle" size={48} color="#ff9aa2" />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity onPress={retryLoad} style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>Tentar novamente</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleClose} style={styles.closeErrorButton}>
+          <Text style={styles.closeErrorButtonText}>Fechar</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <>
+      {/* Toast */}
+      <Toast
+        message={toastMessage}
+        type={toastType}
+        visible={toastVisible}
+        onHide={() => setToastVisible(false)}
+      />
+
       <ScrollView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -892,6 +1072,56 @@ export function PostDetails({
 
 const styles = StyleSheet.create({
   container: { backgroundColor: '#0b0b0f', flex: 1, padding: 16 },
+  
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#0b0b0f',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    color: '#D8D8E3',
+    marginTop: 12,
+    fontSize: 14,
+  },
+
+  errorContainer: {
+    flex: 1,
+    backgroundColor: '#0b0b0f',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: '#ff9aa2',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 16,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: '#7C73FF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  closeErrorButton: {
+    marginTop: 12,
+    paddingVertical: 8,
+  },
+  closeErrorButtonText: {
+    color: '#999',
+    fontSize: 14,
+  },
+
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
