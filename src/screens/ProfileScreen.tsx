@@ -304,7 +304,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
 
-          {isMe && (
+          {/* {isMe && (
             <LinearGradient
               colors={['#55F6C9', '#F985CD', '#5468FF', '#8476D9', '#F08E90']}
               start={{ x: 0, y: 0 }}
@@ -320,7 +320,7 @@ export default function ProfileScreen() {
                 <Feather name="edit-2" size={16} color="#656565" />
               </TouchableOpacity>
             </LinearGradient>
-          )}
+          )}*/}
 
           {/* Avatar */}
           <View style={styles.avatarWrap}>

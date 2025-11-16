@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout'; // 👈 importa offsets
+import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 
@@ -290,16 +290,16 @@ export default function WorkshopsScreen() {
 
   const onCancelar = async (id: ID) => {
     const numericId = Number(id);
-    if (!Number.isFinite(numericId)) return;
-
-    Alert.alert('Inscrição', `Cancelamento de inscrição simulado para o workshop #${numericId}`);
+    if (!Number.isNaN(numericId)) {
+      Alert.alert('Inscrição', `Cancelamento de inscrição simulado para o workshop #${numericId}`);
+    }
   };
 
   const onEditar = (id: ID) => {
     const numericId = Number(id);
-    if (!Number.isFinite(numericId)) return;
-
-    navigation.navigate('EditWorkshopScreen', { id: numericId });
+    if (!Number.isNaN(numericId)) {
+      navigation.navigate('EditWorkshopScreen', { id: numericId });
+    }
   };
 
   const goCreateWorkshop = () => {
@@ -347,11 +347,11 @@ export default function WorkshopsScreen() {
       wrapWithScroll={false}
       initialActivePage="Workshops"
       backgroundColor="rgb(17, 17, 17)"
+      collapsible={false}
     >
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
 
-        {/* header da tela (abaixo do header global) */}
         <View style={styles.header}>
           <View style={styles.titleRow}>
             <Text style={styles.h1}>Workshops</Text>
@@ -363,25 +363,35 @@ export default function WorkshopsScreen() {
           <View style={styles.headerRow}>
             <ModeDropdown value={mode} onChange={setMode} />
 
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={goCreateWorkshop}
-              style={styles.createBtnWrapper}
-            >
-              <LinearGradient
-                colors={['#00FFA3', '#7C73FF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.createBtn}
+            {canShowCreateButton && (
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={goCreateWorkshop}
+                style={styles.createBtnWrapper}
               >
-                <Feather name="plus-circle" size={16} color="#0B0B0E" />
-                <Text style={styles.createBtnText}>Criar workshop</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={['#00FFA3', '#7C73FF']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.createBtn}
+                >
+                  <Feather name="plus-circle" size={16} color="#0B0B0E" />
+                  <Text style={styles.createBtnText}>Criar workshop</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
-        <View style={{ paddingHorizontal: 14, paddingBottom: 24 }}>{content}</View>
+        {/* aqui o conteúdo das listas */}
+        <View
+          style={{
+            paddingHorizontal: 14,
+            paddingBottom: 24,
+          }}
+        >
+          {content}
+        </View>
       </View>
     </AppLayout>
   );
@@ -391,8 +401,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'rgb(17, 17, 17)',
-    paddingTop: HEADER_OFFSET + 8, // 👈 empurra abaixo do header global
-    paddingBottom: FOOTER_OFFSET, // 👈 deixa espaço pro footer
+    paddingTop: HEADER_OFFSET,
+    // 👇 aumentei o "respiro" embaixo pra compensar o footer
+    paddingBottom: FOOTER_OFFSET + 100,
   },
 
   header: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 10 },
