@@ -290,7 +290,7 @@ export default function FeedScreen() {
   }, [tryLoadMore]);
 
   const onListScroll = Animated.event([{ nativeEvent: { contentOffset: { y: layoutScrollY } } }], {
-    useNativeDriver: true,
+    useNativeDriver: false,
     listener: (e: any) => {
       const y = e?.nativeEvent?.contentOffset?.y ?? 0;
       const h = e?.nativeEvent?.layoutMeasurement?.height ?? 0;

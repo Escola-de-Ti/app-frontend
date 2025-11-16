@@ -1,24 +1,21 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
-import RegisterScreen from './src/screens/RegisterScreen';
-import LoginScreen from './src/screens/LoginScreen';
-import CreatePostScreen from './src/screens/CreatePostScreen';
 import AuthScreen from './src/screens/AuthScreen';
+import CreatePostScreen from './src/screens/CreatePostScreen';
 import CreateWorkshopScreen from './src/screens/CreateWorkshopScreen';
 import WorkshopScreen from './src/screens/WorkshopsScreen';
 import FeedScreen from './src/screens/FeedScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import RankingScreen from './src/screens/RankingScreen';
-import TransactionHistoryScreen from 'src/screens/TransactionHistoryScreen';
-import EditProfileScreen from 'src/screens/EditProfileScreen';
-import EditPostScreen from 'src/screens/EditPostScreen';
-import EditWorkshopScreen from 'src/screens/EditWorkshopScreen';
+import TransactionHistoryScreen from './src/screens/TransactionHistoryScreen';
+import EditProfileScreen from './src/screens/EditProfileScreen';
+import EditPostScreen from './src/screens/EditPostScreen';
+import EditWorkshopScreen from './src/screens/EditWorkshopScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -26,7 +23,7 @@ function Router() {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    // opcional: splash/loader
+    // aqui você pode colocar uma tela de splash/carregando se quiser
     return null;
   }
 
@@ -34,8 +31,8 @@ function Router() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
-          // Telas privadas
           <>
+            {/* Telas privadas */}
             <Stack.Screen name="FeedScreen" component={FeedScreen} />
             <Stack.Screen name="CreatePost" component={CreatePostScreen} />
             <Stack.Screen name="CreateWorkshopScreen" component={CreateWorkshopScreen} />
@@ -48,8 +45,8 @@ function Router() {
             <Stack.Screen name="EditWorkshopScreen" component={EditWorkshopScreen} />
           </>
         ) : (
-          // Telas públicas
           <>
+            {/* Telas públicas */}
             <Stack.Screen name="Auth" component={AuthScreen} />
           </>
         )}
@@ -60,20 +57,11 @@ function Router() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Router />
-      <Toast />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <Router />
+        <Toast />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b0b0f',
-  },
-  scrollContent: {
-    padding: 20,
-    alignItems: 'center',
-  },
-});

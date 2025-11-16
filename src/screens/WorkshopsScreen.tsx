@@ -344,7 +344,11 @@ export default function WorkshopsScreen() {
   const canShowCreateButton = isInstructor && mode === 'Meus Workshops';
 
   return (
-    <AppLayout initialActivePage="Workshops" backgroundColor="rgb(17, 17, 17)">
+    <AppLayout
+      wrapWithScroll={false}
+      initialActivePage="Workshops"
+      backgroundColor="rgb(17, 17, 17)"
+    >
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
 

@@ -104,7 +104,7 @@ export default function TransactionHistoryScreen() {
   const empty = !loading && items.length === 0;
 
   return (
-    <AppLayout initialActivePage={null} backgroundColor="rgb(11,11,15)">
+    <AppLayout wrapWithScroll={false} initialActivePage={null} backgroundColor="rgb(11,11,15)">
       <View style={s.container}>
         {/* Header com botão de voltar */}
         <View style={s.headerWrap}>

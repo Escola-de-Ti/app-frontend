@@ -52,7 +52,7 @@ export default function RankingScreen() {
   const data = useMemo(() => items, [items]);
 
   return (
-    <AppLayout initialActivePage={null} backgroundColor="rgb(11,11,15)">
+    <AppLayout wrapWithScroll={false} initialActivePage={null} backgroundColor="rgb(11,11,15)">
       <StatusBar barStyle="light-content" />
       <View style={s.container}>
         {/* Header */}

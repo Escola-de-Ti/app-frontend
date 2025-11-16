@@ -407,7 +407,11 @@ export default function EditWorkshopScreen() {
   ]);
 
   return (
-    <AppLayout initialActivePage="Workshops" backgroundColor="rgb(17, 17, 17)">
+    <AppLayout
+      wrapWithScroll={false}
+      initialActivePage="Workshops"
+      backgroundColor="rgb(17, 17, 17)"
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.select({ ios: 'padding', android: undefined })}

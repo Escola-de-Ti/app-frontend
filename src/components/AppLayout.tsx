@@ -128,7 +128,7 @@ export default function AppLayout({
   const handleInternalScroll =
     wrapWithScroll && collapsible
       ? Animated.event([{ nativeEvent: { contentOffset: { y: internalScrollY } } }], {
-          useNativeDriver: true,
+          useNativeDriver: false,
         })
       : undefined;
 
@@ -192,7 +192,7 @@ export default function AppLayout({
           ]}
         >
           <Footer
-            translateY={footerTY} // segue funcionando (usa só pra compor estilo)
+            translateY={footerTY} // segue funcionando
             activePage={activePage}
             onChangePage={setActivePage}
           />
