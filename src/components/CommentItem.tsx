@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 export type ID = string | number;
@@ -109,18 +116,18 @@ export function CommentItem({
       // rollback
       setUpvoted((prev) => !prev);
       setUpvotes((prev) => (!willUpvote ? prev + 1 : Math.max(0, prev - 1)));
-      Alert.alert('Erro', 'Não foi possível registrar seu voto neste comentário.');
+      // NÃO mostra Alert aqui - deixa o pai (PostDetails) tratar
     } finally {
       votingRef.current = false;
     }
   };
 
-  // ===== SUPER VOTE =====
+  // ===== SUPER VOTE (SEM UPDATE OTIMISTA) =====
   const [superVoted, setSuperVoted] = useState<boolean>(
     typeof initiallySuperVoted === 'boolean' ? initiallySuperVoted : toBool(comment.userSuperVoted)
   );
   const [superVotes, setSuperVotes] = useState<number>(Number(comment.superVotes) || 0);
-  const superVotingRef = useRef(false);
+  const [superVoting, setSuperVoting] = useState(false); // loading state
 
   useEffect(() => {
     if (typeof initiallySuperVoted === 'boolean') {
@@ -137,24 +144,24 @@ export function CommentItem({
   }, [comment.superVotes, comment.id]);
 
   const handleSuperVote = async () => {
-    if (superVotingRef.current) return;
-    superVotingRef.current = true;
+    if (superVoting) return; // evita cliques múltiplos
 
+    setSuperVoting(true); // ativa loading
     const willSuperVote = !superVoted;
 
-    // otimista
-    setSuperVoted(willSuperVote);
-    setSuperVotes((prev) => (willSuperVote ? prev + 1 : Math.max(0, prev - 1)));
-
     try {
+      // AGUARDA a requisição completar ANTES de atualizar o estado
       await onSuperVote?.(comment.id, willSuperVote);
-    } catch {
-      // rollback
-      setSuperVoted((prev) => !prev);
-      setSuperVotes((prev) => (!willSuperVote ? prev + 1 : Math.max(0, prev - 1)));
-      Alert.alert('Erro', 'Não foi possível registrar o super voto neste comentário.');
+
+      // SÓ ATUALIZA SE DEU CERTO
+      setSuperVoted(willSuperVote);
+      setSuperVotes((prev) => (willSuperVote ? prev + 1 : Math.max(0, prev - 1)));
+    } catch (error) {
+      // Se der erro, NÃO atualiza nada
+      // O erro já foi tratado no PostDetails com toast
+      console.log('Erro ao super votar:', error);
     } finally {
-      superVotingRef.current = false;
+      setSuperVoting(false); // desativa loading
     }
   };
 
@@ -237,7 +244,12 @@ export function CommentItem({
 
       <View style={styles.commentFooter}>
         {/* UPVOTE */}
-        <TouchableOpacity onPress={handleUpvote} activeOpacity={0.8} accessibilityRole="button">
+        <TouchableOpacity
+          onPress={handleUpvote}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          disabled={votingRef.current}
+        >
           <View style={[styles.commentUpvoteContainer, upvoted && styles.commentUpvoteActive]}>
             <Feather name="arrow-up" size={13} color={upvoted ? '#003d2b' : '#fff'} />
             <Text style={[styles.commentStatText, upvoted && styles.commentUpvoteTextActive]}>
@@ -246,10 +258,19 @@ export function CommentItem({
           </View>
         </TouchableOpacity>
 
-        {/* SUPER VOTE */}
-        <TouchableOpacity onPress={handleSuperVote} activeOpacity={0.8} accessibilityRole="button">
+        {/* SUPER VOTE com loading indicator */}
+        <TouchableOpacity
+          onPress={handleSuperVote}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          disabled={superVoting}
+        >
           <View style={[styles.superVoteContainer, superVoted && styles.superVoteActive]}>
-            <Feather name="zap" size={13} color={superVoted ? '#2b003d' : '#fff'} />
+            {superVoting ? (
+              <ActivityIndicator size="small" color={superVoted ? '#2b003d' : '#fff'} />
+            ) : (
+              <Feather name="zap" size={13} color={superVoted ? '#2b003d' : '#fff'} />
+            )}
             <Text style={[styles.commentStatText, superVoted && styles.superVoteTextActive]}>
               {superVotes}
             </Text>
@@ -380,6 +401,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 3,
+    minWidth: 50, // garante espaço pro loading indicator
   },
   superVoteActive: {
     backgroundColor: '#f6a8ff',

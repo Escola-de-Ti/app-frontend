@@ -41,7 +41,6 @@ export default function TagManager({
   const addTag = (raw?: string) => {
     const value = (raw ?? input).trim().replace(/\s+/g, ' ');
     if (!value) return;
-
     if (value.length > maxLength) {
       Alert.alert('Tag muito grande', `Use no máximo ${maxLength} caracteres.`);
       return;
@@ -50,26 +49,22 @@ export default function TagManager({
       Alert.alert('Limite atingido', `Você pode adicionar até ${maxTags} tags.`);
       return;
     }
-
     const key = norm(value);
     if (selectedSet.has(key)) {
       setInput('');
       return;
     }
-
     onChange([...tags, value]);
     setInput('');
   };
 
   const removeTag = (t: string) => {
-    // apenas tira da lista selecionada; NÃO mexe em `popular`
     onChange(tags.filter((x) => norm(x) !== norm(t)));
   };
 
   const togglePopular = (t: string) => {
     const key = norm(t);
     if (selectedSet.has(key)) {
-      // se já selecionada, remove da seleção (popular continua igual)
       onChange(tags.filter((x) => norm(x) !== key));
     } else {
       if (tags.length >= maxTags) {
@@ -83,30 +78,29 @@ export default function TagManager({
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}># Tags</Text>
-
       {/* Input + Botão */}
       <View style={styles.tagInputRow}>
-        <AppInput
-          placeholder="Digite sua tag e pressione Enter..."
-          value={input}
-          onChangeText={setInput}
-          onSubmitEditing={() => addTag()}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+        <View style={styles.inputContainer}>
+          <AppInput
+            placeholder="Digite sua tag e pressione Enter..."
+            value={input}
+            onChangeText={setInput}
+            onSubmitEditing={() => addTag()}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
         <TouchableOpacity onPress={() => addTag()} style={styles.addTagButton}>
           <Text style={styles.addTagText}>Adicionar</Text>
         </TouchableOpacity>
       </View>
-
       {/* Selecionadas */}
       <View style={styles.tagList}>
         {tags.map((t, i) => (
           <Tag key={`sel-${i}-${t}`} name={t} type="added" removable onPress={() => removeTag(t)} />
         ))}
       </View>
-
-      {/* Populares (independentes da seleção; só mudamos o visual via `active`) */}
+      {/* Populares */}
       {!!popular.length && <Text style={styles.label}>Populares:</Text>}
       <View style={styles.tagList}>
         {popular.map((t, i) => (
@@ -114,7 +108,7 @@ export default function TagManager({
             key={`pop-${i}-${t}`}
             name={t}
             type="suggested"
-            active={selectedSet.has(norm(t))} // destaca se já estiver selecionada
+            active={selectedSet.has(norm(t))}
             onPress={() => togglePopular(t)}
           />
         ))}
@@ -143,12 +137,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  inputContainer: {
+    flex: 1,
+  },
   addTagButton: {
     backgroundColor: '#8f00ff',
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 14,
     marginLeft: 8,
+    flexShrink: 0,
   },
   addTagText: {
     color: '#fff',
