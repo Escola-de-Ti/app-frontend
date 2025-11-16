@@ -26,6 +26,7 @@ import {
   upvotePost,
   getCommentReplies,
   deletePost,
+  superVoteComment,
 } from '../../services/posts';
 import { useAuth } from '../../hooks/useAuth';
 import { getUserDetails } from '../../services/profile';
@@ -108,14 +109,29 @@ function normalizeComment(raw: any): CommentModel {
         ? repliesArray.length
         : undefined;
 
+  const level =
+    typeof raw.nivel === 'number' ? raw.nivel : typeof raw.level === 'number' ? raw.level : null;
+
   return {
     id: String(raw.id ?? raw.comentarioId ?? raw._id ?? `${Date.now()}-${Math.random()}`),
     user: String(raw.usuarioNome ?? raw.autorNome ?? raw.userName ?? 'Usuário'),
     content: String(raw.texto ?? raw.conteudo ?? raw.body ?? ''),
     upvotes: Number(raw.totalUpVotes ?? raw.upvotes ?? 0),
+
+    userUpvoted:
+      typeof raw.jaVotou === 'boolean'
+        ? raw.jaVotou
+        : typeof raw.usuarioJaVotou === 'boolean'
+          ? raw.usuarioJaVotou
+          : undefined,
+
+    superVotes: Number(raw.totalSuperVotes ?? raw.superVotes ?? 0),
+
     replies,
     repliesCount,
     canLoadMore: true,
+
+    level: level ?? undefined,
   };
 }
 
@@ -210,6 +226,11 @@ export function PostDetails({
           setPostUpvoted(Boolean((data as any).usuarioJaVotou));
         }
 
+        // se o back já mandar nivel no PostDetalhesDTO, usa como fallback
+        if (authorLevel == null && typeof (data as any).nivel === 'number') {
+          setAuthorLevel((data as any).nivel);
+        }
+
         // tags do post
         const rawTags = (data as any)?.tags ?? [];
         if (Array.isArray(rawTags)) {
@@ -294,12 +315,7 @@ export function PostDetails({
                   }
 
                   const mapped: CommentModel[] = repliesDto.map((r) => ({
-                    id: String(r.id),
-                    user: String(r.usuarioNome ?? 'Usuário'),
-                    content: String(r.texto ?? ''),
-                    upvotes: Number(r.totalUpVotes ?? 0),
-                    replies: [],
-                    repliesCount: (r as any)?.repliesCount ?? undefined,
+                    ...normalizeComment(r),
                     canLoadMore: true,
                   }));
 
@@ -342,7 +358,7 @@ export function PostDetails({
     return () => {
       mounted = false;
     };
-  }, [postId, userId]);
+  }, [postId, userId, authorLevel]);
 
   // Detalhes do autor
   useEffect(() => {
@@ -351,7 +367,7 @@ export function PostDetails({
     async function loadAuthorDetails() {
       if (!postOwnerId) {
         setAuthorAvatarUrl(null);
-        setAuthorLevel(null);
+        // não mexe no authorLevel se já veio do PostDetalhes
         return;
       }
 
@@ -362,14 +378,13 @@ export function PostDetails({
         const avatar = details.urlImagemPerfil ?? details.avatarUrl ?? details.imagemUrl ?? null;
 
         setAuthorAvatarUrl(avatar);
-        setAuthorLevel(
-          typeof details.nivel === 'number' && !Number.isNaN(details.nivel) ? details.nivel : null
-        );
+        if (typeof details.nivel === 'number' && !Number.isNaN(details.nivel)) {
+          setAuthorLevel(details.nivel);
+        }
       } catch (e: any) {
         console.log('[PostDetails][author][ERR]', e?.message);
         if (!cancelled) {
           setAuthorAvatarUrl(null);
-          setAuthorLevel(null);
         }
       }
     }
@@ -426,6 +441,8 @@ export function PostDetails({
       user: 'Você',
       content: texto,
       upvotes: 0,
+      userUpvoted: false,
+      superVotes: 0,
       replies: [],
       repliesCount: 0,
       canLoadMore: false,
@@ -438,12 +455,7 @@ export function PostDetails({
       setComments((prev) => {
         const withoutTemp = prev.filter((c) => c.id !== optimistic.id);
         const mapped: CommentModel = {
-          id: String(created.id),
-          user: created.usuarioNome,
-          content: created.texto,
-          upvotes: Number(created.totalUpVotes ?? 0),
-          replies: [],
-          repliesCount: 0,
+          ...normalizeComment(created),
           canLoadMore: false,
         };
         return [mapped, ...withoutTemp];
@@ -465,6 +477,8 @@ export function PostDetails({
       user: 'Você',
       content: texto,
       upvotes: 0,
+      userUpvoted: false,
+      superVotes: 0,
       replies: [],
       repliesCount: 0,
       canLoadMore: false,
@@ -488,12 +502,7 @@ export function PostDetails({
             const newReplies = (c.replies || []).map((r) =>
               String(r.id) === String(tempId)
                 ? {
-                    id: String(saved.id),
-                    user: saved.usuarioNome,
-                    content: saved.texto,
-                    upvotes: Number(saved.totalUpVotes ?? 0),
-                    replies: [],
-                    repliesCount: 0,
+                    ...normalizeComment(saved),
                     canLoadMore: false,
                   }
                 : r
@@ -531,12 +540,7 @@ export function PostDetails({
       const repliesDto = await getCommentReplies(Number(parentId), 50);
       const mapped: CommentModel[] = Array.isArray(repliesDto)
         ? repliesDto.map((r) => ({
-            id: String(r.id),
-            user: String(r.usuarioNome ?? 'Usuário'),
-            content: String(r.texto ?? ''),
-            upvotes: Number(r.totalUpVotes ?? 0),
-            replies: [],
-            repliesCount: (r as any)?.repliesCount ?? undefined,
+            ...normalizeComment(r),
             canLoadMore: true,
           }))
         : [];
@@ -581,7 +585,19 @@ export function PostDetails({
       if (willUpvote) {
         await upvoteComment(Number(commentId));
       } else {
-        // se tiver endpoint de "desvotar", chamar aqui
+        // se tiver endpoint de "desvotar" comentário, colocar aqui
+      }
+    } catch (e) {
+      throw e;
+    }
+  };
+
+  const handleCommentSuperVote = async (commentId: ID, willSuperVote: boolean) => {
+    try {
+      if (willSuperVote) {
+        await superVoteComment(Number(commentId));
+      } else {
+        // se no futuro tiver endpoint pra remover super voto, entra aqui
       }
     } catch (e) {
       throw e;
@@ -721,15 +737,27 @@ export function PostDetails({
             </TouchableOpacity>
           </View>
 
-          {isOwner && (
+          <View style={styles.headerRight}>
+            {isOwner && (
+              <TouchableOpacity
+                onPress={handleOpenPostMenu}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Feather name="more-horizontal" size={22} color="#ccc" />
+              </TouchableOpacity>
+            )}
+
+            {/* Botão X pra fechar o PostDetails */}
             <TouchableOpacity
-              onPress={handleOpenPostMenu}
+              onPress={handleClose}
+              style={styles.closeButton}
               activeOpacity={0.7}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Feather name="more-horizontal" size={22} color="#ccc" />
+              <Feather name="x" size={22} color="#ccc" />
             </TouchableOpacity>
-          )}
+          </View>
         </View>
 
         {/* Título + Descrição */}
@@ -821,7 +849,10 @@ export function PostDetails({
               depth={0}
               onReply={handleReply}
               onUpvote={handleCommentUpvote}
+              onSuperVote={handleCommentSuperVote}
               onLoadMoreReplies={handleLoadMoreReplies}
+              initiallyUpvoted={comment.userUpvoted}
+              initiallySuperVoted={comment as any /* se tiver userSuperVoted no futuro */}
             />
           ))}
         </View>
@@ -863,6 +894,7 @@ const styles = StyleSheet.create({
   container: { backgroundColor: '#0b0b0f', flex: 1, padding: 16 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   closeButton: { padding: 4 },
 
   userInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },

@@ -17,12 +17,24 @@ export type CommentModel = {
   user?: string;
   author?: UserRef | null;
   content: string;
+
+  // votos normais
   upvotes: number;
+  /** opcional: se você já tiver esse booleano no payload do back */
+  userUpvoted?: boolean;
+
+  // SUPER VOTE
+  superVotes?: number;
+  userSuperVoted?: boolean;
+
+  // replies
   replies?: CommentModel[];
   repliesCount?: number | null;
   canLoadMore?: boolean;
-  /** opcional: se você já tiver esse booleano no payload do back */
-  userUpvoted?: boolean;
+
+  // nível vindo do back (nivel do comentário / autor)
+  level?: number | null;
+  nivel?: number | null; // aceita dos dois jeitos, se vier assim do back
 };
 
 type CommentProps = {
@@ -30,10 +42,16 @@ type CommentProps = {
   depth?: number;
   maxDepth?: number;
   onReply: (parentId: ID, replyText: string) => void;
+
   onUpvote?: (commentId: ID, willUpvote: boolean) => Promise<void> | void;
+  onSuperVote?: (commentId: ID, willSuperVote: boolean) => Promise<void> | void;
+
   onLoadMoreReplies?: (commentId: ID) => Promise<void> | void;
-  /** novo: permite o pai informar o estado inicial do voto */
+
+  /** estado inicial de upvote, se o pai já souber */
   initiallyUpvoted?: boolean;
+  /** estado inicial de super vote, se o pai já souber */
+  initiallySuperVoted?: boolean;
 };
 
 const toBool = (v: any): boolean => {
@@ -49,18 +67,18 @@ export function CommentItem({
   maxDepth = 3,
   onReply,
   onUpvote,
+  onSuperVote,
   onLoadMoreReplies,
   initiallyUpvoted,
+  initiallySuperVoted,
 }: CommentProps) {
-  // === AJUSTES DO UPVOTE (início) ===
-  // estado inicial considera: prop initiallyUpvoted > comment.userUpvoted > false
+  // ===== UPVOTE =====
   const [upvoted, setUpvoted] = useState<boolean>(
     typeof initiallyUpvoted === 'boolean' ? initiallyUpvoted : toBool(comment.userUpvoted)
   );
   const [upvotes, setUpvotes] = useState<number>(Number(comment.upvotes) || 0);
   const votingRef = useRef(false); // evita double-tap/disparos concorrentes
 
-  // sincroniza quando o pai atualizar (ex.: após resposta do back)
   useEffect(() => {
     if (typeof initiallyUpvoted === 'boolean') {
       setUpvoted(initiallyUpvoted);
@@ -69,7 +87,6 @@ export function CommentItem({
     }
   }, [initiallyUpvoted, comment.userUpvoted, comment.id]);
 
-  // se o pai atualizar a contagem (ex.: correção do backend)
   useEffect(() => {
     if (typeof comment.upvotes === 'number') {
       setUpvotes(Number(comment.upvotes) || 0);
@@ -77,7 +94,7 @@ export function CommentItem({
   }, [comment.upvotes, comment.id]);
 
   const handleUpvote = async () => {
-    if (votingRef.current) return; // trava enquanto a chamada anterior não termina
+    if (votingRef.current) return;
     votingRef.current = true;
 
     const willUpvote = !upvoted;
@@ -88,8 +105,6 @@ export function CommentItem({
 
     try {
       await onUpvote?.(comment.id, willUpvote);
-      // OBS: se o pai corrigir via props (userUpvoted/upvotes),
-      // os useEffects acima vão sincronizar automaticamente.
     } catch {
       // rollback
       setUpvoted((prev) => !prev);
@@ -99,8 +114,51 @@ export function CommentItem({
       votingRef.current = false;
     }
   };
-  // === AJUSTES DO UPVOTE (fim) ===
 
+  // ===== SUPER VOTE =====
+  const [superVoted, setSuperVoted] = useState<boolean>(
+    typeof initiallySuperVoted === 'boolean' ? initiallySuperVoted : toBool(comment.userSuperVoted)
+  );
+  const [superVotes, setSuperVotes] = useState<number>(Number(comment.superVotes) || 0);
+  const superVotingRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof initiallySuperVoted === 'boolean') {
+      setSuperVoted(initiallySuperVoted);
+    } else if (typeof comment.userSuperVoted !== 'undefined') {
+      setSuperVoted(toBool(comment.userSuperVoted));
+    }
+  }, [initiallySuperVoted, comment.userSuperVoted, comment.id]);
+
+  useEffect(() => {
+    if (typeof comment.superVotes === 'number') {
+      setSuperVotes(Number(comment.superVotes) || 0);
+    }
+  }, [comment.superVotes, comment.id]);
+
+  const handleSuperVote = async () => {
+    if (superVotingRef.current) return;
+    superVotingRef.current = true;
+
+    const willSuperVote = !superVoted;
+
+    // otimista
+    setSuperVoted(willSuperVote);
+    setSuperVotes((prev) => (willSuperVote ? prev + 1 : Math.max(0, prev - 1)));
+
+    try {
+      await onSuperVote?.(comment.id, willSuperVote);
+    } catch {
+      // rollback
+      setSuperVoted((prev) => !prev);
+      setSuperVotes((prev) => (!willSuperVote ? prev + 1 : Math.max(0, prev - 1)));
+      Alert.alert('Erro', 'Não foi possível registrar o super voto neste comentário.');
+    } finally {
+      superVotingRef.current = false;
+    }
+  };
+
+  // ===== REPLY / LOAD MORE =====
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [expanded, setExpanded] = useState(false);
@@ -143,6 +201,14 @@ export function CommentItem({
 
   const borderColor = depth > 0 ? '#F08E90' : '#5b2eff';
 
+  // nível vindo do back (aceita level ou nivel)
+  const level =
+    typeof comment.level === 'number'
+      ? comment.level
+      : typeof comment.nivel === 'number'
+        ? comment.nivel
+        : null;
+
   return (
     <View style={[styles.commentContainer, { marginLeft: depth * 20 }]} testID="comment-item">
       <View style={styles.commentHeader}>
@@ -151,6 +217,12 @@ export function CommentItem({
             <Text style={styles.commentAvatarText}>{displayUser.charAt(0).toUpperCase()}</Text>
           </View>
           <Text style={styles.commentUser}>{displayUser}</Text>
+
+          {typeof level === 'number' && (
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelBadgeText}>Nível {level}</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -164,11 +236,22 @@ export function CommentItem({
       </View>
 
       <View style={styles.commentFooter}>
+        {/* UPVOTE */}
         <TouchableOpacity onPress={handleUpvote} activeOpacity={0.8} accessibilityRole="button">
           <View style={[styles.commentUpvoteContainer, upvoted && styles.commentUpvoteActive]}>
             <Feather name="arrow-up" size={13} color={upvoted ? '#003d2b' : '#fff'} />
             <Text style={[styles.commentStatText, upvoted && styles.commentUpvoteTextActive]}>
               {upvotes}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* SUPER VOTE */}
+        <TouchableOpacity onPress={handleSuperVote} activeOpacity={0.8} accessibilityRole="button">
+          <View style={[styles.superVoteContainer, superVoted && styles.superVoteActive]}>
+            <Feather name="zap" size={13} color={superVoted ? '#2b003d' : '#fff'} />
+            <Text style={[styles.commentStatText, superVoted && styles.superVoteTextActive]}>
+              {superVotes}
             </Text>
           </View>
         </TouchableOpacity>
@@ -225,9 +308,11 @@ export function CommentItem({
               maxDepth={maxDepth}
               onReply={onReply}
               onUpvote={onUpvote}
+              onSuperVote={onSuperVote}
               onLoadMoreReplies={onLoadMoreReplies}
-              // passa o estado inicial do filho (se vier do back)
+              // passa estado inicial pro filho
               initiallyUpvoted={toBool(reply.userUpvoted)}
+              initiallySuperVoted={toBool(reply.userSuperVoted)}
             />
           ))}
         </View>
@@ -249,6 +334,20 @@ const styles = StyleSheet.create({
   },
   commentAvatarText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   commentUser: { color: '#fff', fontWeight: '600' },
+
+  levelBadge: {
+    marginLeft: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: '#2a213f',
+  },
+  levelBadgeText: {
+    color: '#c9b6ff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+
   commentBox: {
     backgroundColor: '#1b1b1f',
     borderLeftWidth: 3,
@@ -259,6 +358,7 @@ const styles = StyleSheet.create({
   },
   commentText: { color: '#ccc', fontSize: 13 },
   commentFooter: { flexDirection: 'row', alignItems: 'center', gap: 14, marginLeft: 34 },
+
   commentUpvoteContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -271,6 +371,24 @@ const styles = StyleSheet.create({
   commentUpvoteActive: { backgroundColor: '#6ef7c3' },
   commentStatText: { color: '#ccc', fontSize: 12 },
   commentUpvoteTextActive: { color: '#003d2b', fontWeight: '600' },
+
+  superVoteContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'transparent',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  superVoteActive: {
+    backgroundColor: '#f6a8ff',
+  },
+  superVoteTextActive: {
+    color: '#2b003d',
+    fontWeight: '600',
+  },
+
   replyText: { color: '#82caff', fontSize: 12 },
   seeMoreText: { color: '#b3b3ff', fontSize: 12, fontWeight: '600' },
   replyInputContainer: {

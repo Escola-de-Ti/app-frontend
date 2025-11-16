@@ -12,7 +12,10 @@ const IMAGEM_ENDPOINT = '/api/imagem';
 export type { PostFeedDTO, GetFeedResponseDTO } from '../types';
 
 // ===== Tipos específicos (detalhes/comentários) =====
-export type TagDTO = { id: number; name: string };
+export type TagDTO = {
+  id: number;
+  name: string;
+};
 
 export type ComentarioDTO = {
   id: number;
@@ -24,6 +27,12 @@ export type ComentarioDTO = {
   totalSuperVotes: number;
   comentarioPaiId: number | null;
   dataCriacao: string;
+  /** flag vinda do back (Boolean jaVotou) */
+  jaVotou?: boolean;
+  /** alias mais semântico pro front usar */
+  usuarioJaVotou?: boolean;
+  /** nível / profundidade do comentário na árvore */
+  nivel?: number | null;
 };
 
 export type PostDetalhesDTO = {
@@ -37,6 +46,12 @@ export type PostDetalhesDTO = {
   dataCriacao: string;
   comentarios: ComentarioDTO[];
   hasMoreComentarios: boolean;
+  /** flag vinda do back (Boolean jaVotou) */
+  jaVotou?: boolean;
+  /** nível do post (mesma ideia de “nivel” no comentário) */
+  nivel?: number | null;
+  /** imagens associadas ao post (List<ImagemPostDTO> no back) */
+  urlsImagens?: Imagem[];
 };
 
 export type PostDetalhesResponse = PostDetalhesDTO & {
@@ -227,16 +242,48 @@ export async function getPostDetails(
       params: { pageSize },
     });
 
-    const totalUpVotes = toNum((data as any)?.totalUpVotes);
+    const raw = data as any;
 
-    const voted = (data as any)?.usuarioJaVotou ?? (data as any)?.votado;
+    const totalUpVotes = toNum(raw?.totalUpVotes);
+    const voted = raw?.usuarioJaVotou ?? raw?.jaVotou ?? raw?.votado;
+
+    // normaliza comentários pra garantir número e flags
+    const comentarios: ComentarioDTO[] = Array.isArray(raw?.comentarios)
+      ? (raw.comentarios as any[]).map((c): ComentarioDTO => {
+          const totalUp = toNum(c?.totalUpVotes);
+          const totalSuper = toNum(c?.totalSuperVotes);
+          const votedComentario = c?.usuarioJaVotou ?? c?.jaVotou;
+
+          return {
+            id: Number(c.id),
+            postId: Number(c.postId),
+            usuarioId: Number(c.usuarioId),
+            usuarioNome: String(c.usuarioNome ?? ''),
+            texto: String(c.texto ?? ''),
+            totalUpVotes: totalUp,
+            totalSuperVotes: totalSuper,
+            comentarioPaiId:
+              c.comentarioPaiId != null && !Number.isNaN(Number(c.comentarioPaiId))
+                ? Number(c.comentarioPaiId)
+                : null,
+            dataCriacao: String(c.dataCriacao ?? ''),
+            jaVotou: typeof c?.jaVotou === 'boolean' ? c.jaVotou : undefined,
+            usuarioJaVotou: typeof votedComentario === 'boolean' ? votedComentario : undefined,
+            nivel: c.nivel != null && !Number.isNaN(Number(c.nivel)) ? Number(c.nivel) : null,
+          };
+        })
+      : [];
+
+    const nivelPost =
+      raw?.nivel != null && !Number.isNaN(Number(raw.nivel)) ? Number(raw.nivel) : null;
 
     return {
-      ...data,
+      ...(data as PostDetalhesDTO),
       totalUpVotes,
       usuarioJaVotou: typeof voted === 'boolean' ? voted : undefined,
-      comentarios: Array.isArray((data as any)?.comentarios) ? (data as any).comentarios : [],
-      hasMoreComentarios: Boolean((data as any)?.hasMoreComentarios),
+      hasMoreComentarios: Boolean(raw?.hasMoreComentarios),
+      comentarios,
+      nivel: nivelPost,
     };
   } catch (err: any) {
     throw new Error(extractErrorMessage(err));

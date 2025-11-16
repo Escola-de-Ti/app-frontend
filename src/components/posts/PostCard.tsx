@@ -10,7 +10,7 @@ import { PostDetails } from './PostDetails';
 import type { PostFeedModel } from '../../types';
 import type { UpvoteResponse } from '../../services/posts';
 import { OwnContentVoteError } from '../../services/posts';
-import { getUserDetails } from '../../services/profile';
+// REMOVIDO: import { getUserDetails } from '../../services/profile';
 
 type PostCardProps = {
   post: PostFeedModel;
@@ -86,43 +86,11 @@ export function PostCard({
     return Number.isFinite(n) ? n : null;
   }, [post]);
 
-  // ==== AVATAR DO AUTOR (buscando em /api/usuarios/detalhes/{id}) ====
-  const [authorAvatarUrl, setAuthorAvatarUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadAuthor() {
-      if (!authorId) {
-        setAuthorAvatarUrl(null);
-        return;
-      }
-
-      try {
-        const details: any = await getUserDetails(authorId);
-        if (cancelled) return;
-
-        // exemplo de resposta:
-        // {
-        //   "nome": "João Silva",
-        //   "imagemUrl": "https://..."
-        //   ...
-        // }
-        const avatar = details.urlImagemPerfil ?? details.avatarUrl ?? details.imagemUrl ?? null;
-
-        setAuthorAvatarUrl(avatar);
-      } catch (err) {
-        console.log('[PostCard][author][ERR]', err);
-        if (!cancelled) setAuthorAvatarUrl(null);
-      }
-    }
-
-    loadAuthor();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authorId]);
+  // ==== AVATAR DO AUTOR (APENAS O QUE JÁ VEM NO POST) ========
+  const authorAvatarUrl = useMemo(() => {
+    const anyPost: any = post;
+    return anyPost.urlImagemPerfil ?? anyPost.avatarUrl ?? anyPost.imagemUrl ?? null;
+  }, [post]);
 
   const authorInitial = useMemo(
     () => (post.nomeUsuario || '?').charAt(0).toUpperCase(),
