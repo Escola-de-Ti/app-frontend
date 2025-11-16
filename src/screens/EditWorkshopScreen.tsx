@@ -35,6 +35,9 @@ import {
 
 const MAX_IMAGES = 10;
 
+// 👇 truque pra tratar 'web' sem o TS chiar
+const IS_WEB = Platform.OS === ('web' as any);
+
 type RouteParams = { id?: number };
 
 type EditableImage = {
@@ -67,6 +70,10 @@ export default function EditWorkshopScreen() {
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
 
+  // Campos de texto das datas (usados principalmente no web)
+  const [startAtText, setStartAtText] = useState('');
+  const [endAtText, setEndAtText] = useState('');
+
   // Imagens
   const [editableImages, setEditableImages] = useState<EditableImage[]>([]);
   const [newImages, setNewImages] = useState<string[]>([]);
@@ -83,6 +90,32 @@ export default function EditWorkshopScreen() {
       d.getHours()
     )}:${pad(d.getMinutes())}`;
   };
+
+  // parser pra datas digitadas no web: "dd/mm/aaaa hh:mm"
+  const parseDateTime = (value: string): Date | null => {
+    const text = value.trim();
+    const m = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+
+    const [, dd, mm, yyyy, hh, min] = m;
+    const day = Number(dd);
+    const month = Number(mm) - 1; // Date usa 0-11
+    const year = Number(yyyy);
+    const hour = Number(hh);
+    const minute = Number(min);
+
+    const d = new Date(year, month, day, hour, minute);
+    if (Number.isNaN(d.getTime())) return null;
+    return d;
+  };
+
+  // Mantém os textos em sync quando as datas mudam (útil pro web)
+  useEffect(() => {
+    const formattedStart = formatDateTime(startAt);
+    const formattedEnd = formatDateTime(endAt);
+    setStartAtText(formattedStart);
+    setEndAtText(formattedEnd);
+  }, [startAt, endAt]);
 
   // ===== carregar workshop pelo id =====
   useEffect(() => {
@@ -104,8 +137,10 @@ export default function EditWorkshopScreen() {
         setDescription(desc);
 
         // datas
-        setStartAt(w.dataInicio ?? new Date());
-        setEndAt(anyW?.dataTermino ?? new Date(Date.now() + 2 * 60 * 60 * 1000));
+        const start = w.dataInicio ?? new Date();
+        const end = anyW?.dataTermino ?? new Date(Date.now() + 2 * 60 * 60 * 1000);
+        setStartAt(start);
+        setEndAt(end);
 
         // link (se tiver)
         const link = anyW?.linkMeet ?? '';
@@ -125,8 +160,6 @@ export default function EditWorkshopScreen() {
         }
 
         // 🔗 imagens existentes do workshop
-        // HOJE: vem em descricao.urlImagem + descricao.idImagem (apenas 1)
-        // FUTURO: se virar array urlsImagens/imagens, também tratamos.
         const rawArray = anyW?.urlsImagens ?? anyW?.imagens;
         const descObj = anyW?.descricao;
 
@@ -151,7 +184,7 @@ export default function EditWorkshopScreen() {
         }
 
         setEditableImages(mapped);
-        setRemovedImageIds([]); // limpamos qualquer estado anterior
+        setRemovedImageIds([]);
         setNewImages([]);
       } catch (e: any) {
         console.log('[EditWorkshop] load error', e?.message);
@@ -436,18 +469,34 @@ export default function EditWorkshopScreen() {
             <View style={styles.datetimeRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Início</Text>
-                <TouchableOpacity style={styles.dtBtn} onPress={() => setShowStartPicker(true)}>
-                  <Text style={styles.dtBtnText}>{formatDateTime(startAt)}</Text>
-                </TouchableOpacity>
-                {showStartPicker && (
-                  <DateTimePicker
-                    value={startAt}
-                    mode="datetime"
-                    onChange={(_, date) => {
-                      setShowStartPicker(false);
-                      if (date) setStartAt(date);
+
+                {IS_WEB ? (
+                  <AppInput
+                    placeholder="dd/mm/aaaa hh:mm"
+                    value={startAtText}
+                    onChangeText={(text) => {
+                      setStartAtText(text);
+                      const parsed = parseDateTime(text);
+                      if (parsed) setStartAt(parsed);
                     }}
+                    autoCapitalize="none"
                   />
+                ) : (
+                  <>
+                    <TouchableOpacity style={styles.dtBtn} onPress={() => setShowStartPicker(true)}>
+                      <Text style={styles.dtBtnText}>{formatDateTime(startAt)}</Text>
+                    </TouchableOpacity>
+                    {showStartPicker && !IS_WEB && (
+                      <DateTimePicker
+                        value={startAt}
+                        mode="datetime"
+                        onChange={(_, date) => {
+                          setShowStartPicker(false);
+                          if (date) setStartAt(date);
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </View>
 
@@ -455,18 +504,34 @@ export default function EditWorkshopScreen() {
 
               <View style={{ flex: 1 }}>
                 <Text style={styles.label}>Término</Text>
-                <TouchableOpacity style={styles.dtBtn} onPress={() => setShowEndPicker(true)}>
-                  <Text style={styles.dtBtnText}>{formatDateTime(endAt)}</Text>
-                </TouchableOpacity>
-                {showEndPicker && (
-                  <DateTimePicker
-                    value={endAt}
-                    mode="datetime"
-                    onChange={(_, date) => {
-                      setShowEndPicker(false);
-                      if (date) setEndAt(date);
+
+                {IS_WEB ? (
+                  <AppInput
+                    placeholder="dd/mm/aaaa hh:mm"
+                    value={endAtText}
+                    onChangeText={(text) => {
+                      setEndAtText(text);
+                      const parsed = parseDateTime(text);
+                      if (parsed) setEndAt(parsed);
                     }}
+                    autoCapitalize="none"
                   />
+                ) : (
+                  <>
+                    <TouchableOpacity style={styles.dtBtn} onPress={() => setShowEndPicker(true)}>
+                      <Text style={styles.dtBtnText}>{formatDateTime(endAt)}</Text>
+                    </TouchableOpacity>
+                    {showEndPicker && !IS_WEB && (
+                      <DateTimePicker
+                        value={endAt}
+                        mode="datetime"
+                        onChange={(_, date) => {
+                          setShowEndPicker(false);
+                          if (date) setEndAt(date);
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </View>
             </View>

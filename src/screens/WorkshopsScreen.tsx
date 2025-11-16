@@ -14,21 +14,27 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import AppLayout from '../components/AppLayout';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import Toast from 'react-native-toast-message';
+
+import {
+  listAll,
+  listOpen,
+  enrollInWorkshop,
+  OwnWorkshopEnrollError,
+  NotEnoughTokensEnrollError,
+} from '../services/workshops';
 
 import type { Workshop } from '../types';
 import AvailableWorkshops from '../components/workshops/AvailableWorkshops';
 import MyWorkshops from '../components/workshops/MyWorkshops';
 import EnrolledWorkshops from '../components/workshops/EnrolledWorkshops';
-import { listAll, listOpen } from '../services/workshops';
 
 // 🔑 resolução de usuário “do jeito certo”
 import { useAuth } from '../hooks/useAuth';
 import { getAccessToken } from '../lib/secure';
 import { getUserIdFromJwt, getEmailFromJwt } from '../lib/jwt';
 import { getUsuarioIdByEmail } from '../services/user';
-
-// ⬇️ input de filtro específico de workshops
-import FilterButton from '../components/filters/FilterButton';
+import { getUserDetails } from '../services/profile';
 
 type Mode = 'Disponíveis' | 'Meus Workshops' | 'Inscritos';
 
@@ -68,6 +74,29 @@ function ModeDropdown({ value, onChange }: { value: Mode; onChange: (v: Mode) =>
   );
 }
 
+function TokenBadge({ tokens }: { tokens: number | null }) {
+  if (tokens == null || Number.isNaN(tokens)) return null;
+
+  const formatted = tokens.toLocaleString('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  });
+
+  return (
+    <LinearGradient
+      colors={['#3CF6B4', '#6F9CFF']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.tokenBadge}
+    >
+      <View style={styles.tokenIcon}>
+        <Text style={styles.tokenIconText}>T</Text>
+      </View>
+      <Text style={styles.tokenText}>{formatted}</Text>
+    </LinearGradient>
+  );
+}
+
 export default function WorkshopsScreen() {
   const navigation = useNavigation<any>();
   const { userId } = useAuth();
@@ -78,6 +107,9 @@ export default function WorkshopsScreen() {
   const [available, setAvailable] = useState<Workshop[]>([]);
   const [mine, setMine] = useState<Workshop[]>([]);
   const [enrolled, setEnrolled] = useState<Workshop[]>([]);
+
+  const [isInstructor, setIsInstructor] = useState(false);
+  const [userTokens, setUserTokens] = useState<number | null>(null);
 
   // termo de busca
   const [q, setQ] = useState('');
@@ -110,36 +142,69 @@ export default function WorkshopsScreen() {
     try {
       const myId = await resolveUserId();
 
-      // Disponíveis (ABERTOS)
-      let abertos = await listOpen();
-      // se o DTO trouxer `inscrito`, não listar como disponível algo já inscrito
-      abertos = abertos.filter((w: any) => !w?.inscrito);
-      setAvailable(abertos);
+      // Descobre se o usuário é INSTRUTOR e pega saldo de tokens
+      if (myId != null) {
+        try {
+          const details: any = await getUserDetails(myId);
 
-      // Meus (por instrutorId)
+          const tipo =
+            details?.tipo ??
+            details?.tipoUsuario ??
+            details?.role ??
+            details?.perfil ??
+            details?.perfilUsuario;
+          setIsInstructor(String(tipo).toUpperCase() === 'INSTRUTOR');
+
+          const tokensRaw =
+            details?.tokens ??
+            details?.saldoTokens ??
+            details?.saldoToken ??
+            details?.tokensDisponiveis ??
+            details?.qtdTokens;
+
+          const tokensNum = Number(tokensRaw);
+          setUserTokens(Number.isFinite(tokensNum) ? tokensNum : null);
+        } catch (e) {
+          console.log(
+            '[WorkshopsScreen] erro ao carregar tipo / tokens do usuário',
+            (e as any)?.message
+          );
+          setIsInstructor(false);
+          setUserTokens(null);
+        }
+      } else {
+        setIsInstructor(false);
+        setUserTokens(null);
+      }
+
+      // Disponíveis = status ABERTO (que ainda não estou inscrito)
+      const abertosRaw = await listOpen();
+      const disponiveis = (abertosRaw as any[]).filter((w) => !w?.inscrito);
+      setAvailable(disponiveis);
+
+      // Meus = todos com instrutorId = meuId (independente de status)
       const meus = myId ? await listAll({ instrutorId: myId }) : [];
       setMine(meus);
 
-      // Inscritos (heurística até existir endpoint dedicado)
-      const andamento = await listAll({ status: 'EM_ANDAMENTO' });
-      const concluido = await listAll({ status: 'CONCLUIDO' });
-
-      let inscritos = [...andamento, ...concluido];
-
-      // 1) se vier `inscrito` do back, usa-o como verdade
-      if (inscritos.some((w: any) => 'inscrito' in w)) {
-        inscritos = inscritos.filter((w: any) => w?.inscrito === true);
-      }
-
-      // 2) exclui workshops em que eu sou o instrutor
+      // Inscritos = todos que vierem com inscrito === true (qualquer status),
+      // e que não sejam workshops onde EU sou o instrutor.
+      const todos = await listAll();
       const myIdNum = myId != null ? Number(myId) : null;
+
+      let inscritos = (todos as any[]).filter((w) => w?.inscrito === true);
+
       if (myIdNum != null) {
         inscritos = inscritos.filter((w) => Number(w.instrutorId) !== myIdNum);
       }
 
-      // 3) remove duplicatas por id
       const uniq = new Map<number, Workshop>();
-      inscritos.forEach((w) => uniq.set(Number(w.id), w));
+      inscritos.forEach((w: any) => {
+        const idNum = Number(w.id);
+        if (Number.isFinite(idNum)) {
+          uniq.set(idNum, w as Workshop);
+        }
+      });
+
       setEnrolled(Array.from(uniq.values()));
     } catch (e: any) {
       console.log('[WorkshopsScreen] load error:', e?.message);
@@ -191,9 +256,43 @@ export default function WorkshopsScreen() {
     }
   }, []);
 
-  // Handlers — por enquanto simulados
+  // Handlers
   const onInscrever = async (id: number) => {
-    Alert.alert('Inscrição', `Ação de inscrição simulada para o workshop #${id}`);
+    try {
+      await enrollInWorkshop(id);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Inscrição realizada!',
+        text2: 'Você foi inscrito neste workshop.',
+      });
+
+      await load();
+    } catch (e: any) {
+      if (e instanceof OwnWorkshopEnrollError) {
+        Toast.show({
+          type: 'error',
+          text1: 'Não permitido',
+          text2: e.message || 'Você não pode se inscrever no seu próprio workshop.',
+        });
+        return;
+      }
+
+      if (e instanceof NotEnoughTokensEnrollError) {
+        Toast.show({
+          type: 'error',
+          text1: 'Tokens insuficientes',
+          text2: e.message || 'Você não possui tokens suficientes para este workshop.',
+        });
+        return;
+      }
+
+      Toast.show({
+        type: 'error',
+        text1: 'Erro ao se inscrever',
+        text2: e?.message || 'Não foi possível concluir a inscrição. Tente novamente.',
+      });
+    }
   };
 
   const onCancelar = async (id: number) => {
@@ -242,6 +341,8 @@ export default function WorkshopsScreen() {
     onEditar,
   ]);
 
+  const canShowCreateButton = isInstructor && mode === 'Meus Workshops';
+
   return (
     <AppLayout initialActivePage="Workshops" backgroundColor="rgb(17, 17, 17)">
       <View style={styles.container}>
@@ -251,21 +352,32 @@ export default function WorkshopsScreen() {
         <View style={styles.header}>
           <View style={styles.titleRow}>
             <Text style={styles.h1}>Workshops</Text>
-
-            {mode === 'Meus Workshops' && (
-              <TouchableOpacity activeOpacity={0.9} onPress={goCreateWorkshop}>
-                <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.createBtn}>
-                  <Feather name="plus-circle" size={16} color="#0B0B0E" />
-                  <Text style={styles.createBtnText}>Criar workshop</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
+            {/* 💰 badge de tokens no canto superior direito */}
+            <TokenBadge tokens={userTokens} />
           </View>
 
           <Text style={styles.subtitleHeader}>Aprenda com especialistas da comunidade</Text>
 
           <View style={styles.headerRow}>
             <ModeDropdown value={mode} onChange={setMode} />
+
+            {canShowCreateButton && (
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={goCreateWorkshop}
+                style={styles.createBtnWrapper}
+              >
+                <LinearGradient
+                  colors={['#00FFA3', '#7C73FF']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.createBtn}
+                >
+                  <Feather name="plus-circle" size={16} color="#0B0B0E" />
+                  <Text style={styles.createBtnText}>Criar workshop</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -292,17 +404,54 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    justifyContent: 'space-between',
+  },
+
+  createBtnWrapper: {
+    flexShrink: 0,
   },
 
   createBtn: {
-    borderRadius: 10,
+    borderRadius: 999,
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   createBtnText: {
+    color: '#0B0B0E',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+
+  // 🎨 badge de tokens
+  tokenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  tokenIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#0B0B0E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  tokenIconText: {
+    color: '#00FFA3',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  tokenText: {
     color: '#0B0B0E',
     fontWeight: '800',
     fontSize: 12,

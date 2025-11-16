@@ -46,6 +46,10 @@ export default function WorkshopCard({
     }
   }
 
+  // 💰 custo em tokens (compat com campos antigos/novos)
+  const rawCost = (anyItem?.custo ?? anyItem?.tokens) as number | undefined;
+  const costTokens = Number.isFinite(Number(rawCost)) ? Number(rawCost) : 0;
+
   return (
     <View style={s.card}>
       {/* Capa / banner do workshop */}
@@ -56,9 +60,18 @@ export default function WorkshopCard({
       )}
 
       <View style={s.body}>
-        <Text style={s.title} numberOfLines={2}>
-          {item.titulo}
-        </Text>
+        {/* Título + custo em tagzinha rosa */}
+        <View style={s.titleRow}>
+          <Text style={s.title} numberOfLines={2}>
+            {item.titulo}
+          </Text>
+
+          {costTokens > 0 && (
+            <View style={s.costTag}>
+              <Text style={s.costTagText}>{costTokens} tokens</Text>
+            </View>
+          )}
+        </View>
 
         {/* Tema (se houver) */}
         {item.descricao?.tema ? (
@@ -170,7 +183,29 @@ const s = StyleSheet.create({
   body: {
     padding: 16,
   },
-  title: { color: '#fff', fontSize: 18, fontWeight: '600' },
+
+  // título + tag de custo
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  title: { color: '#fff', fontSize: 18, fontWeight: '600', flex: 1 },
+
+  // 💰 tagzinha rosa só com contorno
+  costTag: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#f472b6',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  costTagText: {
+    color: '#f9a8d4',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
   subTitle: { color: '#bdbdbd', marginTop: 4 },
   meta: { color: '#9ca3af', marginTop: 4 },
   desc: { color: '#d1d5db', marginTop: 8 },
