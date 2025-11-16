@@ -21,13 +21,19 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.gabrielams012.AppKnowHall"
     },
     "web": {
       "favicon": "./assets/icons/favicon.png"
     },
     "plugins": [
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "174704d4-1223-4b6f-8fae-fd60af964bd6"
+      }
+    }
   }
 }
