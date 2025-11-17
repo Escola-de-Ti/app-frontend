@@ -19,7 +19,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 
-import AppLayout from '../components/AppLayout';
+import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 import AppInput from '../components/AppInput';
 import ImageUploader from '../components/ImageUploader';
 
@@ -35,15 +35,14 @@ import {
 
 const MAX_IMAGES = 10;
 
-// 👇 truque pra tratar 'web' sem o TS chiar
 const IS_WEB = Platform.OS === ('web' as any);
 
 type RouteParams = { id?: number };
 
 type EditableImage = {
   id: number;
-  url: string; // URL remota atual
-  localUri?: string; // nova imagem escolhida (local) para substituir
+  url: string;
+  localUri?: string;
 };
 
 export default function EditWorkshopScreen() {
@@ -53,31 +52,25 @@ export default function EditWorkshopScreen() {
 
   const [loading, setLoading] = useState(false);
 
-  // Dados principais
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
-  // Link (apenas link, sem modalidade)
   const [meetingLink, setMeetingLink] = useState('');
 
-  // Capacidade / Tokens
   const [capacity, setCapacity] = useState('');
   const [tokens, setTokens] = useState('');
 
-  // Datas
   const [startAt, setStartAt] = useState<Date>(new Date());
   const [endAt, setEndAt] = useState<Date>(new Date(Date.now() + 2 * 60 * 60 * 1000));
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
 
-  // Campos de texto das datas (usados principalmente no web)
   const [startAtText, setStartAtText] = useState('');
   const [endAtText, setEndAtText] = useState('');
 
-  // Imagens
   const [editableImages, setEditableImages] = useState<EditableImage[]>([]);
   const [newImages, setNewImages] = useState<string[]>([]);
-  const [removedImageIds, setRemovedImageIds] = useState<number[]>([]); // ids a deletar no back
+  const [removedImageIds, setRemovedImageIds] = useState<number[]>([]);
 
   const titleCount = title.trim().length;
   const descriptionCount = description.trim().length;
@@ -91,7 +84,6 @@ export default function EditWorkshopScreen() {
     )}:${pad(d.getMinutes())}`;
   };
 
-  // parser pra datas digitadas no web: "dd/mm/aaaa hh:mm"
   const parseDateTime = (value: string): Date | null => {
     const text = value.trim();
     const m = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/);
@@ -99,7 +91,7 @@ export default function EditWorkshopScreen() {
 
     const [, dd, mm, yyyy, hh, min] = m;
     const day = Number(dd);
-    const month = Number(mm) - 1; // Date usa 0-11
+    const month = Number(mm) - 1;
     const year = Number(yyyy);
     const hour = Number(hh);
     const minute = Number(min);
@@ -109,7 +101,6 @@ export default function EditWorkshopScreen() {
     return d;
   };
 
-  // Mantém os textos em sync quando as datas mudam (útil pro web)
   useEffect(() => {
     const formattedStart = formatDateTime(startAt);
     const formattedEnd = formatDateTime(endAt);
@@ -131,22 +122,18 @@ export default function EditWorkshopScreen() {
         const w: Workshop = await getWorkshopById(id);
         const anyW: any = w;
 
-        // título / descrição
         setTitle(w.titulo ?? '');
         const desc = anyW?.descricao?.descricao ?? anyW?.descricao ?? '';
         setDescription(desc);
 
-        // datas
         const start = w.dataInicio ?? new Date();
         const end = anyW?.dataTermino ?? new Date(Date.now() + 2 * 60 * 60 * 1000);
         setStartAt(start);
         setEndAt(end);
 
-        // link (se tiver)
         const link = anyW?.linkMeet ?? '';
         setMeetingLink(link);
 
-        // capacidade / tokens (tenta campos novos e depois os antigos)
         if (anyW?.capacidade != null) {
           setCapacity(String(anyW.capacidade));
         } else if (anyW?.vagasTotais != null) {
@@ -159,7 +146,6 @@ export default function EditWorkshopScreen() {
           setTokens(String(anyW.tokens));
         }
 
-        // 🔗 imagens existentes do workshop
         const rawArray = anyW?.urlsImagens ?? anyW?.imagens;
         const descObj = anyW?.descricao;
 
@@ -209,7 +195,7 @@ export default function EditWorkshopScreen() {
     const baseOk = _title.length >= 4 && _desc.length >= 20;
     const timeOk = startAt.getTime() < endAt.getTime();
     const imagesOk = totalImagesCount <= MAX_IMAGES;
-    const linkOk = !_link || _link.length >= 6; // se preencher, exige tamanho mínimo
+    const linkOk = !_link || _link.length >= 6;
 
     return baseOk && linkOk && timeOk && imagesOk && !loading;
   }, [title, description, meetingLink, startAt, endAt, totalImagesCount, loading]);
@@ -236,7 +222,6 @@ export default function EditWorkshopScreen() {
     }
   };
 
-  // 🗑 remover imagem EXISTENTE do workshop
   const handleRemoveExistingImage = (imageId: number) => {
     setEditableImages((prev) => prev.filter((img) => img.id !== imageId));
     setRemovedImageIds((prev) => (prev.includes(imageId) ? prev : [...prev, imageId]));
@@ -317,7 +302,6 @@ export default function EditWorkshopScreen() {
       console.log('[EditWorkshop] UPDATE payload', { id, payload });
       await updateWorkshop(id, payload);
 
-      // 🔁 atualizar imagens EXISTENTES que foram trocadas
       const imagesToUpdate = editableImages.filter((img) => img.localUri);
       if (imagesToUpdate.length > 0) {
         for (const img of imagesToUpdate) {
@@ -337,7 +321,6 @@ export default function EditWorkshopScreen() {
         }
       }
 
-      // 🗑 remover imagens que o usuário excluiu (X)
       if (removedImageIds.length > 0) {
         for (const imgId of removedImageIds) {
           try {
@@ -356,7 +339,6 @@ export default function EditWorkshopScreen() {
         }
       }
 
-      // 📎 anexar novas imagens
       if (newImages.length > 0) {
         try {
           console.log('[EditWorkshop] upload novas imagens', id, newImages);
@@ -408,19 +390,19 @@ export default function EditWorkshopScreen() {
 
   return (
     <AppLayout
-      wrapWithScroll={true}
+      wrapWithScroll={false}
       initialActivePage="Workshops"
       backgroundColor="rgb(17, 17, 17)"
     >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.select({ ios: 'padding', android: undefined })}
-        keyboardVerticalOffset={Platform.select({ ios: 64, android: 0 })}
+        keyboardVerticalOffset={Platform.select({ ios: HEADER_OFFSET + 16, android: 0 })}
       >
         <ScrollView
           style={styles.container}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 48 }}
+          contentContainerStyle={{ paddingBottom: FOOTER_OFFSET + 48 }}
         >
           <View style={styles.headerView}>
             <Text style={styles.title}>Editar Workshop</Text>
@@ -599,8 +581,7 @@ export default function EditWorkshopScreen() {
               </View>
             )}
 
-            {/* ImageUploader para NOVAS imagens do workshop
-                👉 Só aparece quando NÃO tiver nenhuma imagem já anexada */}
+            {/* ImageUploader para NOVAS imagens do workshop*/}
             {editableImages.length === 0 && (
               <>
                 <View style={[styles.inlineHeader, { marginTop: 16 }]}>
@@ -670,7 +651,12 @@ export default function EditWorkshopScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'rgb(17, 17, 17)', padding: 20, paddingTop: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: 'rgb(17, 17, 17)',
+    padding: 20,
+    paddingTop: HEADER_OFFSET + 8,
+  },
   title: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
   subtitle: { color: '#ccc', fontSize: 14, marginBottom: 20 },
   card: {
@@ -759,7 +745,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // X pra remover imagem já anexada
   removeExistingButton: {
     position: 'absolute',
     top: 4,

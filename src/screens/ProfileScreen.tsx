@@ -65,9 +65,6 @@ export default function ProfileScreen() {
   const route = useRoute<any>();
   const { userId: userIdFromAuth, logout } = useAuth();
 
-  // 1) se veio via rota (perfil de outro usuário), usa ele
-  // 2) senão, tenta do contexto do useAuth()
-  // 3) fallback: extrai do JWT
   const myIdNum = toNumOrNull(userIdFromAuth ?? getUserIdFromJwt?.());
   const viewedIdNum = toNumOrNull(route?.params?.userId);
   const fetchId = viewedIdNum ?? myIdNum;
@@ -78,7 +75,6 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Fundo editável (só front)
   const [colorA, setColorA] = useState<string>(TOKENS.gradientA);
   const [colorB, setColorB] = useState<string>(TOKENS.gradientB);
   const [opacityPct, setOpacityPct] = useState<number>(100);
@@ -92,7 +88,6 @@ export default function ProfileScreen() {
   const previewA = withOpacity(draftA, Math.max(0, Math.min(100, Number(draftPct) || 0)) / 100);
   const previewB = withOpacity(draftB, Math.max(0, Math.min(100, Number(draftPct) || 0)) / 100);
 
-  // avatar: aceita tanto avatarUrl (front) quanto imagemUrl (back)
   const avatarUrl = useMemo(() => {
     if (!profile) return null;
     const anyP: any = profile;
@@ -133,15 +128,13 @@ export default function ProfileScreen() {
 
     try {
       if (isMe) {
-        // MEU PERFIL -> /usuarios/user + /usuarios/detalhes/{id}
-        const base = await getMyProfile(); // /usuarios/user
+        const base = await getMyProfile();
 
         let details: any | null = null;
         if ((base as any)?.id != null) {
-          details = await getUserDetails((base as any).id); // /usuarios/detalhes/id
+          details = await getUserDetails((base as any).id);
         }
 
-        // base primeiro, depois details
         const merged: any = {
           ...(base || {}),
           ...(details || {}),
@@ -151,9 +144,8 @@ export default function ProfileScreen() {
 
         setProfile(merged as MyProfile);
       } else {
-        // PERFIL DE OUTRO USUÁRIO -> /usuarios/{id} + /usuarios/detalhes/{id}
-        const base = await getUserById(fetchId); // /usuarios/{id}
-        const details = await getUserDetails(fetchId); // /usuarios/detalhes/{id}
+        const base = await getUserById(fetchId);
+        const details = await getUserDetails(fetchId);
 
         const merged: any = {
           ...(base || {}),
@@ -189,9 +181,7 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     try {
       await logout();
-    } catch {
-      // quiet
-    }
+    } catch {}
   };
 
   if (loading) {
@@ -708,7 +698,6 @@ const styles = StyleSheet.create({
   subSectionTitle: { color: TOKENS.txtPrimary, fontWeight: '800', fontSize: 14 },
   bioText: { color: '#D8D8E3', marginTop: 6, lineHeight: 18 },
 
-  // ====== STATS ======
   statsWrap: {
     marginTop: 12,
     flexDirection: 'row',

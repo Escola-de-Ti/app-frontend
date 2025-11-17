@@ -183,7 +183,6 @@ function RankingCard({ user }: { user: RankingUser }) {
   );
 }
 
-/** Aplica alpha em hex #RRGGBB */
 function hexWithAlpha(hex: string, alpha: number) {
   const a = Math.max(0, Math.min(1, alpha));
   const val = Math.round(a * 255);

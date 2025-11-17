@@ -402,7 +402,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgb(17, 17, 17)',
     paddingTop: HEADER_OFFSET,
-    // 👇 aumentei o "respiro" embaixo pra compensar o footer
     paddingBottom: FOOTER_OFFSET + 100,
   },
 

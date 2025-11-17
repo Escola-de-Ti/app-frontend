@@ -20,7 +20,6 @@ export default function WorkshopCard({
   primaryLabel,
   secondaryLabel,
 }: WorkshopCardProps) {
-  const isOnline = !!item.linkMeet;
   const idNum = Number(item.id);
 
   const anyItem: any = item;
@@ -103,7 +102,7 @@ export default function WorkshopCard({
                 ? 'Em andamento'
                 : 'Concluído'}
           </Badge>
-          <Badge>{isOnline ? 'Online' : 'Presencial'}</Badge>
+          <Badge>{'Online'}</Badge>
         </View>
 
         {/* Quando */}

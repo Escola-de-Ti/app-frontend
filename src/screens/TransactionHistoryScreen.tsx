@@ -26,7 +26,6 @@ export default function TransactionHistoryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // paginação / resumo
   const [page, setPage] = useState(0);
   const [size] = useState(20);
   const [hasMore, setHasMore] = useState(true);
@@ -34,7 +33,6 @@ export default function TransactionHistoryScreen() {
   const [totalRecebido, setTotalRecebido] = useState<number>(0);
   const [totalGasto, setTotalGasto] = useState<number>(0);
 
-  // filtros opcionais (se quiser conectar em UI depois)
   const [motivoFilter] = useState<string | undefined>(undefined);
   const [dataInicioFilter] = useState<Date | string | undefined>(undefined);
   const [dataFimFilter] = useState<Date | string | undefined>(undefined);
@@ -57,12 +55,10 @@ export default function TransactionHistoryScreen() {
         const currentPage = reset ? 0 : page;
         const resp = await getTransactionHistory(buildParams(currentPage));
 
-        // resumo
         setSaldoAtual(resp.saldoAtual);
         setTotalRecebido(resp.totalRecebido);
         setTotalGasto(resp.totalGasto);
 
-        // lista + paginação
         setItems((prev) => (reset ? resp.transacoes : [...prev, ...resp.transacoes]));
         const stillHasMore = Boolean(resp.hasMore) && currentPage + 1 < (resp.totalPages ?? 1);
         setHasMore(stillHasMore);
