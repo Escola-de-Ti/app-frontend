@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   Modal,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
@@ -22,7 +23,7 @@ import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout
 import PostCard from '../components/posts/PostCard';
 import PostDetails from '../components/posts/PostDetails';
 
-import type { PostFeedModel, PostFeedDTO, ID } from '../types'; // 👈 adicionado ID
+import type { PostFeedModel, PostFeedDTO, ID } from '../types';
 import { getFeed, upvotePost, type OrderBy } from '../services/posts';
 import type { UpvoteResponse } from '../services/posts';
 
@@ -56,7 +57,6 @@ type OrderFilter =
   | 'Menos votados'
   | 'Mais recentes'
   | 'Mais antigos'
-  | 'Mais comentados'
   | null;
 
 // mapeia o label do botão pro enum do back
@@ -72,11 +72,112 @@ const mapFilterToOrderBy = (filter: OrderFilter): OrderBy | undefined => {
       return 'DATE_DESC';
     case 'Mais antigos':
       return 'DATE_ASC';
-    case 'Mais comentados':
     default:
       return undefined;
   }
 };
+
+// Toast Component
+function Toast({
+  message,
+  type = 'error',
+  visible,
+  onHide,
+}: {
+  message: string;
+  type?: 'error' | 'success' | 'info';
+  visible: boolean;
+  onHide: () => void;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(-20)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      const timer = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateY, {
+            toValue: -20,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          onHide();
+        });
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [visible, opacity, translateY, onHide]);
+
+  if (!visible) return null;
+
+  const iconName =
+    type === 'error' ? 'alert-circle' : type === 'success' ? 'check-circle' : 'info';
+  const bgColor =
+    type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : '#339af0';
+
+  return (
+    <Animated.View
+      style={[
+        toastStyles.container,
+        {
+          backgroundColor: bgColor,
+          opacity,
+          transform: [{ translateY }],
+        },
+      ]}
+    >
+      <Feather name={iconName} size={20} color="#fff" />
+      <Text style={toastStyles.message}>{message}</Text>
+    </Animated.View>
+  );
+}
+
+const toastStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    right: 16,
+    backgroundColor: '#ff6b6b',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    zIndex: 9999,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  message: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});
 
 export default function FeedScreen() {
   const navigation = useNavigation<any>();
@@ -84,9 +185,15 @@ export default function FeedScreen() {
   const params: FeedRouteParams = route.params || {};
 
   const [data, setData] = useState<PostFeedModel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'error' | 'success' | 'info'>('error');
 
   const [q, setQ] = useState('');
   const [searching, setSearching] = useState(false);
@@ -108,8 +215,15 @@ export default function FeedScreen() {
   // ===== filtro de ordenação =====
   const [orderFilter, setOrderFilter] = useState<OrderFilter>(null);
   const orderByRef = useRef<OrderBy | undefined>(undefined);
+  const [changingFilter, setChangingFilter] = useState(false);
 
-  // 👇 aqui o ajuste: recebe ID e converte pra number
+  // Toast helper
+  const showToast = (message: string, type: 'error' | 'success' | 'info' = 'error') => {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+  };
+
   const handleOpenPost = useCallback((postId: ID) => {
     const numericId = Number(postId);
     if (!Number.isFinite(numericId)) return;
@@ -228,6 +342,16 @@ export default function FeedScreen() {
         if (isReset) {
           initialLoadedRef.current = true;
         }
+
+        setError(null);
+      } catch (e: any) {
+        const errorMsg = e?.response?.data?.message || e?.message || 'Não foi possível carregar o feed';
+        console.log('[FEED] erro ao carregar:', errorMsg);
+        if (isReset) {
+          setError(errorMsg);
+        } else {
+          showToast(errorMsg, 'error');
+        }
       } finally {
         inFlightRef.current = false;
       }
@@ -237,6 +361,7 @@ export default function FeedScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    setError(null);
     try {
       cursorRef.current = null;
       initialLoadedRef.current = false;
@@ -249,8 +374,21 @@ export default function FeedScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      onRefresh();
-    }, [onRefresh])
+      const loadInitial = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          cursorRef.current = null;
+          initialLoadedRef.current = false;
+          setHasMore(true);
+          await fetchFeed({ reset: true });
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadInitial();
+    }, [fetchFeed])
   );
 
   const tryLoadMore = useCallback(async () => {
@@ -353,7 +491,9 @@ export default function FeedScreen() {
         );
 
         return resp;
-      } catch (e) {
+      } catch (e: any) {
+        const errorMsg = e?.response?.data?.message || e?.message || 'Não foi possível votar no post';
+        showToast(errorMsg, 'error');
         console.log('[FEED] falha ao votar no post', postId, e);
       }
     },
@@ -364,15 +504,14 @@ export default function FeedScreen() {
 
   const ItemSeparator = useCallback(() => <View style={{ height: 14 }} />, []);
 
-  const sortedData = useMemo(() => {
-    if (orderFilter !== 'Mais comentados') return data;
+  const sortedData = useMemo(() => {    
 
     const copy = [...data];
     return copy.sort((a, b) => (b.totalComentarios ?? 0) - (a.totalComentarios ?? 0));
   }, [data, orderFilter]);
 
   const handleSelectOrderFilter = useCallback(
-    (filter: string) => {
+    async (filter: string) => {
       const nextFilter = filter as OrderFilter;
       setOrderFilter(nextFilter);
 
@@ -382,7 +521,13 @@ export default function FeedScreen() {
       initialLoadedRef.current = false;
       setHasMore(true);
 
-      fetchFeed({ reset: true });
+      // Mostra loading enquanto muda ordenação
+      setChangingFilter(true);
+      try {
+        await fetchFeed({ reset: true });
+      } finally {
+        setChangingFilter(false);
+      }
     },
     [fetchFeed]
   );
@@ -428,6 +573,41 @@ export default function FeedScreen() {
     [q, searching, fetchFeed, handleSelectOrderFilter, orderFilter]
   );
 
+  // Loading inicial
+  if (loading && !refreshing) {
+    return (
+      <AppLayout
+        initialActivePage="Feed"
+        backgroundColor="rgb(17, 17, 17)"
+        wrapWithScroll={false}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#7C73FF" />
+          <Text style={styles.loadingText}>Carregando feed…</Text>
+        </View>
+      </AppLayout>
+    );
+  }
+
+  // Error state
+  if (error && !data.length) {
+    return (
+      <AppLayout
+        initialActivePage="Feed"
+        backgroundColor="rgb(17, 17, 17)"
+        wrapWithScroll={false}
+      >
+        <View style={styles.errorContainer}>
+          <Feather name="alert-circle" size={48} color="#ff9aa2" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={onRefresh} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Tentar novamente</Text>
+          </TouchableOpacity>
+        </View>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout
       initialActivePage="Feed"
@@ -435,6 +615,24 @@ export default function FeedScreen() {
       wrapWithScroll={false}
       externalScrollY={layoutScrollY}
     >
+      {/* Toast */}
+      <Toast
+        message={toastMessage}
+        type={toastType}
+        visible={toastVisible}
+        onHide={() => setToastVisible(false)}
+      />
+
+      {/* Loading overlay quando muda filtro */}
+      {changingFilter && (
+        <View style={styles.filterLoadingOverlay}>
+          <View style={styles.filterLoadingBox}>
+            <ActivityIndicator size="large" color="#7C73FF" />
+            <Text style={styles.filterLoadingText}>Aplicando filtro…</Text>
+          </View>
+        </View>
+      )}
+
       <FlatList
         style={styles.container}
         contentContainerStyle={{
@@ -482,7 +680,7 @@ export default function FeedScreen() {
         ListFooterComponent={
           loadingMore ? (
             <View style={{ paddingVertical: 18, alignItems: 'center' }}>
-              <Feather name="loader" size={18} color="#7C73FF" />
+              <ActivityIndicator size="small" color="#7C73FF" />
             </View>
           ) : null
         }
@@ -534,5 +732,69 @@ const styles = StyleSheet.create({
   },
   searchInputWrapper: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: 'rgb(17, 17, 17)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    color: '#D8D8E3',
+    marginTop: 12,
+    fontSize: 14,
+  },
+  errorContainer: {
+    flex: 1,
+    backgroundColor: 'rgb(17, 17, 17)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: '#ff9aa2',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 16,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: '#7C73FF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  filterLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    zIndex: 1000,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterLoadingBox: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2A2A33',
+  },
+  filterLoadingText: {
+    color: '#D8D8E3',
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

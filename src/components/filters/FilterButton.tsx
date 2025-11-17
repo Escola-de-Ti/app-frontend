@@ -32,8 +32,7 @@ type FilterDef = {
     | 'Mais votados'
     | 'Menos votados'
     | 'Mais recentes'
-    | 'Mais antigos'
-    | 'Mais comentados';
+    | 'Mais antigos';
   icon: FilterIcon;
 };
 
@@ -43,7 +42,6 @@ const FILTERS: FilterDef[] = [
   { label: 'Menos votados', icon: 'thumbs-down' },
   { label: 'Mais recentes', icon: 'clock' },
   { label: 'Mais antigos', icon: 'rotate-ccw' },
-  { label: 'Mais comentados', icon: 'message-circle' },
 ];
 
 export function FilterButton({ size = 20, onSelectFilter, activeFilter }: FilterButtonProps) {
