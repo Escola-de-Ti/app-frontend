@@ -286,11 +286,11 @@ export default function WorkshopsScreen() {
         return;
       }
 
-      Toast.show({
-        type: 'error',
-        text1: 'Erro ao se inscrever',
-        text2: e?.message || 'Não foi possível concluir a inscrição. Tente novamente.',
-      });
+      // Toast.show({
+      //   type: 'error',
+      //   text1: 'Erro ao se inscrever',
+      //   text2: e?.message || 'Não foi possível concluir a inscrição. Tente novamente.',
+      // });
     }
   };
 

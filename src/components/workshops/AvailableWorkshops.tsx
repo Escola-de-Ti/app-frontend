@@ -1,5 +1,5 @@
 // === src/components/workshops/AvailableWorkshops.tsx ===
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, View, Text, StyleSheet } from 'react-native';
 import Toast from 'react-native-toast-message';
 
@@ -28,6 +28,8 @@ export default function AvailableWorkshops({
   onRefresh,
   onEnroll,
 }: AvailableWorkshopsProps) {
+  const [enrollingId, setEnrollingId] = useState<number | null>(null);
+
   const keyExtractor = useCallback((w: Workshop) => String(w.id), []);
 
   const handleEnroll = useCallback(
@@ -35,7 +37,12 @@ export default function AvailableWorkshops({
       // se já estiver marcado como inscrito, não faz nada
       if (alreadyEnrolled) return;
 
+      // se já estiver processando inscrição desse mesmo workshop, ignora clique
+      if (enrollingId === id) return;
+
       try {
+        setEnrollingId(id);
+
         await enrollInWorkshop(id);
 
         Toast.show({
@@ -67,14 +74,16 @@ export default function AvailableWorkshops({
           return;
         }
 
-        Toast.show({
-          type: 'error',
-          text1: 'Erro ao se inscrever',
-          text2: e?.message || 'Não foi possível concluir a inscrição. Tente novamente.',
-        });
+        // Toast.show({
+        //   type: 'error',
+        //   text1: 'Erro ao se inscrever',
+        //   text2: e?.message || 'Não foi possível concluir a inscrição. Tente novamente.',
+        // });
+      } finally {
+        setEnrollingId((current) => (current === id ? null : current));
       }
     },
-    [onEnroll, onRefresh]
+    [onEnroll, onRefresh, enrollingId]
   );
 
   const renderItem = useCallback(

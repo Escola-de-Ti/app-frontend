@@ -114,9 +114,10 @@ export async function deleteWorkshop(id: number): Promise<void> {
 export async function enrollInWorkshop(workshopId: number): Promise<void> {
   try {
     await api.post(`${INSCRICOES_ENDPOINT}/workshops/${workshopId}`, {});
+    return;
   } catch (err: any) {
-    const msg = extractErrorMessage(err);
-    const lower = (msg || '').toLowerCase();
+    const msg = extractErrorMessage(err) || 'Falha ao se inscrever no workshop.';
+    const lower = msg.toLowerCase();
 
     // 🚫 tentar se inscrever no próprio workshop
     if (
@@ -142,6 +143,17 @@ export async function enrollInWorkshop(workshopId: number): Promise<void> {
       throw new NotEnoughTokensEnrollError(
         msg || 'Você não possui tokens suficientes para se inscrever neste workshop.'
       );
+    }
+
+    // ✅ já está inscrito
+    if (
+      lower.includes('já está inscrito') ||
+      lower.includes('ja esta inscrito') ||
+      lower.includes('já inscrito') ||
+      lower.includes('ja inscrito') ||
+      lower.includes('already enrolled')
+    ) {
+      throw new Error('Você já está inscrito neste workshop.');
     }
 
     // fallback genérico
