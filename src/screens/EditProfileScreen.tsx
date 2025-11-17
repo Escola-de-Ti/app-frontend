@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
-import AppLayout from '../components/AppLayout';
+import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 import AppInput from '../components/AppInput';
 import ProfileAvatarPicker from '../components/ProfileAvatarPicker';
 import Toast from 'react-native-toast-message';
@@ -28,13 +28,11 @@ import {
 } from '../services/profile';
 import type { UpdateUserRequest, MyProfile } from '../types';
 
-// gerenciador visual de tags
 import TagManager from '../components/TagManager';
 import { createOrGetTagIds } from '../services/tags';
 
 const COLOR_PRESETS = ['#b14cb3', '#2edba7', '#4562f0', '#a65bf7', '#d36d6d', '#00FFA3', '#7C73FF'];
 
-/** HEX + opacidade -> rgba() (só pra UI do banner) */
 function hexToRgba(hex?: string | null, opacity?: number | null) {
   const safeHex = (hex || '#141417').replace('#', '');
   const o = typeof opacity === 'number' ? Math.min(1, Math.max(0, opacity)) : 0.2;
@@ -45,7 +43,6 @@ function hexToRgba(hex?: string | null, opacity?: number | null) {
   return `rgba(${r}, ${g}, ${b}, ${o})`;
 }
 
-// normalização/limpeza de tags (dedup + upper por consistência)
 const normalizeTags = (arr: string[]) =>
   Array.from(
     new Set(
@@ -63,22 +60,18 @@ export default function EditProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<MyProfile | null>(null);
 
-  // campos editáveis
   const [nome, setNome] = useState('');
   const [biografia, setBiografia] = useState('');
   const [telefone, setTelefone] = useState('');
-  const [email, setEmail] = useState(''); // editável
-  const [cpf, setCpf] = useState(''); // editável
+  const [email, setEmail] = useState('');
+  const [cpf, setCpf] = useState('');
 
-  // estado local de tags (string[])
   const [tags, setTags] = useState<string[]>([]);
 
-  // avatar
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [avatarImageId, setAvatarImageId] = useState<number | null>(null);
   const [avatarChanged, setAvatarChanged] = useState(false);
 
-  // banner (apenas UI local)
   const [bannerHex, setBannerHex] = useState<string>('#141417');
   const [bannerOpacity, setBannerOpacity] = useState<number>(0.2);
   const [openBannerModal, setOpenBannerModal] = useState(false);
@@ -91,7 +84,6 @@ export default function EditProfileScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // pega dados completos do usuário logado (/api/usuarios/user)
       const me = await getMyProfile();
       setProfile(me);
 
@@ -99,16 +91,14 @@ export default function EditProfileScreen() {
       setBiografia(me.biografia ?? '');
       setTelefone(me.telefone ?? '');
       setEmail(me.email ?? '');
-      setCpf((me as any)?.cpf ?? ''); // se vier null/undefined, fica vazio
+      setCpf((me as any)?.cpf ?? '');
 
       const anyMe: any = me;
 
-      // foto de perfil: tenta urlImagemPerfil > avatarUrl > imagemUrl
       setAvatarUri(anyMe.urlImagemPerfil ?? anyMe.avatarUrl ?? anyMe.imagemUrl ?? null);
       setAvatarImageId(anyMe.idImagemPerfil ?? null);
       setAvatarChanged(false);
 
-      // banner (se algum dia vier do back, já aproveita)
       setBannerHex(anyMe.bannerColorHex ?? '#141417');
       setBannerOpacity(
         typeof anyMe.bannerOpacity === 'number' && !Number.isNaN(anyMe.bannerOpacity)
@@ -116,7 +106,6 @@ export default function EditProfileScreen() {
           : 0.2
       );
 
-      // tags do perfil -> string[] (aceita string[] ou [{id, name}])
       const initialTagNames =
         Array.isArray(anyMe.tags) && anyMe.tags.length
           ? anyMe.tags
@@ -136,10 +125,8 @@ export default function EditProfileScreen() {
     load();
   }, [load]);
 
-  // validação simples
   const emailOk = /\S+@\S+\.\S+/.test(email.trim());
   const cpfDigits = (cpf || '').replace(/\D/g, '');
-  // CPF opcional: aceita vazio ou 11 dígitos
   const cpfOk = cpfDigits.length === 0 || cpfDigits.length === 11;
 
   const canSave = useMemo(
@@ -170,18 +157,16 @@ export default function EditProfileScreen() {
       let finalAvatarImageId: number | null = avatarImageId ?? anyProfile?.idImagemPerfil ?? null;
 
       if (avatarChanged && avatarUri && userId != null) {
-        // se já tinha imagem de perfil -> atualiza
         if (finalAvatarImageId) {
           const img = await updateUserAvatar(finalAvatarImageId, avatarUri);
           finalAvatarImageId = (img as any)?.id ?? finalAvatarImageId;
         } else {
-          // senão -> faz upload novo
           const img = await uploadUserAvatar(userId, avatarUri);
           finalAvatarImageId = (img as any)?.id ?? null;
         }
       }
 
-      // ================== TAGS (NOMES -> IDs -> { id }) ==================
+      // ================== TAGS (NOMES -> IDs) ==================
       const normalized = normalizeTags(tags);
 
       let tagIds: number[] = [];
@@ -196,18 +181,8 @@ export default function EditProfileScreen() {
         }
       }
 
-      // backend espera algo como:
-      // {
-      //   "tags": [
-      //     { "id": 1 },
-      //     { "id": 2 }
-      //   ]
-      // }
-      const tagsPayload = tagIds.length ? tagIds.map((id) => ({ id })) : undefined;
-
       // ================== PAYLOAD PERFIL ==================
       const payload: UpdateUserRequest & {
-        // tags?: { id: number }[];
         idImagemPerfil?: number | null;
       } = {
         email: email.trim(),
@@ -216,8 +191,7 @@ export default function EditProfileScreen() {
         telefone: telefone.trim() || undefined,
         telefone2: anyProfile?.telefone2 ?? undefined,
         biografia: biografia.trim() || undefined,
-        // senha: undefined, // só enviar se for alterar
-        tipoUsuario: anyProfile?.tipoUsuario, // preserva se existir
+        tipoUsuario: anyProfile?.tipoUsuario,
         tags: tagIds.length ? tagIds : undefined,
         idImagemPerfil: finalAvatarImageId ?? undefined,
       };
@@ -227,14 +201,12 @@ export default function EditProfileScreen() {
 
       const anyUpdated: any = updated;
 
-      // avatar / imagem de perfil após update
       setAvatarImageId(anyUpdated.idImagemPerfil ?? finalAvatarImageId ?? null);
       setAvatarUri(
         anyUpdated.urlImagemPerfil ?? anyUpdated.avatarUrl ?? anyUpdated.imagemUrl ?? avatarUri
       );
       setAvatarChanged(false);
 
-      // atualiza estado local com o que voltou (string[] ou {id, name}[])
       const updatedTagNames =
         Array.isArray(anyUpdated.tags) && anyUpdated.tags.length
           ? (anyUpdated.tags as any[])
@@ -244,8 +216,6 @@ export default function EditProfileScreen() {
       setTags(updatedTagNames);
 
       Toast.show({ type: 'success', text1: 'Perfil atualizado!' });
-      // se quiser voltar após salvar:
-      // navigation.goBack();
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || 'Não foi possível salvar.';
       Toast.show({ type: 'error', text1: 'Erro ao salvar', text2: msg });
@@ -282,7 +252,10 @@ export default function EditProfileScreen() {
 
   return (
     <AppLayout wrapWithScroll={false} initialActivePage={null} backgroundColor="rgb(17, 17, 17)">
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: FOOTER_OFFSET + 32 }}
+      >
         {/* Header: Voltar + Título */}
         <View style={styles.headerWrap}>
           <TouchableOpacity
@@ -336,7 +309,6 @@ export default function EditProfileScreen() {
             returnKeyType="next"
           />
 
-          {/* CPF opcional – comentado, mas a validação aceita vazio */}
           {/* <Text style={styles.label}>CPF</Text>
           <AppInput
             value={cpf}
@@ -465,7 +437,11 @@ export default function EditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b0b0f' },
+  container: {
+    flex: 1,
+    backgroundColor: '#0b0b0f',
+    paddingTop: HEADER_OFFSET + 8,
+  },
 
   headerWrap: { paddingHorizontal: 16, paddingTop: 16, marginBottom: 8 },
   backBtn: {
@@ -504,7 +480,6 @@ const styles = StyleSheet.create({
   },
   saveText: { color: '#0B0B0E', fontWeight: '800' },
 
-  // modal
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   modalCard: {
     position: 'absolute',

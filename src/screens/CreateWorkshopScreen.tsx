@@ -47,30 +47,23 @@ export default function CreateWorkshopScreen() {
   const { id } = (route?.params || {}) as RouteParams;
   const isEdit = useMemo(() => typeof id === 'number', [id]);
 
-  // animação de scroll pro AppLayout (header/footer colapsáveis)
   const layoutScrollY = useRef(new Animated.Value(0)).current;
 
-  // Media & meta
   const [images, setImages] = useState<string[]>([]);
 
-  // Campos principais
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 
-  // Link (apenas link, sem "online/presencial")
   const [meetingLink, setMeetingLink] = useState('');
 
-  // Capacidade / Tokens
   const [capacity, setCapacity] = useState('');
   const [tokens, setTokens] = useState('');
 
-  // Datas
   const [startAt, setStartAt] = useState<Date>(new Date());
   const [endAt, setEndAt] = useState<Date>(new Date(Date.now() + 2 * 60 * 60 * 1000));
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
 
-  // textos das datas (pra web)
   const [startAtText, setStartAtText] = useState('');
   const [endAtText, setEndAtText] = useState('');
 
@@ -79,7 +72,7 @@ export default function CreateWorkshopScreen() {
   const titleCount = title.trim().length;
   const descriptionCount = description.trim().length;
 
-  const { userId } = useAuth(); // pode vir vazio dependendo do fluxo
+  const { userId } = useAuth();
 
   const formatDateTime = (d: Date) => {
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -88,7 +81,6 @@ export default function CreateWorkshopScreen() {
     )}:${pad(d.getMinutes())}`;
   };
 
-  // parser pra "dd/mm/aaaa hh:mm"
   const parseDateTime = (value: string): Date | null => {
     const text = value.trim();
     const m = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/);
@@ -106,13 +98,11 @@ export default function CreateWorkshopScreen() {
     return d;
   };
 
-  // mantem os textos sincronizados com as datas
   useEffect(() => {
     setStartAtText(formatDateTime(startAt));
     setEndAtText(formatDateTime(endAt));
   }, [startAt, endAt]);
 
-  // carregar dados no modo edição
   useEffect(() => {
     if (!isEdit) return;
     (async () => {
@@ -145,7 +135,6 @@ export default function CreateWorkshopScreen() {
     })();
   }, [isEdit, id, navigation]);
 
-  // validação (somente UX/visual)
   const canPublish = useMemo(() => {
     const _title = title.trim();
     const _desc = description.trim();
@@ -155,7 +144,6 @@ export default function CreateWorkshopScreen() {
     return baseOk && timeOk && imagesOk && !loading;
   }, [title, description, startAt, endAt, images, loading]);
 
-  // 🔑 Resolve instrutorId na ordem: useAuth → token(userId) → token(email)→ API
   const resolveInstructorId = async (): Promise<number | null> => {
     if (userId && Number.isFinite(Number(userId))) return Number(userId);
 
@@ -169,9 +157,7 @@ export default function CreateWorkshopScreen() {
         try {
           const idByEmail = await getUsuarioIdByEmail(email);
           if (idByEmail && Number.isFinite(Number(idByEmail))) return Number(idByEmail);
-        } catch {
-          // silencioso
-        }
+        } catch {}
       }
     }
     return null;
@@ -409,7 +395,7 @@ export default function CreateWorkshopScreen() {
               autoCapitalize="sentences"
             />
 
-            {/* Link (apenas um input, sem toggle de modalidade) */}
+            {/* Link */}
             <Text style={styles.label}>Link do encontro (opcional)</Text>
             <AppInput
               placeholder="Link da reunião (Zoom/Meet/Teams...)"

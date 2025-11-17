@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
-import AppLayout from '../components/AppLayout';
+import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 import AppInput from '../components/AppInput';
 import ImageUploader from '../components/ImageUploader';
 import TagManager from '../components/TagManager';
@@ -31,15 +31,14 @@ type EditPostRouteParams = {
   postId: number;
   initialTitle?: string;
   initialContent?: string;
-  // agora recebemos id + url da imagem
   initialImages?: { id: number; url?: string; urlImagem?: string }[];
   initialTags?: string[];
 };
 
 type EditableImage = {
   id: number;
-  url: string; // URL atual (remota)
-  localUri?: string; // nova imagem escolhida (local) para substituir
+  url: string;
+  localUri?: string;
 };
 
 export default function EditPostScreen() {
@@ -58,21 +57,17 @@ export default function EditPostScreen() {
       .filter((img) => img.url)
   );
 
-  // novas imagens selecionadas no app (URIs locais, serão anexadas além das já existentes)
   const [newImages, setNewImages] = useState<string[]>([]);
-  // ids de imagens existentes que o usuário mandou remover no X
   const [removedImageIds, setRemovedImageIds] = useState<number[]>([]);
 
-  // tags já existentes + novas, exibidas como "Adicionadas" no TagManager
   const [tags, setTags] = useState<string[]>(initialTags || []);
 
   const [title, setTitle] = useState(initialTitle || '');
   const [content, setContent] = useState(initialContent || '');
   const [submitting, setSubmitting] = useState(false);
 
-  const { userId } = useAuth(); // só pra validar sessão
+  const { userId } = useAuth();
 
-  // trocar imagem existente (sobrescreve via /api/imagem/update/{id})
   const handlePickReplacement = async (imageId: number) => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -95,13 +90,11 @@ export default function EditPostScreen() {
     }
   };
 
-  // remover imagem EXISTENTE (vai chamar DELETE no salvar)
   const handleRemoveExistingImage = (imageId: number) => {
     setEditableImages((prev) => prev.filter((img) => img.id !== imageId));
     setRemovedImageIds((prev) => (prev.includes(imageId) ? prev : [...prev, imageId]));
   };
 
-  // novas imagens (só front; serão anexadas via uploadPostImages)
   const handleNewImagesChange = (uris: string[]) => {
     const total = editableImages.length + uris.length;
     if (total > MAX_IMAGES) {
@@ -151,7 +144,6 @@ export default function EditPostScreen() {
       const updated = await updatePost(Number(postId), payload);
       console.log('[EditPost] post atualizado =>', updated);
 
-      // 🔁 atualizar imagens EXISTENTES que foram trocadas (update)
       const imagesToUpdate = editableImages.filter((img) => img.localUri);
       if (imagesToUpdate.length > 0) {
         for (const img of imagesToUpdate) {
@@ -171,7 +163,6 @@ export default function EditPostScreen() {
         }
       }
 
-      // 🗑 remover imagens que o usuário excluiu (X) — DELETE /api/imagem/delete/{id}
       if (removedImageIds.length > 0) {
         for (const imgId of removedImageIds) {
           try {
@@ -190,7 +181,6 @@ export default function EditPostScreen() {
         }
       }
 
-      // 📎 anexar novas imagens
       if (newImages.length > 0) {
         try {
           console.log('[EditPost] enviando novas imagens para o post', postId, newImages);
@@ -204,7 +194,6 @@ export default function EditPostScreen() {
         }
       }
 
-      // ✅ Toast de sucesso + volta pro Feed abrindo o PostDetails desse post
       if (Platform.OS === 'android') {
         ToastAndroid.show('Post atualizado com sucesso!', ToastAndroid.SHORT);
       }
@@ -225,7 +214,11 @@ export default function EditPostScreen() {
 
   return (
     <AppLayout wrapWithScroll={false} initialActivePage={null} backgroundColor="rgb(17, 17, 17)">
-      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.container}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: FOOTER_OFFSET + 24 }}
+      >
         <View style={styles.headerView}>
           <Text style={styles.title}>Editar Post</Text>
           <Text style={styles.subtitle}>Ajuste o conteúdo antes de salvar</Text>
@@ -356,7 +349,12 @@ export default function EditPostScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'rgb(17, 17, 17)', padding: 20, paddingTop: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: 'rgb(17, 17, 17)',
+    padding: 20,
+    paddingTop: HEADER_OFFSET + 8,
+  },
   title: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
   subtitle: { color: '#ccc', fontSize: 14, marginBottom: 20 },
   card: {
@@ -416,7 +414,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // X pra remover imagem já anexada
   removeExistingButton: {
     position: 'absolute',
     top: 4,

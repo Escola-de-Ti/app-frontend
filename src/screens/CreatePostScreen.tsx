@@ -12,7 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 
-import AppLayout from '../components/AppLayout';
+import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 import AppInput from '../components/AppInput';
 import ImageUploader from '../components/ImageUploader';
 import TagManager from '../components/TagManager';
@@ -24,18 +24,15 @@ import { createOrGetTagIds } from '../services/tags';
 const MAX_IMAGES = 3;
 
 export default function CreatePostScreen() {
-  // imagens: URIs locais vindas do ImageUploader
   const [images, setImages] = useState<string[]>([]);
-  // tags: nomes vindos do TagManager
   const [tags, setTags] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { userId } = useAuth(); // necessário pro campo usuarioId (number)
+  const { userId } = useAuth();
   const navigation = useNavigation<any>();
 
-  // controla o limite de imagens e mostra o "toast" (Alert) de erro
   const handleImagesChange = (uris: string[]) => {
     if (uris.length > MAX_IMAGES) {
       Alert.alert(
@@ -49,7 +46,6 @@ export default function CreatePostScreen() {
   };
 
   const handlePublish = async () => {
-    // garantia extra, caso algo escape
     if (images.length > MAX_IMAGES) {
       Alert.alert(
         'Limite de imagens',
@@ -58,7 +54,6 @@ export default function CreatePostScreen() {
       return;
     }
 
-    // ✅ só título é obrigatório para a API
     if (!title.trim()) {
       Alert.alert('Campos obrigatórios', 'Preencha o título antes de publicar.');
       return;
@@ -76,7 +71,6 @@ export default function CreatePostScreen() {
 
       const payload = {
         titulo: title.trim(),
-        // ✅ descrição opcional
         descricao: content.trim() || undefined,
         usuarioId: Number(userId),
         tagIds: tagIds.length ? tagIds : undefined,
@@ -85,7 +79,6 @@ export default function CreatePostScreen() {
 
       const created = await createPost(payload);
 
-      // 🔗 se tiver imagens selecionadas, tenta anexar ao post recém-criado
       if (images.length > 0) {
         try {
           console.log('[CreatePost] enviando imagens para o post', created?.id, images);
@@ -101,14 +94,12 @@ export default function CreatePostScreen() {
 
       Alert.alert('Sucesso', 'Post criado com sucesso!');
 
-      // limpa formulário
       setTitle('');
       setContent('');
       setTags([]);
       setImages([]);
 
-      // redireciona para o feed
-      navigation.navigate('FeedScreen'); // ajuste o nome da rota se for diferente
+      navigation.navigate('FeedScreen');
     } catch (err: any) {
       console.log('[CreatePost] ERRO', {
         message: err?.message,
@@ -123,9 +114,12 @@ export default function CreatePostScreen() {
   };
 
   return (
-    // não queremos nenhuma aba do footer “verdinha” aqui
-    <AppLayout wrapWithScroll={true} initialActivePage={null} backgroundColor="rgb(17, 17, 17)">
-      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+    <AppLayout wrapWithScroll={false} initialActivePage={null} backgroundColor="rgb(17, 17, 17)">
+      <ScrollView
+        style={styles.container}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: FOOTER_OFFSET + 24 }}
+      >
         <View style={styles.headerView}>
           <Text style={styles.title}>Criar Post</Text>
           <Text style={styles.subtitle}>Compartilhe seu conhecimento com a comunidade</Text>
@@ -217,7 +211,12 @@ export default function CreatePostScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'rgb(17, 17, 17)', padding: 20, paddingTop: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: 'rgb(17, 17, 17)',
+    padding: 20,
+    paddingTop: HEADER_OFFSET + 8,
+  },
   title: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
   subtitle: { color: '#ccc', fontSize: 14, marginBottom: 20 },
   card: {
