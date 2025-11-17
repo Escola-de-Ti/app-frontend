@@ -4,6 +4,7 @@ import type { Workshop, WorkshopDTO, WorkshopCreateDTO, WorkshopUpdateDTO, Image
 import { mapWorkshopDTO } from '../types';
 
 const IMAGEM_ENDPOINT = '/api/imagem';
+const INSCRICOES_ENDPOINT = '/api/inscricoes';
 
 async function uriToBytes(uri: string): Promise<ArrayBuffer> {
   const res = await fetch(uri);
@@ -47,6 +48,20 @@ export class NotEnoughTokensEnrollError extends Error {
     super(message);
     this.name = 'NotEnoughTokensEnrollError';
   }
+}
+
+// ========== TIPOS DE INSCRIÇÃO ==========
+
+export type EnrollmentStatus = 'INSCRITO' | 'CANCELADO';
+
+export interface EnrollmentDTO {
+  id: number;
+  usuarioId: number;
+  usuarioNome: string;
+  workshopId: number;
+  workshopTitulo: string;
+  status: EnrollmentStatus;
+  dataInscricao: string;
 }
 
 // ========== WORKSHOPS CRUD BÁSICO ==========
@@ -98,8 +113,7 @@ export async function deleteWorkshop(id: number): Promise<void> {
  */
 export async function enrollInWorkshop(workshopId: number): Promise<void> {
   try {
-    // body vazio mesmo, igual sua curl (só pra manter JSON)
-    await api.post(`/api/inscricoes/workshops/${workshopId}`, {});
+    await api.post(`${INSCRICOES_ENDPOINT}/workshops/${workshopId}`, {});
   } catch (err: any) {
     const msg = extractErrorMessage(err);
     const lower = (msg || '').toLowerCase();
@@ -132,6 +146,54 @@ export async function enrollInWorkshop(workshopId: number): Promise<void> {
 
     // fallback genérico
     throw new Error(msg);
+  }
+}
+
+/**
+ * Lista TODAS as inscrições do usuário logado.
+ * GET /api/inscricoes/minhas
+ */
+export async function listMyEnrollments(): Promise<EnrollmentDTO[]> {
+  const { data } = await api.get<EnrollmentDTO[]>(`${INSCRICOES_ENDPOINT}/minhas`);
+  return data;
+}
+
+/**
+ * Retorna SOMENTE os workshops em que o usuário está inscrito (status = INSCRITO),
+ * já mapeados para o tipo Workshop, igual a lógica do frontend web.
+ */
+export async function listMyEnrolledWorkshops(): Promise<Workshop[]> {
+  const inscricoes = await listMyEnrollments();
+  const ativas = inscricoes.filter((i) => i.status === 'INSCRITO');
+
+  if (!ativas.length) return [];
+
+  const detalhes = await Promise.all(
+    ativas.map(async (i) => {
+      try {
+        return await getWorkshopById(i.workshopId);
+      } catch (e) {
+        console.log('[listMyEnrolledWorkshops] erro ao buscar workshop', {
+          workshopId: i.workshopId,
+          errMessage: (e as any)?.message,
+        });
+        return null;
+      }
+    })
+  );
+
+  return detalhes.filter((w): w is Workshop => w != null);
+}
+
+/**
+ * Cancela inscrição do usuário em um workshop.
+ * DELETE /api/inscricoes/workshops/{id}
+ */
+export async function cancelWorkshopEnrollment(workshopId: number): Promise<void> {
+  try {
+    await api.delete(`${INSCRICOES_ENDPOINT}/workshops/${workshopId}`);
+  } catch (err: any) {
+    throw new Error(extractErrorMessage(err));
   }
 }
 

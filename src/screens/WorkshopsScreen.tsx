@@ -8,7 +8,6 @@ import {
   StatusBar,
   Modal,
   Pressable,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -22,6 +21,8 @@ import {
   enrollInWorkshop,
   OwnWorkshopEnrollError,
   NotEnoughTokensEnrollError,
+  listMyEnrolledWorkshops,
+  cancelWorkshopEnrollment,
 } from '../services/workshops';
 
 import type { Workshop, ID } from '../types';
@@ -139,6 +140,7 @@ export default function WorkshopsScreen() {
     try {
       const myId = await resolveUserId();
 
+      // carregar tipo de usuário + tokens
       if (myId != null) {
         try {
           const details: any = await getUserDetails(myId);
@@ -173,24 +175,28 @@ export default function WorkshopsScreen() {
         setUserTokens(null);
       }
 
+      // Workshops disponíveis (ABERTO) -> exclui os em que já está inscrito (backend pode marcar isso no DTO)
       const abertosRaw = await listOpen();
       const disponiveis = (abertosRaw as any[]).filter((w) => !w?.inscrito);
       setAvailable(disponiveis);
 
+      // Meus workshops como instrutor
       const meus = myId ? await listAll({ instrutorId: myId }) : [];
       setMine(meus);
 
-      const todos = await listAll();
+      // === Inscritos (igual web: /inscricoes/minhas + buscar workshop por id) ===
+      const inscritosRaw = await listMyEnrolledWorkshops();
       const myIdNum = myId != null ? Number(myId) : null;
 
-      let inscritos = (todos as any[]).filter((w) => w?.inscrito === true);
+      // não mostrar na aba "Inscritos" workshops em que o usuário é o instrutor
+      const filtrados =
+        myIdNum != null
+          ? inscritosRaw.filter((w) => Number((w as any).instrutorId) !== myIdNum)
+          : inscritosRaw;
 
-      if (myIdNum != null) {
-        inscritos = inscritos.filter((w) => Number(w.instrutorId) !== myIdNum);
-      }
-
+      // garantir unicidade por id (igual sua lógica anterior)
       const uniq = new Map<number, Workshop>();
-      inscritos.forEach((w: any) => {
+      filtrados.forEach((w: any) => {
         const idNum = Number(w.id);
         if (Number.isFinite(idNum)) {
           uniq.set(idNum, w as Workshop);
@@ -290,8 +296,24 @@ export default function WorkshopsScreen() {
 
   const onCancelar = async (id: ID) => {
     const numericId = Number(id);
-    if (!Number.isNaN(numericId)) {
-      Alert.alert('Inscrição', `Cancelamento de inscrição simulado para o workshop #${numericId}`);
+    if (!Number.isFinite(numericId)) return;
+
+    try {
+      await cancelWorkshopEnrollment(numericId);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Inscrição cancelada',
+        text2: 'Você cancelou sua inscrição neste workshop.',
+      });
+
+      await load();
+    } catch (e: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Erro ao cancelar inscrição',
+        text2: e?.message || 'Não foi possível cancelar. Tente novamente.',
+      });
     }
   };
 
@@ -419,7 +441,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    justifyContent: 'space-between',
   },
 
   createBtnWrapper: {
