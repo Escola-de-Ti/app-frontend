@@ -34,7 +34,7 @@ export default function TransactionItem({ item, expanded, onToggle }: Props) {
           </Text>
         </View>
 
-        <View style={s.right}>
+        {/* <View style={s.right}>
           {expanded && (
             <TouchableOpacity style={s.supportBtn} onPress={handleSupportPress}>
               <Text style={s.supportText}>Contatar suporte</Text>
@@ -43,7 +43,7 @@ export default function TransactionItem({ item, expanded, onToggle }: Props) {
           <TouchableOpacity activeOpacity={0.8} onPress={() => onToggle(item.id)}>
             <Feather name="more-horizontal" size={18} color="#ccc" />
           </TouchableOpacity>
-        </View>
+        </View> */}
       </View>
 
       <Text style={s.data}>
