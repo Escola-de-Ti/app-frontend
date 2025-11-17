@@ -40,30 +40,63 @@ export default function AuthScreen() {
   // anim
   const [isRegister, setIsRegister] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
-  const cardHeight = useRef(new Animated.Value(460)).current;
+  const cardHeight = useRef(new Animated.Value(400)).current;
 
   useEffect(() => {
-    Animated.timing(cardHeight, {
-      toValue: isRegister ? 820 : 460,
-      duration: 400,
-      easing: Easing.out(Easing.exp),
+    Animated.spring(cardHeight, {
+      toValue: isRegister ? 820 : 400,
+      friction: 10,
+      tension: 50,
       useNativeDriver: false,
     }).start();
   }, [isRegister, cardHeight]);
 
   const toggleForm = () => {
+    setIsRegister(!isRegister);
+    
     Animated.timing(anim, {
       toValue: isRegister ? 0 : 1,
-      duration: 600,
-      easing: Easing.out(Easing.exp),
+      duration: 800,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1), // ease-in-out suave
       useNativeDriver: true,
-    }).start(() => setIsRegister(!isRegister));
+    }).start();
   };
 
-  const translateXLogin = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -350] });
-  const translateXRegister = anim.interpolate({ inputRange: [0, 1], outputRange: [350, 0] });
-  const opacityLogin = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  const opacityRegister = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const translateXLogin = anim.interpolate({ 
+    inputRange: [0, 1], 
+    outputRange: [0, -400],
+    extrapolate: 'clamp',
+  });
+  
+  const translateXRegister = anim.interpolate({ 
+    inputRange: [0, 1], 
+    outputRange: [400, 0],
+    extrapolate: 'clamp',
+  });
+  
+  const opacityLogin = anim.interpolate({ 
+    inputRange: [0, 0.3, 1], 
+    outputRange: [1, 0.5, 0],
+    extrapolate: 'clamp',
+  });
+  
+  const opacityRegister = anim.interpolate({ 
+    inputRange: [0, 0.7, 1], 
+    outputRange: [0, 0.5, 1],
+    extrapolate: 'clamp',
+  });
+
+  const scaleLogin = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.95],
+    extrapolate: 'clamp',
+  });
+
+  const scaleRegister = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.95, 1],
+    extrapolate: 'clamp',
+  });
 
   // ====== AÇÕES ======
   const handleLogin = async () => {
@@ -77,7 +110,6 @@ export default function AuthScreen() {
     }
     try {
       await login(emailLogin.trim(), senhaLogin);
-      // não precisa navegar manualmente: o Router troca pro stack autenticado
     } catch (e: any) {
       Toast.show({
         type: 'error',
@@ -171,57 +203,37 @@ export default function AuthScreen() {
       <Animated.View style={[styles.card, { height: cardHeight }]}>
         {/* Tabs */}
         <View style={styles.tabs}>
-          {/* Entrar */}
-          <Animated.View
-            style={{
-              flex: 1,
-              opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.4] }),
-              transform: [
-                { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.95] }) },
-              ],
-            }}
-          >
-            {!isRegister ? (
-              <LinearGradient
-                colors={['#00FFA3', '#7C73FF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.tabActive}
-              >
-                <Text style={styles.tabTextActive}>Entrar</Text>
-              </LinearGradient>
-            ) : (
-              <TouchableOpacity style={styles.tabInactive} onPress={toggleForm}>
-                <Text style={styles.tabTextInactive}>Entrar</Text>
-              </TouchableOpacity>
-            )}
-          </Animated.View>
+          {/* Tab Entrar */}
+          {!isRegister ? (
+            <LinearGradient
+              colors={['#00FFA3', '#7C73FF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.tabActive}
+            >
+              <Text style={styles.tabTextActive}>Entrar</Text>
+            </LinearGradient>
+          ) : (
+            <TouchableOpacity style={styles.tabInactive} onPress={toggleForm} activeOpacity={0.7}>
+              <Text style={styles.tabTextInactive}>Entrar</Text>
+            </TouchableOpacity>
+          )}
 
-          {/* Criar Conta */}
-          <Animated.View
-            style={{
-              flex: 1,
-              opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }),
-              transform: [
-                { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) },
-              ],
-            }}
-          >
-            {isRegister ? (
-              <LinearGradient
-                colors={['#00FFA3', '#7C73FF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.tabActive}
-              >
-                <Text style={styles.tabTextActive}>Criar Conta</Text>
-              </LinearGradient>
-            ) : (
-              <TouchableOpacity style={styles.tabInactive} onPress={toggleForm}>
-                <Text style={styles.tabTextInactive}>Criar Conta</Text>
-              </TouchableOpacity>
-            )}
-          </Animated.View>
+          {/* Tab Criar Conta */}
+          {isRegister ? (
+            <LinearGradient
+              colors={['#00FFA3', '#7C73FF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.tabActive}
+            >
+              <Text style={styles.tabTextActive}>Criar Conta</Text>
+            </LinearGradient>
+          ) : (
+            <TouchableOpacity style={styles.tabInactive} onPress={toggleForm} activeOpacity={0.7}>
+              <Text style={styles.tabTextInactive}>Criar Conta</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Forms */}
@@ -230,50 +242,45 @@ export default function AuthScreen() {
           <Animated.View
             style={[
               styles.form,
-              { transform: [{ translateX: translateXLogin }], opacity: opacityLogin },
+              { 
+                transform: [
+                  { translateX: translateXLogin },
+                  { scale: scaleLogin },
+                ], 
+                opacity: opacityLogin,
+                zIndex: !isRegister ? 10 : 1,
+              },
             ]}
+            pointerEvents={!isRegister ? 'auto' : 'none'}
           >
-            <Text style={styles.label}>
-              E-mail <Text style={styles.required}>*</Text>
-            </Text>
-            <AppInput
-              placeholder="Digite seu e-mail"
-              keyboardType="email-address"
-              style={styles.inputStyle}
-              value={emailLogin}
-              onChangeText={setEmailLogin}
-              autoCapitalize="none"
-            />
-            <Text style={styles.label}>
-              Senha <Text style={styles.required}>*</Text>
-            </Text>
-            <AppInput
-              placeholder="Digite sua senha"
-              secureTextEntry
-              style={styles.inputStyle}
-              value={senhaLogin}
-              onChangeText={setSenhaLogin}
-            />
-            <TouchableOpacity>
-              <Text style={styles.forgotPassword}>Esqueceu a senha?</Text>
-            </TouchableOpacity>
-            <View style={styles.socialContainer}>
-              <TouchableOpacity style={styles.socialButton} disabled>
-                <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.socialBorder}>
-                  <View style={styles.socialInner}>
-                    <Feather name="github" size={28} color="#00FFA3" />
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton} disabled>
-                <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.socialBorder}>
-                  <View style={styles.socialInner}>
-                    <Text style={styles.socialText}>G</Text>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                E-mail <Text style={styles.required}>*</Text>
+              </Text>
+              <AppInput
+                placeholder="Digite seu e-mail"
+                keyboardType="email-address"
+                style={styles.inputStyle}
+                value={emailLogin}
+                onChangeText={setEmailLogin}
+                autoCapitalize="none"
+              />
             </View>
-            <TouchableOpacity onPress={handleLogin} disabled={isLoading}>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Senha <Text style={styles.required}>*</Text>
+              </Text>
+              <AppInput
+                placeholder="Digite sua senha"
+                secureTextEntry
+                style={styles.inputStyle}
+                value={senhaLogin}
+                onChangeText={setSenhaLogin}
+              />
+            </View>
+
+            <TouchableOpacity onPress={handleLogin} disabled={isLoading} style={{ marginTop: 24 }}>
               <LinearGradient colors={['#00FFA3', '#7C73FF']} style={styles.submitButton}>
                 {isLoading ? (
                   <ActivityIndicator color="#000" />
@@ -288,103 +295,130 @@ export default function AuthScreen() {
           <Animated.View
             style={[
               styles.form,
-              { transform: [{ translateX: translateXRegister }], opacity: opacityRegister },
+              { 
+                transform: [
+                  { translateX: translateXRegister },
+                  { scale: scaleRegister },
+                ], 
+                opacity: opacityRegister,
+                zIndex: isRegister ? 10 : 1,
+              },
             ]}
+            pointerEvents={isRegister ? 'auto' : 'none'}
           >
             <View style={{ paddingBottom: 60 }}>
-              <Text style={styles.label}>
-                Nome de Usuário <Text style={styles.required}>*</Text>
-              </Text>
-              <AppInput
-                placeholder="Digite seu nome de usuário"
-                style={styles.inputStyle}
-                value={nome}
-                onChangeText={setNome}
-              />
-              <Text style={styles.label}>
-                CPF <Text style={styles.required}>*</Text>
-              </Text>
-              <AppInput
-                placeholder="Digite seu CPF"
-                keyboardType="numeric"
-                style={styles.inputStyle}
-                value={cpf}
-                onChangeText={setCpf}
-              />
-              <Text style={styles.label}>
-                E-mail <Text style={styles.required}>*</Text>
-              </Text>
-              <AppInput
-                placeholder="Digite seu e-mail"
-                keyboardType="email-address"
-                style={styles.inputStyle}
-                value={emailReg}
-                onChangeText={setEmailReg}
-                autoCapitalize="none"
-              />
-              <Text style={styles.label}>Telefone (opcional)</Text>
-              <AppInput
-                placeholder="Digite seu telefone"
-                keyboardType="phone-pad"
-                style={styles.inputStyle}
-                value={telefone}
-                onChangeText={setTelefone}
-              />
-              <Text style={styles.label}>
-                Senha <Text style={styles.required}>*</Text>
-              </Text>
-              <AppInput
-                placeholder="Crie uma senha"
-                secureTextEntry
-                style={styles.inputStyle}
-                value={senhaReg}
-                onChangeText={setSenhaReg}
-              />
-              <Text style={styles.label}>
-                Confirmar Senha <Text style={styles.required}>*</Text>
-              </Text>
-              <AppInput
-                placeholder="Confirme sua senha"
-                secureTextEntry
-                style={styles.inputStyle}
-                value={confirmSenha}
-                onChangeText={setConfirmSenha}
-              />
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  Nome de Usuário <Text style={styles.required}>*</Text>
+                </Text>
+                <AppInput
+                  placeholder="Digite seu nome de usuário"
+                  style={styles.inputStyle}
+                  value={nome}
+                  onChangeText={setNome}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  CPF <Text style={styles.required}>*</Text>
+                </Text>
+                <AppInput
+                  placeholder="Digite seu CPF"
+                  keyboardType="numeric"
+                  style={styles.inputStyle}
+                  value={cpf}
+                  onChangeText={setCpf}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  E-mail <Text style={styles.required}>*</Text>
+                </Text>
+                <AppInput
+                  placeholder="Digite seu e-mail"
+                  keyboardType="email-address"
+                  style={styles.inputStyle}
+                  value={emailReg}
+                  onChangeText={setEmailReg}
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Telefone (opcional)</Text>
+                <AppInput
+                  placeholder="Digite seu telefone"
+                  keyboardType="phone-pad"
+                  style={styles.inputStyle}
+                  value={telefone}
+                  onChangeText={setTelefone}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  Senha <Text style={styles.required}>*</Text>
+                </Text>
+                <AppInput
+                  placeholder="Crie uma senha"
+                  secureTextEntry
+                  style={styles.inputStyle}
+                  value={senhaReg}
+                  onChangeText={setSenhaReg}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  Confirmar Senha <Text style={styles.required}>*</Text>
+                </Text>
+                <AppInput
+                  placeholder="Confirme sua senha"
+                  secureTextEntry
+                  style={styles.inputStyle}
+                  value={confirmSenha}
+                  onChangeText={setConfirmSenha}
+                />
+              </View>
 
               {/* Tipo de Conta (exclusivo) */}
-              <Text style={[styles.label, { marginTop: 12 }]}>
-                Tipo de conta <Text style={styles.required}>*</Text>
-              </Text>
-              <View style={styles.radioRow}>
-                <TouchableOpacity
-                  style={styles.radioItem}
-                  onPress={() => setTipoUsuario('ALUNO')}
-                  activeOpacity={0.8}
-                >
-                  <Feather
-                    name={tipoUsuario === 'ALUNO' ? 'check-square' : 'square'}
-                    size={20}
-                    color={tipoUsuario === 'ALUNO' ? '#00FFA3' : '#888'}
-                  />
-                  <Text style={styles.radioText}>Aluno</Text>
-                </TouchableOpacity>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  Tipo de conta <Text style={styles.required}>*</Text>
+                </Text>
+                <View style={styles.radioRow}>
+                  <TouchableOpacity
+                    style={styles.radioItem}
+                    onPress={() => setTipoUsuario('ALUNO')}
+                    activeOpacity={0.8}
+                  >
+                    <Feather
+                      name={tipoUsuario === 'ALUNO' ? 'check-square' : 'square'}
+                      size={20}
+                      color={tipoUsuario === 'ALUNO' ? '#00FFA3' : '#888'}
+                    />
+                    <Text style={styles.radioText}>Aluno</Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.radioItem}
-                  onPress={() => setTipoUsuario('INSTRUTOR')}
-                  activeOpacity={0.8}
-                >
-                  <Feather
-                    name={tipoUsuario === 'INSTRUTOR' ? 'check-square' : 'square'}
-                    size={20}
-                    color={tipoUsuario === 'INSTRUTOR' ? '#00FFA3' : '#888'}
-                  />
-                  <Text style={styles.radioText}>Instrutor</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.radioItem}
+                    onPress={() => setTipoUsuario('INSTRUTOR')}
+                    activeOpacity={0.8}
+                  >
+                    <Feather
+                      name={tipoUsuario === 'INSTRUTOR' ? 'check-square' : 'square'}
+                      size={20}
+                      color={tipoUsuario === 'INSTRUTOR' ? '#00FFA3' : '#888'}
+                    />
+                    <Text style={styles.radioText}>Instrutor</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <TouchableOpacity
-                style={{ marginTop: 10 }}
+                style={{ marginTop: 20 }}
                 onPress={handleRegister}
                 disabled={isLoading}
               >
@@ -396,6 +430,7 @@ export default function AuthScreen() {
                   )}
                 </LinearGradient>
               </TouchableOpacity>
+
               <View style={styles.backToLogin}>
                 <Text style={styles.backText}>Já tem uma conta?</Text>
                 <TouchableOpacity onPress={toggleForm}>
@@ -417,81 +452,101 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingVertical: 40,
   },
-  header: { alignItems: 'center', marginBottom: 30 },
+  header: { alignItems: 'center', marginBottom: 32 },
   card: {
     backgroundColor: '#1A1A1A',
     borderRadius: 16,
-    padding: 20,
+    padding: 24,
     width: '100%',
-    overflow: 'hidden',
+    maxWidth: 500,
   },
   tabs: {
     flexDirection: 'row',
     backgroundColor: '#111',
     borderRadius: 24,
-    marginBottom: 20,
-    padding: 4,
+    marginBottom: 28,
+    padding: 6,
+    gap: 8,
   },
   tabInactive: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 24,
-    paddingVertical: 10,
+    borderRadius: 20,
+    paddingVertical: 14,
+    backgroundColor: 'transparent',
   },
   tabActive: {
     flex: 1,
-    borderRadius: 24,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 14,
   },
-  tabTextInactive: { color: '#ccc', fontWeight: '500' },
-  tabTextActive: { color: '#fff', fontWeight: '600' },
+  tabTextInactive: {
+    color: '#BDBDCC',
+    fontWeight: '600',
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  tabTextActive: {
+    color: '#0E0E0E',
+    fontWeight: '800',
+    fontSize: 15,
+    textAlign: 'center',
+  },
 
-  formWrapper: { width: '100%', minHeight: 460 },
-  form: { position: 'absolute', width: '100%', top: 0 },
-  label: { color: '#fff', fontSize: 14, marginBottom: 0, marginTop: 10 },
-  inputStyle: { height: 50, marginTop: 10 },
-  required: { color: '#FF6B6B' },
-  forgotPassword: {
-    color: '#00FFA3',
-    fontSize: 13,
+  formWrapper: { width: '100%', minHeight: 300 },
+  form: { 
+    position: 'absolute', 
+    width: '100%', 
+    top: 0,
+  },
+
+  inputGroup: {
     marginBottom: 20,
-    textAlign: 'right',
+  },
+  label: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 10,
+    letterSpacing: 0.5,
+  },
+  inputStyle: {
+    height: 50,
+  },
+  required: { color: '#FF6B6B' },
+
+  submitButton: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  submitText: { color: '#0E0E0E', fontWeight: '800', fontSize: 16 },
+
+  backToLogin: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
+  backText: { color: '#BDBDCC', fontSize: 14 },
+  backLink: { color: '#00FFA3', fontSize: 14, fontWeight: '700' },
+
+  radioRow: {
+    flexDirection: 'row',
+    gap: 12,
     marginTop: 10,
   },
-  socialContainer: { flexDirection: 'row', justifyContent: 'center', marginBottom: 20, gap: 20 },
-  socialButton: { borderRadius: 12, overflow: 'hidden' },
-  socialBorder: { borderRadius: 12, padding: 2 },
-  socialInner: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    width: 60,
-    height: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  socialText: { color: '#00FFA3', fontSize: 28, fontWeight: 'bold' },
-  submitButton: { borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 10 },
-  submitText: { color: '#000', fontWeight: '700', fontSize: 16 },
-  backToLogin: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
-  backText: { color: '#ccc', fontSize: 14 },
-  backLink: { color: '#00FFA3', fontSize: 14, fontWeight: '600' },
-
-  radioRow: { flexDirection: 'row', gap: 14, marginTop: 8 },
   radioItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     backgroundColor: '#15151A',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#2A2A33',
+    flex: 1,
   },
-  radioText: { color: '#EDEDF5', fontWeight: '700' },
+  radioText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
 });

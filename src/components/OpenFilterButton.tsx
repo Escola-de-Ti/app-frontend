@@ -66,7 +66,7 @@ export function OpenFilterButton() {
 
       {isMenuOpen && (
         <View style={[styles.dropdown, { top: buttonHeight + filterHeight + 10 }]}>
-          {['Mais votados', 'Mais recentes', 'Mais comentados'].map((filter) => (
+          {['Mais votados', 'Mais recentes'].map((filter) => (
             <TouchableOpacity
               key={filter}
               style={[styles.option, selectedFilter === filter && styles.optionSelected]}
