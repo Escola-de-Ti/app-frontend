@@ -15,15 +15,51 @@ function extractErrorMessage(err: any): string {
 
 /**
  * Converte uma URI local/remota em bytes (ArrayBuffer) para envio em octet-stream.
- * Funciona com `file://`, `content://` e URLs http(s).
+ * Funciona em web e React Native:
+ * - tenta usar blob.arrayBuffer()
+ * - se não existir, faz fallback usando FileReader via globalThis (any)
  */
 async function uriToBytes(uri: string): Promise<ArrayBuffer> {
   const res = await fetch(uri);
   if (!res.ok) {
     throw new Error('Não foi possível ler o arquivo de imagem.');
   }
-  const blob = await res.blob();
-  return await blob.arrayBuffer();
+
+  const blob: any = await res.blob();
+
+  // Navegador moderno / alguns ambientes: blob.arrayBuffer já existe
+  if (typeof blob.arrayBuffer === 'function') {
+    return await blob.arrayBuffer();
+  }
+
+  // Fallback pra React Native / ambientes sem blob.arrayBuffer
+  return await new Promise<ArrayBuffer>((resolve, reject) => {
+    try {
+      const FileReaderCtor = (globalThis as any).FileReader;
+      if (typeof FileReaderCtor !== 'function') {
+        reject(new Error('Leitura de arquivo não suportada neste ambiente.'));
+        return;
+      }
+
+      const reader = new FileReaderCtor();
+      reader.onloadend = () => {
+        const result = reader.result;
+        if (result instanceof ArrayBuffer) {
+          resolve(result);
+        } else if (result && (result as any).buffer instanceof ArrayBuffer) {
+          resolve((result as any).buffer);
+        } else {
+          reject(new Error('Falha ao ler o arquivo de imagem.'));
+        }
+      };
+      reader.onerror = () => {
+        reject(new Error('Falha ao ler o arquivo de imagem.'));
+      };
+      reader.readAsArrayBuffer(blob);
+    } catch (e) {
+      reject(new Error('Leitura de arquivo não suportada neste ambiente.'));
+    }
+  });
 }
 
 // ================== PERFIL ==================
@@ -60,11 +96,7 @@ export async function updateMyProfile(payload: UpdateUserRequest): Promise<MyPro
 
 /**
  * Faz upload de uma nova imagem de perfil para um usuário.
- * Backend costuma associar pelo `type` + `id_type`.
- *
- * Exemplo de params esperados no back:
- *   type = 'USUARIO' (ou 'USER' / 'PERFIL' — ajuste se for outro nome)
- *   id_type = ID do usuário
+ * Backend espera bytes (application/octet-stream) + params `type` e `id_type`.
  */
 export async function uploadUserAvatar(userId: number, uri: string): Promise<Imagem> {
   try {
@@ -75,7 +107,7 @@ export async function uploadUserAvatar(userId: number, uri: string): Promise<Ima
         'Content-Type': 'application/octet-stream',
       },
       params: {
-        type: 'USUARIO', // 🔴 ajuste aqui se o back usar outro valor
+        type: 'USUARIO', // ajuste se o back usar outro valor
         id_type: String(userId),
       },
     });
@@ -89,7 +121,7 @@ export async function uploadUserAvatar(userId: number, uri: string): Promise<Ima
 
 /**
  * Atualiza uma imagem de perfil existente (sobrescreve o arquivo).
- * Usa o mesmo endpoint de update usado pra posts: /api/imagem/update/{id}
+ * Usa o mesmo padrão octet-stream do back: PUT /api/imagem/update/{id}
  */
 export async function updateUserAvatar(imagemId: number, uri: string): Promise<Imagem> {
   try {
@@ -109,9 +141,7 @@ export async function updateUserAvatar(imagemId: number, uri: string): Promise<I
 }
 
 /**
- * Remove uma imagem de perfil pelo ID (seu back provavelmente já faz:
- * - deletar o registro da imagem
- * - e remover referência do usuário, se houver regra pra isso)
+ * Remove uma imagem de perfil pelo ID.
  */
 export async function deleteUserAvatar(imagemId: number): Promise<void> {
   try {
