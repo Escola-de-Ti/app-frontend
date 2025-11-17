@@ -17,9 +17,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AppLayout, { HEADER_OFFSET, FOOTER_OFFSET } from '../components/AppLayout';
 import AppInput from '../components/AppInput';
 import ImageUploader from '../components/ImageUploader';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import Toast from 'react-native-toast-message';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 
 import type { Workshop } from '../types';
 import { toUtcNoMillis, toIsoWithMillis } from '../types';
@@ -61,11 +61,13 @@ export default function CreateWorkshopScreen() {
 
   const [startAt, setStartAt] = useState<Date>(new Date());
   const [endAt, setEndAt] = useState<Date>(new Date(Date.now() + 2 * 60 * 60 * 1000));
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
 
   const [startAtText, setStartAtText] = useState('');
   const [endAtText, setEndAtText] = useState('');
+
+  // controle do modal de data/hora (iOS / Android)
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerTarget, setPickerTarget] = useState<'start' | 'end' | null>(null);
 
   const [loading, setLoading] = useState(false);
 
@@ -113,8 +115,10 @@ export default function CreateWorkshopScreen() {
         const desc = (w as any)?.descricao?.descricao ?? (w as any)?.descricao ?? '';
         setDescription(desc);
 
-        const start = w.dataInicio ?? new Date();
-        const end = (w as any).dataTermino ?? new Date(Date.now() + 2 * 60 * 60 * 1000);
+        const start = (w as any).dataInicio ? new Date((w as any).dataInicio) : new Date();
+        const end = (w as any).dataTermino
+          ? new Date((w as any).dataTermino)
+          : new Date(Date.now() + 2 * 60 * 60 * 1000);
         setStartAt(start);
         setEndAt(end);
 
@@ -331,6 +335,27 @@ export default function CreateWorkshopScreen() {
     setEndAt(new Date(Date.now() + 2 * 60 * 60 * 1000));
   }, []);
 
+  // helpers do picker (mobile)
+  const openPicker = (target: 'start' | 'end') => {
+    if (IS_WEB) return;
+    setPickerTarget(target);
+    setPickerVisible(true);
+  };
+
+  const closePicker = () => {
+    setPickerVisible(false);
+    setPickerTarget(null);
+  };
+
+  const handleConfirmPicker = (date: Date) => {
+    if (pickerTarget === 'start') {
+      setStartAt(date);
+    } else if (pickerTarget === 'end') {
+      setEndAt(date);
+    }
+    closePicker();
+  };
+
   return (
     <AppLayout
       wrapWithScroll={false}
@@ -421,21 +446,9 @@ export default function CreateWorkshopScreen() {
                     autoCapitalize="none"
                   />
                 ) : (
-                  <>
-                    <TouchableOpacity style={styles.dtBtn} onPress={() => setShowStartPicker(true)}>
-                      <Text style={styles.dtBtnText}>{formatDateTime(startAt)}</Text>
-                    </TouchableOpacity>
-                    {showStartPicker && !IS_WEB && (
-                      <DateTimePicker
-                        value={startAt}
-                        mode="datetime"
-                        onChange={(_, date) => {
-                          setShowStartPicker(false);
-                          if (date) setStartAt(date);
-                        }}
-                      />
-                    )}
-                  </>
+                  <TouchableOpacity style={styles.dtBtn} onPress={() => openPicker('start')}>
+                    <Text style={styles.dtBtnText}>{formatDateTime(startAt)}</Text>
+                  </TouchableOpacity>
                 )}
               </View>
 
@@ -456,21 +469,9 @@ export default function CreateWorkshopScreen() {
                     autoCapitalize="none"
                   />
                 ) : (
-                  <>
-                    <TouchableOpacity style={styles.dtBtn} onPress={() => setShowEndPicker(true)}>
-                      <Text style={styles.dtBtnText}>{formatDateTime(endAt)}</Text>
-                    </TouchableOpacity>
-                    {showEndPicker && !IS_WEB && (
-                      <DateTimePicker
-                        value={endAt}
-                        mode="datetime"
-                        onChange={(_, date) => {
-                          setShowEndPicker(false);
-                          if (date) setEndAt(date);
-                        }}
-                      />
-                    )}
-                  </>
+                  <TouchableOpacity style={styles.dtBtn} onPress={() => openPicker('end')}>
+                    <Text style={styles.dtBtnText}>{formatDateTime(endAt)}</Text>
+                  </TouchableOpacity>
                 )}
               </View>
             </View>
@@ -558,6 +559,24 @@ export default function CreateWorkshopScreen() {
             </View>
           </LinearGradient>
         </ScrollView>
+
+        {/* Modal nativo de data/hora (iOS / Android) */}
+        {!IS_WEB && (
+          <DateTimePickerModal
+            isVisible={pickerVisible}
+            mode="datetime"
+            date={pickerTarget === 'end' ? endAt : startAt}
+            locale="pt-BR"
+            // cores / tema
+            themeVariant="dark"
+            textColor="#FFFFFF"
+            buttonTextColorIOS="#00FFA3"
+            pickerStyleIOS={{ backgroundColor: '#111111' }}
+            backdropStyleIOS={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
+            onConfirm={handleConfirmPicker}
+            onCancel={closePicker}
+          />
+        )}
       </KeyboardAvoidingView>
     </AppLayout>
   );

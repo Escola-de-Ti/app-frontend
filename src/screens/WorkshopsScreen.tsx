@@ -385,23 +385,21 @@ export default function WorkshopsScreen() {
           <View style={styles.headerRow}>
             <ModeDropdown value={mode} onChange={setMode} />
 
-            {canShowCreateButton && (
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={goCreateWorkshop}
-                style={styles.createBtnWrapper}
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={goCreateWorkshop}
+              style={styles.createBtnWrapper}
+            >
+              <LinearGradient
+                colors={['#00FFA3', '#7C73FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.createBtn}
               >
-                <LinearGradient
-                  colors={['#00FFA3', '#7C73FF']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.createBtn}
-                >
-                  <Feather name="plus-circle" size={16} color="#0B0B0E" />
-                  <Text style={styles.createBtnText}>Criar workshop</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
+                <Feather name="plus-circle" size={16} color="#0B0B0E" />
+                <Text style={styles.createBtnText}>Criar workshop</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
 
