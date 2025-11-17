@@ -5,12 +5,11 @@ import { Feather } from '@expo/vector-icons';
 import RNModal from 'react-native-modal';
 import { useNavigation } from '@react-navigation/native';
 
-import { PostDetails } from './PostDetails';
+import PostDetails from './PostDetails';
 
 import type { PostFeedModel } from '../../types';
 import type { UpvoteResponse } from '../../services/posts';
 import { OwnContentVoteError } from '../../services/posts';
-// REMOVIDO: import { getUserDetails } from '../../services/profile';
 
 type PostCardProps = {
   post: PostFeedModel;
@@ -89,13 +88,32 @@ export function PostCard({
   // ==== AVATAR DO AUTOR (APENAS O QUE JÁ VEM NO POST) ========
   const authorAvatarUrl = useMemo(() => {
     const anyPost: any = post;
-    return anyPost.urlImagemPerfil ?? anyPost.avatarUrl ?? anyPost.imagemUrl ?? null;
+    return anyPost.urlImagem ?? null;
   }, [post]);
 
   const authorInitial = useMemo(
     () => (post.nomeUsuario || '?').charAt(0).toUpperCase(),
     [post.nomeUsuario]
   );
+
+  // ==== IMAGEM PRINCIPAL DO POST (usa exatamente o formato do feed) ====
+  const postMainImageUrl = useMemo(() => {
+    const anyPost: any = post;
+
+    // 1) formato do feed: imagens: [{ urlImagem }]
+    if (Array.isArray(anyPost.imagens) && anyPost.imagens.length > 0) {
+      const first = anyPost.imagens[0];
+      return first?.urlImagem ?? first?.url ?? null;
+    }
+
+    // 2) fallback se vier como urlsImagens (detalhes)
+    if (Array.isArray(anyPost.urlsImagens) && anyPost.urlsImagens.length > 0) {
+      const first = anyPost.urlsImagens[0];
+      return first?.urlImagem ?? first?.url ?? null;
+    }
+
+    return null;
+  }, [post]);
 
   const handleUpvote = async () => {
     if (votingRef.current) return; // trava enquanto a chamada anterior não termina
@@ -197,6 +215,17 @@ export function PostCard({
           <View style={styles.body}>
             <Text style={styles.title}>{post.titulo}</Text>
             {!!post.descricao && <Text style={styles.description}>{post.descricao}</Text>}
+
+            {/* IMAGEM PRINCIPAL DO POST (se existir) */}
+            {postMainImageUrl && (
+              <View style={styles.postImageWrapper}>
+                <Image
+                  source={{ uri: postMainImageUrl }}
+                  style={styles.postImage}
+                  resizeMode="cover"
+                />
+              </View>
+            )}
           </View>
 
           <View style={styles.footer}>
@@ -302,6 +331,20 @@ const styles = StyleSheet.create({
   body: { marginTop: 14 },
   title: { color: '#fff', fontWeight: '700', fontSize: 16, marginBottom: 6 },
   description: { color: '#ccc', fontSize: 14, lineHeight: 20 },
+
+  // imagem do post
+  postImageWrapper: {
+    marginTop: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  postImage: {
+    width: '100%',
+    height: 200,
+  },
+
   footer: {
     marginTop: 16,
     flexDirection: 'row',

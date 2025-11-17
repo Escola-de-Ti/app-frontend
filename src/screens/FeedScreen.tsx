@@ -130,10 +130,8 @@ function Toast({
 
   if (!visible) return null;
 
-  const iconName =
-    type === 'error' ? 'alert-circle' : type === 'success' ? 'check-circle' : 'info';
-  const bgColor =
-    type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : '#339af0';
+  const iconName = type === 'error' ? 'alert-circle' : type === 'success' ? 'check-circle' : 'info';
+  const bgColor = type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : '#339af0';
 
   return (
     <Animated.View
@@ -259,37 +257,69 @@ export default function FeedScreen() {
   }, []);
 
   const mapPost = useCallback((p: PostFeedDTO): PostFeedModel => {
-    const idNum = Number((p as any).id);
-    const usuarioIdNum = Number((p as any).usuarioId);
+    const anyP: any = p;
+
+    const idNum = Number(anyP.id);
+    const usuarioIdNum = Number(anyP.usuarioId);
     const totalComentarios = toNum(
-      (p as any).totalComentarios ?? (p as any).comentariosCount ?? (p as any).comments ?? 0
+      anyP.totalComentarios ?? anyP.comentariosCount ?? anyP.comments ?? 0
     );
 
-    const voted =
-      (p as any).jaVotou ??
-      (p as any).votado ??
-      (p as any).usuarioJaVotou ??
-      (p as any).userVoted ??
-      false;
+    const voted = anyP.jaVotou ?? anyP.votado ?? anyP.usuarioJaVotou ?? anyP.userVoted ?? false;
+
+    // 🔴 aqui pegamos a URL da foto de perfil do usuário vinda do back
+    const avatarFromApi =
+      anyP.urlImagemPerfilUsuario ??
+      anyP.urlImagemPerfil ??
+      anyP.avatarUrl ??
+      anyP.imagemUrl ??
+      null;
+
+    // se o feed também trouxer imagens do post (imagens[]), já normalizamos
+    const imagens =
+      Array.isArray(anyP.imagens) && anyP.imagens.length
+        ? anyP.imagens
+            .map((img: any) => ({
+              id: Number(img.id ?? img.imagemId),
+              imagemId:
+                img.imagemId != null && !Number.isNaN(Number(img.imagemId))
+                  ? Number(img.imagemId)
+                  : undefined,
+              urlImagem: img.urlImagem ?? img.url ?? '',
+              ordemImagem:
+                img.ordemImagem != null && !Number.isNaN(Number(img.ordemImagem))
+                  ? Number(img.ordemImagem)
+                  : 0,
+            }))
+            .filter((img: { urlImagem: any }) => !!img.urlImagem)
+        : [];
 
     return {
-      id: Number.isFinite(idNum) ? idNum : ((p as any).id as any),
-      usuarioId: Number.isFinite(usuarioIdNum) ? usuarioIdNum : ((p as any).usuarioId as any),
-      nomeUsuario: (p as any).nomeUsuario,
-      titulo: (p as any).titulo,
-      descricao: (p as any).descricao ?? '',
-      totalUpVotes: toNum((p as any).totalUpVotes ?? 0),
+      id: Number.isFinite(idNum) ? idNum : (anyP.id as any),
+      usuarioId: Number.isFinite(usuarioIdNum) ? usuarioIdNum : (anyP.usuarioId as any),
+      nomeUsuario: anyP.nomeUsuario,
+      titulo: anyP.titulo,
+      descricao: anyP.descricao ?? '',
+      totalUpVotes: toNum(anyP.totalUpVotes ?? 0),
       totalComentarios,
       usuarioJaVotou: toBool(voted),
       tags:
-        (p as any).tags?.map((t: any) => ({
+        anyP.tags?.map((t: any) => ({
           id: typeof t.id === 'string' ? t.id : Number(t.id),
           nome: t.nome ?? t.name ?? '',
         })) ?? [],
-      dataCriacao: String((p as any).dataCriacao),
-      relevanceScore: (p as any).relevanceScore ?? undefined,
-      tagsEmComum: (p as any).tagsEmComum ?? undefined,
-    };
+      dataCriacao: String(anyP.dataCriacao),
+      relevanceScore: anyP.relevanceScore ?? undefined,
+      tagsEmComum: anyP.tagsEmComum ?? undefined,
+
+      // campos pra avatar do usuário — PostCard pode usar qualquer um deles
+      // imagemUrl: avatarFromApi,
+      urlImagem: avatarFromApi,
+      // avatarUrl: avatarFromApi,
+
+      // se quiser usar as imagens do post no card
+      imagens,
+    } as PostFeedModel;
   }, []);
 
   // ===== load =====
@@ -345,7 +375,8 @@ export default function FeedScreen() {
 
         setError(null);
       } catch (e: any) {
-        const errorMsg = e?.response?.data?.message || e?.message || 'Não foi possível carregar o feed';
+        const errorMsg =
+          e?.response?.data?.message || e?.message || 'Não foi possível carregar o feed';
         console.log('[FEED] erro ao carregar:', errorMsg);
         if (isReset) {
           setError(errorMsg);
@@ -492,7 +523,8 @@ export default function FeedScreen() {
 
         return resp;
       } catch (e: any) {
-        const errorMsg = e?.response?.data?.message || e?.message || 'Não foi possível votar no post';
+        const errorMsg =
+          e?.response?.data?.message || e?.message || 'Não foi possível votar no post';
         showToast(errorMsg, 'error');
         console.log('[FEED] falha ao votar no post', postId, e);
       }
@@ -504,8 +536,7 @@ export default function FeedScreen() {
 
   const ItemSeparator = useCallback(() => <View style={{ height: 14 }} />, []);
 
-  const sortedData = useMemo(() => {    
-
+  const sortedData = useMemo(() => {
     const copy = [...data];
     return copy.sort((a, b) => (b.totalComentarios ?? 0) - (a.totalComentarios ?? 0));
   }, [data, orderFilter]);
@@ -576,11 +607,7 @@ export default function FeedScreen() {
   // Loading inicial
   if (loading && !refreshing) {
     return (
-      <AppLayout
-        initialActivePage="Feed"
-        backgroundColor="rgb(17, 17, 17)"
-        wrapWithScroll={false}
-      >
+      <AppLayout initialActivePage="Feed" backgroundColor="rgb(17, 17, 17)" wrapWithScroll={false}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#7C73FF" />
           <Text style={styles.loadingText}>Carregando feed…</Text>
@@ -592,11 +619,7 @@ export default function FeedScreen() {
   // Error state
   if (error && !data.length) {
     return (
-      <AppLayout
-        initialActivePage="Feed"
-        backgroundColor="rgb(17, 17, 17)"
-        wrapWithScroll={false}
-      >
+      <AppLayout initialActivePage="Feed" backgroundColor="rgb(17, 17, 17)" wrapWithScroll={false}>
         <View style={styles.errorContainer}>
           <Feather name="alert-circle" size={48} color="#ff9aa2" />
           <Text style={styles.errorText}>{error}</Text>

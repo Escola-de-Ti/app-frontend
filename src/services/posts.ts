@@ -155,6 +155,53 @@ function extractErrorMessage(err: any): string {
   return err?.message || 'Falha na requisição.';
 }
 
+/**
+ * Converte uma URI local/remota em bytes (ArrayBuffer) para envio em octet-stream.
+ * Versão compatível com web + React Native:
+ * - tenta blob.arrayBuffer()
+ * - se não tiver, cai pro FileReader via globalThis
+ */
+async function uriToBytes(uri: string): Promise<ArrayBuffer> {
+  const res = await fetch(uri);
+  if (!res.ok) {
+    throw new Error(`Falha ao ler imagem local (status ${res.status})`);
+  }
+
+  const blob: any = await res.blob();
+
+  if (blob && typeof blob.arrayBuffer === 'function') {
+    return await blob.arrayBuffer();
+  }
+
+  return await new Promise<ArrayBuffer>((resolve, reject) => {
+    try {
+      const FileReaderCtor = (globalThis as any).FileReader;
+      if (typeof FileReaderCtor !== 'function') {
+        reject(new Error('Leitura de arquivo não suportada neste ambiente.'));
+        return;
+      }
+
+      const reader = new FileReaderCtor();
+      reader.onloadend = () => {
+        const result = reader.result;
+        if (result instanceof ArrayBuffer) {
+          resolve(result);
+        } else if (result && (result as any).buffer instanceof ArrayBuffer) {
+          resolve((result as any).buffer);
+        } else {
+          reject(new Error('Falha ao ler o arquivo de imagem.'));
+        }
+      };
+      reader.onerror = () => {
+        reject(new Error('Falha ao ler o arquivo de imagem.'));
+      };
+      reader.readAsArrayBuffer(blob);
+    } catch (e) {
+      reject(new Error('Leitura de arquivo não suportada neste ambiente.'));
+    }
+  });
+}
+
 export class OwnContentVoteError extends Error {
   constructor(message: string) {
     super(message);
@@ -174,18 +221,15 @@ export async function createPost(payload: CreatePostPayload) {
   }
 }
 
-/** PUT /api/posts/{id} - atualização de post */
+/** PUT/PATCH /api/posts/{id} - atualização de post */
 export async function updatePost(postId: number, payload: UpdatePostPayload) {
   try {
     const body = buildUpdateBody(postId, payload);
-    // console.log('[POST][UPDATE][REQ]', { postId, body });
 
     const { data } = await api.patch<PostDetalhesDTO>(`${POSTS_ENDPOINT}/${postId}`, body);
 
-    // console.log('[POST][UPDATE][OK]', { postId, data });
     return data;
   } catch (err: any) {
-    // console.log('[POST][UPDATE][ERR]', err?.response?.status, err?.response?.data);
     throw new Error(extractErrorMessage(err));
   }
 }
@@ -212,23 +256,20 @@ export async function getFeed(params: FeedParams = {}): Promise<GetFeedResponseD
   const seq = ++FEED_SEQ;
   const finalParams = { pageSize: 20, ...params };
 
-  // console.log('[FEED][API][REQ]', { seq, finalParams });
-
   const { data } = await api.get<GetFeedResponseDTO>('/api/posts/feed', { params: finalParams });
 
-  const count = Array.isArray((data as any)?.posts) ? (data as any).posts.length : 0;
-  // console.log('[FEED][API][RESP]', {
-  //   seq,
-  //   count,
-  //   lastPostId: (data as any)?.lastPostId,
-  //   lastScore: (data as any)?.lastScore,
-  // });
+  const raw: any = data;
 
+  const posts = Array.isArray(raw?.posts) ? raw.posts : [];
+
+  // aqui não mexo na estrutura dos posts, só garanto array
+  // se o back já está mandando `imagens: [{ id, imagemId, urlImagem, ordemImagem }]`
+  // o front pega direto de `post.imagens`
   return {
-    posts: Array.isArray((data as any)?.posts) ? (data as any).posts : [],
-    hasMore: Boolean((data as any)?.hasMore),
-    lastPostId: (data as any)?.lastPostId ?? null,
-    lastScore: (data as any)?.lastScore ?? null,
+    posts,
+    hasMore: Boolean(raw?.hasMore),
+    lastPostId: raw?.lastPostId ?? null,
+    lastScore: raw?.lastScore ?? null,
   };
 }
 
@@ -316,7 +357,6 @@ export async function createComment(args: {
     });
     return data;
   } catch (err: any) {
-    // console.log('[createComment][ERR]', err?.response?.status, err?.response?.data);
     throw new Error(extractErrorMessage(err));
   }
 }
@@ -337,7 +377,6 @@ export async function getCommentReplies(
     if (Array.isArray((data as any)?.items)) return (data as any).items as ComentarioDTO[];
     return [];
   } catch (err: any) {
-    // console.log('[getCommentReplies][ERR]', err?.response?.status, err?.response?.data);
     throw new Error(extractErrorMessage(err));
   }
 }
@@ -419,14 +458,7 @@ export async function superVoteComment(comentarioId: number) {
   }
 }
 
-async function uriToBytes(uri: string): Promise<ArrayBuffer> {
-  const res = await fetch(uri);
-  if (!res.ok) {
-    throw new Error(`Falha ao ler imagem local (status ${res.status})`);
-  }
-  return res.arrayBuffer();
-}
-
+/** POST images de post: /api/imagem/upload?type=POST&id_type={postId} */
 export async function uploadPostImages(postId: number, imageUris: string[]): Promise<Imagem[]> {
   const validUris = Array.from(
     new Set((imageUris || []).filter((u) => typeof u === 'string' && u.trim().length > 0))
@@ -452,7 +484,6 @@ export async function uploadPostImages(postId: number, imageUris: string[]): Pro
 
       uploaded.push(data);
     } catch (err: any) {
-      // console.log('[uploadPostImages][ERR]', { uri, errMessage: err?.message });
       throw new Error(extractErrorMessage(err));
     }
   }
@@ -460,6 +491,7 @@ export async function uploadPostImages(postId: number, imageUris: string[]): Pro
   return uploaded;
 }
 
+/** PUT imagem de post: /api/imagem/update/{id} */
 export async function updatePostImage(imagemId: number, uri: string): Promise<Imagem> {
   try {
     const bytes = await uriToBytes(uri);
@@ -472,7 +504,6 @@ export async function updatePostImage(imagemId: number, uri: string): Promise<Im
 
     return data;
   } catch (err: any) {
-    // console.log('[updatePostImage][ERR]', { imagemId, errMessage: err?.message });
     throw new Error(extractErrorMessage(err));
   }
 }
@@ -482,7 +513,6 @@ export async function deletePostImage(imagemId: number): Promise<void> {
   try {
     await api.delete(`${IMAGEM_ENDPOINT}/delete/${imagemId}`);
   } catch (err: any) {
-    // console.log('[deletePostImage][ERR]', { imagemId, errMessage: err?.message });
     throw new Error(extractErrorMessage(err));
   }
 }
