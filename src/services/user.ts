@@ -17,3 +17,26 @@ export async function getUsuarioIdByEmail(email: string): Promise<number | null>
   const u = usuarios.find((x) => x.email?.toLowerCase() === email.toLowerCase());
   return u?.id ?? null;
 }
+
+export interface RankingUsuarioDTO {
+  id: number;
+  posicao: number;
+  nome: string;
+  qntdXp: number;
+  nivel: number;
+}
+
+// GET /api/usuarios/buscar?nome=...
+export async function buscarUsuariosPorNome(nome: string): Promise<RankingUsuarioDTO[]> {
+  const query = (nome || '').trim();
+
+  if (!query) {
+    return [];
+  }
+
+  const { data } = await api.get<RankingUsuarioDTO[]>('/api/usuarios/buscar', {
+    params: { nome: query },
+  });
+
+  return Array.isArray(data) ? data : [];
+}

@@ -267,7 +267,7 @@ export default function FeedScreen() {
 
     const voted = anyP.jaVotou ?? anyP.votado ?? anyP.usuarioJaVotou ?? anyP.userVoted ?? false;
 
-    // 🔴 aqui pegamos a URL da foto de perfil do usuário vinda do back
+    // URL da foto de perfil do usuário vinda do back
     const avatarFromApi =
       anyP.urlImagemPerfilUsuario ??
       anyP.urlImagemPerfil ??
@@ -275,7 +275,7 @@ export default function FeedScreen() {
       anyP.imagemUrl ??
       null;
 
-    // se o feed também trouxer imagens do post (imagens[]), já normalizamos
+    // imagens do post (imagens[])
     const imagens =
       Array.isArray(anyP.imagens) && anyP.imagens.length
         ? anyP.imagens
@@ -312,12 +312,12 @@ export default function FeedScreen() {
       relevanceScore: anyP.relevanceScore ?? undefined,
       tagsEmComum: anyP.tagsEmComum ?? undefined,
 
-      // campos pra avatar do usuário — PostCard pode usar qualquer um deles
-      // imagemUrl: avatarFromApi,
-      urlImagem: avatarFromApi,
-      // avatarUrl: avatarFromApi,
+      // campos pra avatar do usuário — PostCard lê urlImagemPerfil / avatarUrl / imagemUrl
+      imagemUrl: avatarFromApi,
+      urlImagemPerfil: avatarFromApi,
+      avatarUrl: avatarFromApi,
 
-      // se quiser usar as imagens do post no card
+      // imagens do post
       imagens,
     } as PostFeedModel;
   }, []);
@@ -590,7 +590,7 @@ export default function FeedScreen() {
                   setSearching(false);
                 }
               }}
-              placeholder="Buscar posts e usuários…"
+              placeholder="Buscar usuários…"
             />
           </View>
 
